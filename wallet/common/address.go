@@ -22,10 +22,10 @@ Callers MUST ensure:
 */
 func UnsafeGetAddress(pk []byte, desc descriptor.Descriptor) [AddressSize]byte {
 	// noinspection GoBoolExpressions
-	if AddressSize > 32 {
+	if AddressSize > 64 {
 		//coverage:ignore
-		//rationale: compile-time assertion, AddressSize is a constant (20) which is <= 32
-		panic("AddressSize must be <= 32")
+		//rationale: compile-time assertion, AddressSize is a constant (48) which is <= 64
+		panic("AddressSize must be <= 64")
 	}
 
 	sh := sha3.NewShake256()
