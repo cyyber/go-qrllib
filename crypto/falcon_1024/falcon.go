@@ -187,7 +187,7 @@ func signFinish(priv PrivateKey, hashData sha3.ShakeHash, nonce []byte) (PaddedS
 		return PaddedSignature{}, err
 	}
 
-	sigp, err := sign(f, g, ntruF, ntruG, hm)
+	sigp, err := signDyn(f, g, ntruF, ntruG, hm)
 	if err != nil {
 		return PaddedSignature{}, err
 	}
