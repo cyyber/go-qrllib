@@ -1,10 +1,11 @@
 package falcon
 
 const (
-	fprBnormMax fpr = 16822.4121
-	fprP2       fpr = 0.001953125
-	fprQ        fpr = 12289
-	fprZero     fpr = 0
+	fprBnormMax   fpr = 16822.4121
+	fprP2         fpr = 0.001953125
+	fprQ          fpr = 12289
+	fprZero       fpr = 0
+	fprInverseOfQ fpr = 1.0 / fpr(modulusQ)
 )
 
 var fprGmTab = [...]fpr{
@@ -533,3 +534,8 @@ func fprSqr(x fpr) fpr    { return x * x }
 func fprInv(x fpr) fpr    { return 1 / x }
 func fprLt(x, y fpr) bool { return x < y }
 func fprOf(i int32) fpr   { return fpr(i) }
+
+func fprRint(x fpr) fpr {
+	// TODO
+	return x
+}

@@ -44,9 +44,50 @@ func polyMulAutoAdjFFT(a, b fprPoly) {
 	}
 }
 
+func polyMulSelfAdjFFT(a fprPoly) {
+	for u := range hn {
+		aRe := a[u]
+		aIm := a[u+hn]
+		a[u] = fprAdd(fprSqr(aRe), fprSqr(aIm))
+		a[u+hn] = fprZero
+	}
+}
+
+func polyMulAdjFFT(a, b fprPoly) {
+	for u := range hn {
+		aRe := a[u]
+		aIm := a[u+hn]
+		bRe := b[u]
+		bIm := fprNeg(b[u+hn])
+		a[u], a[u+hn] = fpcMul(aRe, aIm, bRe, bIm) // TODO
+	}
+}
+
+func polyMulFFT(a, b fprPoly) {
+	for i := range hn {
+		aRe := a[i]
+		aIm := a[i+hn]
+		bRe := b[i]
+		bIm := b[i+hn]
+		a[i], a[i+hn] = fpcMul(aRe, aIm, bRe, bIm)
+	}
+}
+
 func polyMulConst(a fprPoly, x fpr) {
 	for i := range polyDegree {
 		a[i] = fprMul(a[i], x)
+	}
+}
+
+func polyNeg(a fprPoly) {
+	for u := range polyDegree {
+		a[u] = fprNeg(a[u])
+	}
+}
+
+func polyAdd(a, b fprPoly) {
+	for u := range polyDegree {
+		a[u] = fprAdd(a[u], b[u])
 	}
 }
 
@@ -73,7 +114,7 @@ func fft(f fprPoly) {
 	}
 }
 
-func iftt(f fprPoly) {
+func ifft(f fprPoly) {
 	t := 1
 	m := polyDegree
 	for u := logPolyDegree; u > 1; u-- {

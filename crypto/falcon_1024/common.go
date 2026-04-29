@@ -9,3 +9,7 @@ func hashToPointVartime(sc sha3.ShakeHash) (coeffPoly, error) {
 func isShort(s1, s2 coeffPoly) bool {
 	return false
 }
+
+func isShortHalf(sqn uint32, s2 coeffPoly) bool {
+	return false
+}

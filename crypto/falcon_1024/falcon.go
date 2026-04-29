@@ -131,31 +131,36 @@ func newKeyFromSeed(priv, pub, seed []byte) error {
 }
 
 func Sign(random io.Reader, priv PrivateKey, msg []byte) (PaddedSignature, error) {
-	nonce, hashData, err := signStart(random)
+	if random == nil {
+		random = rand.Reader
+	}
+
+	rng, err := newSigningRNG(random)
 	if err != nil {
-		return PaddedSignature{}, nil
+		return PaddedSignature{}, err
+	}
+
+	nonce, hashData, err := signStart(rng)
+	if err != nil {
+		return PaddedSignature{}, err
 	}
 
 	_, err = hashData.Write(msg)
 	if err != nil {
-		return PaddedSignature{}, nil
+		return PaddedSignature{}, err
 	}
 
-	sig, err := signFinish(priv, hashData, nonce)
+	sig, err := signFinish(rng, priv, hashData, nonce)
 	if err != nil {
-		return PaddedSignature{}, nil
+		return PaddedSignature{}, err
 	}
 
 	return PaddedSignature(sig), nil
 }
 
-func signStart(random io.Reader) ([]byte, sha3.ShakeHash, error) {
-	if random == nil {
-		random = rand.Reader
-	}
-
+func signStart(rng sha3.ShakeHash) ([]byte, sha3.ShakeHash, error) {
 	nonce := make([]byte, nonceSize)
-	if _, err := io.ReadFull(random, nonce[:]); err != nil {
+	if _, err := io.ReadFull(rng, nonce[:]); err != nil {
 		return nil, nil, err
 	}
 
@@ -167,7 +172,7 @@ func signStart(random io.Reader) ([]byte, sha3.ShakeHash, error) {
 	return nonce, hashData, nil
 }
 
-func signFinish(priv PrivateKey, hashData sha3.ShakeHash, nonce []byte) (PaddedSignature, error) {
+func signFinish(rng sha3.ShakeHash, priv PrivateKey, hashData sha3.ShakeHash, nonce []byte) (PaddedSignature, error) {
 	if priv[0] != privateKeyHeader {
 		return PaddedSignature{}, ErrInvalidPrivateKeyFormat
 	}
@@ -187,21 +192,25 @@ func signFinish(priv PrivateKey, hashData sha3.ShakeHash, nonce []byte) (PaddedS
 		return PaddedSignature{}, err
 	}
 
-	sigp, err := signDyn(f, g, ntruF, ntruG, hm)
-	if err != nil {
-		return PaddedSignature{}, err
+	for {
+		sigp, err := signDyn(rng, f, g, ntruF, ntruG, hm)
+		if err != nil {
+			return PaddedSignature{}, err
+		}
+
+		sig := PaddedSignature{signaturePaddedHeader}
+		copy(sig[encodedHeaderSize:signaturePrefixSize], nonce[:])
+
+		_, err = compEncode(sig[signaturePrefixSize:], sigp)
+		if err != nil {
+			if errors.Is(err, ErrCompEncodeDestinationTooSmall) {
+				continue
+			}
+			return PaddedSignature{}, err
+		}
+
+		return sig, nil
 	}
-
-	sig := PaddedSignature{signaturePaddedHeader}
-	copy(sig[encodedHeaderSize:signaturePrefixSize], nonce[:])
-
-	_, err = compEncode(sig[signaturePrefixSize:], sigp)
-	if err != nil {
-		// TODO: original code is inside loop, double check
-		return PaddedSignature{}, err
-	}
-
-	return sig, nil
 }
 
 func Verify(pub PublicKey, msg, sig []byte) (bool, error) {
@@ -316,4 +325,19 @@ func decodePublicKey(pub []byte) (mqPoly, error) {
 
 func decodeSignature(sig []byte) (coeffPoly, error) {
 	return coeffPoly{}, nil
+}
+
+func newSigningRNG(random io.Reader) (sha3.ShakeHash, error) {
+	var seed [SeedSize]byte
+	if _, err := io.ReadFull(random, seed[:]); err != nil {
+		return nil, err
+	}
+
+	shake := sha3.NewShake256()
+	_, err := shake.Write(seed[:])
+	if err != nil {
+		return nil, err
+	}
+
+	return shake, nil
 }
