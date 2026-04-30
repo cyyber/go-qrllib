@@ -1,4 +1,4 @@
-package falcon
+package falcon_1024
 
 import (
 	"encoding/binary"

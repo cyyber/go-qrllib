@@ -1,4 +1,4 @@
-package falcon
+package falcon_1024
 
 import (
 	"crypto/rand"
@@ -37,17 +37,15 @@ var (
 	ErrInvalidPublicKeyFormat  = errors.New("invalid public key format")
 )
 
-type PublicKey [PublicKeySize]byte
+type PublicKey []byte
 
-type PaddedSignature [PaddedSignatureSize]byte
-
-type PrivateKey [PrivateKeySize]byte
+type PrivateKey []byte
 
 func (priv PrivateKey) Public() (PublicKey, error) {
 	return makePublic(priv)
 }
 
-func (priv PrivateKey) Sign(random io.Reader, msg []byte) (PaddedSignature, error) {
+func (priv PrivateKey) Sign(random io.Reader, msg []byte) ([]byte, error) {
 	return Sign(random, priv, msg)
 }
 
@@ -130,32 +128,32 @@ func newKeyFromSeed(priv, pub, seed []byte) error {
 	return nil
 }
 
-func Sign(random io.Reader, priv PrivateKey, msg []byte) (PaddedSignature, error) {
+func Sign(random io.Reader, priv PrivateKey, msg []byte) ([]byte, error) {
 	if random == nil {
 		random = rand.Reader
 	}
 
 	rng, err := newSigningRNG(random)
 	if err != nil {
-		return PaddedSignature{}, err
+		return nil, err
 	}
 
 	nonce, hashData, err := signStart(rng)
 	if err != nil {
-		return PaddedSignature{}, err
+		return nil, err
 	}
 
 	_, err = hashData.Write(msg)
 	if err != nil {
-		return PaddedSignature{}, err
+		return nil, err
 	}
 
 	sig, err := signFinish(rng, priv, hashData, nonce)
 	if err != nil {
-		return PaddedSignature{}, err
+		return nil, err
 	}
 
-	return PaddedSignature(sig), nil
+	return sig, nil
 }
 
 func signStart(rng sha3.ShakeHash) ([]byte, sha3.ShakeHash, error) {
@@ -172,33 +170,34 @@ func signStart(rng sha3.ShakeHash) ([]byte, sha3.ShakeHash, error) {
 	return nonce, hashData, nil
 }
 
-func signFinish(rng sha3.ShakeHash, priv PrivateKey, hashData sha3.ShakeHash, nonce []byte) (PaddedSignature, error) {
+func signFinish(rng sha3.ShakeHash, priv PrivateKey, hashData sha3.ShakeHash, nonce []byte) ([]byte, error) {
 	if priv[0] != privateKeyHeader {
-		return PaddedSignature{}, ErrInvalidPrivateKeyFormat
+		return nil, ErrInvalidPrivateKeyFormat
 	}
 
 	f, g, ntruF, err := decodePrivateKey(priv[:])
 	if err != nil {
-		return PaddedSignature{}, err
+		return nil, err
 	}
 
 	ntruG, err := completePrivate(f, g, ntruF)
 	if err != nil {
-		return PaddedSignature{}, err
+		return nil, err
 	}
 
 	hm, err := hashToPointVartime(hashData)
 	if err != nil {
-		return PaddedSignature{}, err
+		return nil, err
 	}
 
 	for {
 		sigp, err := signDyn(rng, f, g, ntruF, ntruG, hm)
 		if err != nil {
-			return PaddedSignature{}, err
+			return nil, err
 		}
 
-		sig := PaddedSignature{signaturePaddedHeader}
+		sig := make([]byte, PaddedSignatureSize)
+		sig[0] = signaturePaddedHeader
 		copy(sig[encodedHeaderSize:signaturePrefixSize], nonce[:])
 
 		_, err = compEncode(sig[signaturePrefixSize:], sigp)
@@ -206,7 +205,7 @@ func signFinish(rng sha3.ShakeHash, priv PrivateKey, hashData sha3.ShakeHash, no
 			if errors.Is(err, ErrCompEncodeDestinationTooSmall) {
 				continue
 			}
-			return PaddedSignature{}, err
+			return nil, err
 		}
 
 		return sig, nil
@@ -281,46 +280,118 @@ func makePublic(priv PrivateKey) (PublicKey, error) {
 
 // encodePrivateKey serializes Falcon-1024 private key fields f, g, and F.
 func encodePrivateKey(dst []byte, f, g, ntruF coeffPoly) error {
-	priv := PrivateKey{privateKeyHeader}
+	if len(dst) != PrivateKeySize {
+		return ErrInvalidPrivateKeyFormat
+	}
+
+	dst[0] = privateKeyHeader
 	offset := encodedHeaderSize
 
-	written, err := trimI8Encode(priv[offset:], f, privateKeySmallCoeffBits)
+	written, err := trimI8Encode(dst[offset:], f, privateKeySmallCoeffBits)
 	if err != nil {
 		return err
 	}
 	offset += written
 
-	written, err = trimI8Encode(priv[offset:], g, privateKeySmallCoeffBits)
+	written, err = trimI8Encode(dst[offset:], g, privateKeySmallCoeffBits)
 	if err != nil {
 		return err
 	}
 	offset += written
 
-	written, err = trimI8Encode(priv[offset:], ntruF, privateKeyNtruFBits)
+	written, err = trimI8Encode(dst[offset:], ntruF, privateKeyNtruFBits)
 	if err != nil {
 		return err
 	}
 	offset += written
 
-	// TODO
-	// if offset != PrivateKeySize {
-	// 	return PrivateKey{}, ErrEncodePrivateKeyWrongSize
-	// }
+	if offset != PrivateKeySize {
+		return ErrInvalidPrivateKeyFormat
+	}
 
 	return nil
 }
 
 func decodePrivateKey(priv []byte) (coeffPoly, coeffPoly, coeffPoly, error) {
-	return coeffPoly{}, coeffPoly{}, coeffPoly{}, nil
+	if len(priv) != PrivateKeySize {
+		return nil, nil, nil, ErrInvalidPrivateKeyFormat
+	}
+	if priv[0] != privateKeyHeader {
+		return nil, nil, nil, ErrInvalidPrivateKeyFormat
+	}
+
+	offset := encodedHeaderSize
+
+	f, written, err := trimI8Decode(priv[offset:], privateKeySmallCoeffBits)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	offset += written
+
+	g, written, err := trimI8Decode(priv[offset:], privateKeySmallCoeffBits)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	offset += written
+
+	ntruF, written, err := trimI8Decode(priv[offset:], privateKeyNtruFBits)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	offset += written
+
+	if offset != PrivateKeySize {
+		return nil, nil, nil, ErrInvalidPrivateKeyFormat
+	}
+
+	return f, g, ntruF, nil
 }
 
 // encodePublicKey serializes the Falcon-1024 public polynomial h.
 func encodePublicKey(dst []byte, h mqPoly) error {
+	if len(dst) != PublicKeySize {
+		return ErrInvalidPublicKeyFormat
+	}
+	if len(h) != polyDegree {
+		return ErrInvalidPublicKeyFormat
+	}
+
+	dst[0] = publicKeyHeader
+
+	written, err := modQEncode(dst[encodedHeaderSize:], h)
+	if err != nil {
+		return err
+	}
+
+	if encodedHeaderSize+written != PublicKeySize {
+		return ErrInvalidPublicKeyFormat
+	}
+
 	return nil
 }
 
 func decodePublicKey(pub []byte) (mqPoly, error) {
-	return mqPoly{}, nil
+	if len(pub) != PublicKeySize {
+		return nil, ErrInvalidPublicKeyFormat
+	}
+	if pub[0] != publicKeyHeader {
+		return nil, ErrInvalidPublicKeyFormat
+	}
+
+	h, read, err := modQDecode(pub[encodedHeaderSize:])
+	if err != nil {
+		return nil, err
+	}
+
+	if encodedHeaderSize+read != PublicKeySize {
+		return nil, ErrInvalidPublicKeyFormat
+	}
+
+	return h, nil
+}
+
+func encodeSignature(dst []byte, sv coeffPoly) error {
+	return nil
 }
 
 func decodeSignature(sig []byte) (coeffPoly, error) {

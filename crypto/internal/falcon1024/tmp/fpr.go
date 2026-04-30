@@ -1,12 +1,33 @@
-package falcon
+package falcon_1024
+
+import "math"
 
 const (
-	fprBnormMax   fpr = 16822.4121
-	fprP2         fpr = 0.001953125
-	fprQ          fpr = 12289
-	fprZero       fpr = 0
-	fprInverseOfQ fpr = 1.0 / fpr(modulusQ)
+	fprBnormMax      fpr = 16822.4121
+	fprP2            fpr = 0.001953125
+	fprQ             fpr = 12289
+	fprZero          fpr = 0
+	fprInverseOfQ    fpr = 1.0 / fpr(modulusQ)
+	fprSigmaMin      fpr = 1.29828033434429191
+	fprInv2sqrsigma0 fpr = 0.15086504887537272
+	fprLog2          fpr = 0.69314718055994530941723212146
+	fprInvLog2       fpr = 1.4426950408889634073599246810
+	fprPtwo63        fpr = 9223372036854775808.0
 )
+
+var fprInvSigma = [...]fpr{
+	0, // unused
+	0.00690547932959408896,
+	0.00681022677671779767,
+	0.00671881019107227126,
+	0.00658833543700736678,
+	0.00646517812076029003,
+	0.00634867888280789966,
+	0.00623825865290843738,
+	0.00613340650209302611,
+	0.00603366966815772378,
+	0.00593864530953311636,
+}
 
 var fprGmTab = [...]fpr{
 	0, 0, -0.000000000000000000000000000, 1.000000000000000000000000000,
@@ -535,7 +556,60 @@ func fprInv(x fpr) fpr    { return 1 / x }
 func fprLt(x, y fpr) bool { return x < y }
 func fprOf(i int32) fpr   { return fpr(i) }
 
-func fprRint(x fpr) fpr {
-	// TODO
-	return x
+func fprRint(x fpr) int64 {
+	xb := math.Float64bits(float64(x))
+
+	m := ((xb << 10) | (uint64(1) << 62)) & ((uint64(1) << 63) - 1)
+	e := 1085 - int((xb>>52)&0x7FF)
+
+	if e >= 64 {
+		m = 0
+	}
+	e &= 63
+
+	d := m << uint(63-e)
+	dd := uint32(d) | (uint32(d>>32) & 0x1FFFFFFF)
+	f := uint32(d>>61) | ((dd | -dd) >> 31)
+
+	m = (m >> uint(e)) + uint64((0xC8>>f)&1)
+
+	s := uint32(xb >> 63)
+	return (int64(m) ^ -int64(s)) + int64(s)
+}
+
+func fprSqrt(x fpr) fpr {
+	return fpr(math.Sqrt(float64(x)))
+}
+
+func fprFloor(x fpr) int64 {
+	r := int64(x)
+	if x < fpr(r) {
+		r--
+	}
+	return r
+}
+
+func fprTrunc(x fpr) int64 {
+	return int64(x)
+}
+
+func fprExpmP63(x, ccs fpr) uint64 {
+	d := x
+
+	y := fpr(0.000000002073772366009083061987)
+	y = fpr(0.000000025299506379442070029551) - y*d
+	y = fpr(0.000000275607356160477811864927) - y*d
+	y = fpr(0.000002755586350219122514855659) - y*d
+	y = fpr(0.000024801566833585381209939524) - y*d
+	y = fpr(0.000198412739277311890541063977) - y*d
+	y = fpr(0.001388888894063186997887560103) - y*d
+	y = fpr(0.008333333327800835146903501993) - y*d
+	y = fpr(0.041666666666110491190622155955) - y*d
+	y = fpr(0.166666666666984014666397229121) - y*d
+	y = fpr(0.500000000000019206858326015208) - y*d
+	y = fpr(0.999999999999994892974086724280) - y*d
+	y = fpr(1.000000000000000000000000000000) - y*d
+	y *= ccs
+
+	return uint64(y * fprPtwo63)
 }
