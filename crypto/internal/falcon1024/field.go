@@ -7,6 +7,7 @@ import (
 
 const (
 	n                  = 1024
+	logN               = 10
 	q                  = 12289
 	qNegInv            = 12287 // -q^-1 mod 2^16
 	r2                 = 10952 // 2^32 mod q

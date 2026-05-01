@@ -148,7 +148,6 @@ func Verify(pub *PublicKey, message []byte, sig *Signature) error {
 }
 
 const (
-	logN                     = 10
 	signatureHeader     byte = 0x30 + logN
 	nonceSize                = 40
 	encodedHeaderSize        = 1
