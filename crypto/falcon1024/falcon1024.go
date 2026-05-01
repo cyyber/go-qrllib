@@ -169,5 +169,11 @@ func verify(publicKey PublicKey, message, sig []byte) error {
 	if err != nil {
 		return err
 	}
-	return falcon1024.Verify(k, message, sig)
+
+	s, err := falcon1024.NewSignature(sig)
+	if err != nil {
+		return err
+	}
+
+	return falcon1024.Verify(k, message, s)
 }

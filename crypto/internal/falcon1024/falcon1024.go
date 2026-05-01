@@ -1,6 +1,7 @@
 package falcon1024
 
 import (
+	"crypto/sha3"
 	"errors"
 	"strconv"
 )
@@ -13,16 +14,16 @@ const (
 )
 
 type PrivateKey struct {
-	seed [seedSize]byte
+	raw  [privateKeySize]byte
 	pub  *PublicKey
-	// pub  [publicKeySize]byte
-	// TODO
+	seed [seedSize]byte
+	// b00, b01, b10, b11 fprFullPoly
+	// tree fprTree // ffLDL tree for sign_tree
 }
 
 func (priv *PrivateKey) Bytes() []byte {
-	k := make([]byte, 0, privateKeySize)
-	// k = append(k, priv.seed[:]...)
-	// k = append(k, priv.pub[:]...)
+	k := make([]byte, privateKeySize)
+	copy(k, priv.raw[:])
 	return k
 }
 
@@ -32,25 +33,24 @@ func (priv *PrivateKey) Seed() []byte {
 }
 
 func (priv *PrivateKey) PublicKey() *PublicKey {
-	// pub := priv.pub
-	// return pub[:]
-	return nil
+	return priv.pub
 }
 
 type PublicKey struct {
-	// TODO
+	raw       [publicKeySize]byte
+	hNTTMonty nttElement
 }
 
 func (pub *PublicKey) Bytes() []byte {
-	// TODO
-	// a := pub.aBytes
-	// return a[:]
-	return nil
+	k := make([]byte, publicKeySize)
+	copy(k, pub.raw[:])
+	return k
 }
 
 // GenerateKey generates a new Falcon-1024 private key pair.
 func GenerateKey() (*PrivateKey, error) {
-	return nil, nil
+	priv := &PrivateKey{}
+	return generateKey(priv)
 }
 
 func generateKey(priv *PrivateKey) (*PrivateKey, error) {
@@ -80,28 +80,60 @@ func NewPrivateKey(priv []byte) (*PrivateKey, error) {
 }
 
 func newPrivateKey(priv *PrivateKey, privBytes []byte) (*PrivateKey, error) {
-	// TODO
+	if l := len(privBytes); l != privateKeySize {
+		return nil, errors.New("falcon1024: bad private key length: " + strconv.Itoa(l))
+	}
+	/*
+		if privBytes[0] != privateKeyHdr {
+			return nil, errors.New("falcon1024: bad private key")
+		}
+
+		copy(priv.raw[:], privBytes)
+
+		rawPub, err := falcontmp.PrivateKey(privBytes).Public()
+		if err != nil {
+			return nil, errors.New("falcon1024: bad private key")
+		}
+
+		if priv.pub == nil {
+			priv.pub = &PublicKey{}
+		}
+		copy(priv.pub.raw[:], rawPub)
+		return priv, nil
+	*/
 	return nil, nil
 }
+
+const (
+	publicKeyHeader byte = 0x00 + logN
+)
 
 func NewPublicKey(pub []byte) (*PublicKey, error) {
 	p := &PublicKey{}
 	return newPublicKey(p, pub)
 }
 
+var (
+	errInvalidPublicKeyLength = errors.New("falcon-1024: invalid public key length")
+	errInvalidPublicKey       = errors.New("falcon-1024: invalid public key")
+)
+
 func newPublicKey(pub *PublicKey, pubBytes []byte) (*PublicKey, error) {
-	/*
-		if l := len(pubBytes); l != publicKeySize {
-			return nil, errors.New("ed25519: bad public key length: " + strconv.Itoa(l))
-		}
-		// SetBytes checks that the point is on the curve.
-		if _, err := pub.a.SetBytes(pubBytes); err != nil {
-			return nil, errors.New("ed25519: bad public key")
-		}
-		copy(pub.aBytes[:], pubBytes)
-		return pub, nil
-	*/
-	return nil, nil
+	if l := len(pubBytes); l != publicKeySize {
+		return nil, errInvalidPublicKeyLength
+	}
+	if pubBytes[0] != publicKeyHeader {
+		return nil, errInvalidPublicKey
+	}
+
+	h, err := polyByteDecode[ringElement](pubBytes[encodedHeaderSize:])
+	if err != nil {
+		return nil, err
+	}
+
+	copy(pub.raw[:], pubBytes)
+	pub.hNTTMonty = toNTTMonty(h)
+	return pub, nil
 }
 
 func Sign(priv *PrivateKey, message []byte) []byte {
@@ -112,10 +144,89 @@ func sign(signature []byte, priv *PrivateKey, message []byte) []byte {
 	return nil
 }
 
-func Verify(pub *PublicKey, message, sig []byte) error {
+func Verify(pub *PublicKey, message []byte, sig *Signature) error {
+	return verify(pub, message, sig)
+}
+
+const (
+	logN                     = 10
+	signatureHeader     byte = 0x30 + logN
+	nonceSize                = 40
+	encodedHeaderSize        = 1
+	signaturePrefixSize      = encodedHeaderSize + nonceSize
+)
+
+type Signature struct {
+	nonce [nonceSize]byte
+	s2    smallPolynomial
+}
+
+var (
+	errInvalidSignatureLength = errors.New("falcon-1024: invalid signature length")
+	errInvalidSignature       = errors.New("falcon-1024: invalid signature")
+)
+
+func NewSignature(sig []byte) (*Signature, error) {
+	s := &Signature{}
+	return newSignature(s, sig)
+}
+
+func newSignature(sig *Signature, sigBytes []byte) (*Signature, error) {
+	if l := len(sigBytes); l != signatureSize {
+		return nil, errors.New("falcon-1024: bad signature length: " + strconv.Itoa(l))
+	}
+	if sigBytes[0] != signatureHeader {
+		return nil, errors.New("falcon-1024: invalid signature")
+	}
+
+	copy(sig.nonce[:], sigBytes[encodedHeaderSize:signaturePrefixSize])
+
+	s2, consumed, err := compressedDecode(sigBytes[signaturePrefixSize:])
+	if err != nil {
+		return nil, err
+	}
+	sig.s2 = s2
+
+	for _, b := range sigBytes[signaturePrefixSize+consumed:] {
+		if b != 0 {
+			return nil, errors.New("falcon-1024: invalid signature")
+		}
+	}
+
+	return sig, nil
+}
+
+func verify(pub *PublicKey, message []byte, sig *Signature) error {
+	h := sha3.NewSHAKE256()
+	h.Write(sig.nonce[:])
+	h.Write(message)
+
+	c0, err := hashToPoint(h)
+	if err != nil {
+		return err
+	}
+
+	if !verifyRaw(c0, sig.s2, pub.hNTTMonty) {
+		return errors.New("falcon-1024: invalid signature")
+	}
+
 	return nil
 }
 
-func verify(pub *PublicKey, message, sig []byte) error {
-	return nil
+func verifyRaw(c0 ringElement, s2 smallPolynomial, h nttElement) bool {
+	var t ringElement
+	for i := range t {
+		t[i] = fieldFromSmall(s2[i])
+	}
+
+	tNTT := ntt(t)
+	tNTT = nttMul(tNTT, h)
+	t = inverseNTT(tNTT)
+
+	var s1 smallPolynomial
+	for i := range s1 {
+		s1[i] = fieldCenteredMod(fieldSub(c0[i], t[i]))
+	}
+
+	return signatureNormWithinBound(s1, s2)
 }
