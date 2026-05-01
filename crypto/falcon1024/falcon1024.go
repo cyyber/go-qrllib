@@ -85,18 +85,17 @@ func (priv PrivateKey) Seed() ([]byte, error) {
 var privateKeyCache cache.Cache[byte, falcon1024.PrivateKey]
 
 func (priv PrivateKey) Sign(rand io.Reader, message []byte) (signature []byte, err error) {
-	/*
-		k, err := privateKeyCache.Get(&priv[0], func() (*falcon1024.PrivateKey, error) {
-			return falcon1024.NewPrivateKey(priv)
-		}, func(k *falcon1024.PrivateKey) bool {
-			return subtle.ConstantTimeCompare(priv, k.Bytes()) == 1
-		})
-		if err != nil {
-			return nil, err
-		}
+	// TODO
+	// k, err := privateKeyCache.Get(&priv[0], func() (*falcon1024.PrivateKey, error) {
+	// 	return falcon1024.NewPrivateKey(priv)
+	// }, func(k *falcon1024.PrivateKey) bool {
+	// 	return subtle.ConstantTimeCompare(priv, k.Bytes()) == 1
+	// })
+	// if err != nil {
+	// 	return nil, err
+	// }
 
-		return falcon1024.Sign(k, message), nil
-	*/
+	// return falcon1024.Sign(k, message)
 	return nil, nil
 }
 
@@ -135,13 +134,18 @@ func newKeyFromSeed(publicKey, privateKey, seed []byte) {
 
 // Sign signs the message with privateKey and returns a signature. It will
 // panic if len(privateKey) is not [PrivateKeySize].
-func Sign(privateKey PrivateKey, message []byte) []byte {
+func Sign(random io.Reader, privateKey PrivateKey, message []byte) ([]byte, error) {
+	if random == nil {
+		random = rand.Reader
+	}
 	signature := make([]byte, SignatureSize)
-	sign(signature, privateKey, message)
-	return signature
+	if err := sign(random, signature, privateKey, message); err != nil {
+		return nil, err
+	}
+	return signature, nil
 }
 
-func sign(signature []byte, privateKey PrivateKey, message []byte) {
+func sign(random io.Reader, signature []byte, privateKey PrivateKey, message []byte) error {
 	k, err := privateKeyCache.Get(&privateKey[0], func() (*falcon1024.PrivateKey, error) {
 		return falcon1024.NewPrivateKey(privateKey)
 	}, func(k *falcon1024.PrivateKey) bool {
@@ -150,8 +154,12 @@ func sign(signature []byte, privateKey PrivateKey, message []byte) {
 	if err != nil {
 		panic("falcon-1024: bad private key: " + err.Error())
 	}
-	sig := falcon1024.Sign(k, message)
+	sig, err := falcon1024.Sign(random, k, message)
+	if err != nil {
+		return nil
+	}
 	copy(signature, sig)
+	return nil
 }
 
 // Verify reports whether sig is a valid signature of message by publicKey. It

@@ -90,3 +90,8 @@ func compressedDecode(src []byte) (smallPolynomial, int, error) {
 
 	return p, r.pos, nil
 }
+
+func compressedEncode(dst []byte, s smallPolynomial) (int, error) {
+	// TODO
+	return 0, nil
+}

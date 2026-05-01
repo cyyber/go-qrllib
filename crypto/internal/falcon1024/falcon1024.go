@@ -3,6 +3,7 @@ package falcon1024
 import (
 	"crypto/sha3"
 	"errors"
+	"io"
 	"strconv"
 )
 
@@ -73,7 +74,9 @@ func newPrivateKeyFromSeed(priv *PrivateKey, seed []byte) (*PrivateKey, error) {
 	return priv, nil
 }
 
-func precomputePrivateKey(priv *PrivateKey) {}
+func precomputePrivateKey(priv *PrivateKey) {
+
+}
 
 func NewPrivateKey(priv []byte) (*PrivateKey, error) {
 	p := &PrivateKey{}
@@ -82,19 +85,19 @@ func NewPrivateKey(priv []byte) (*PrivateKey, error) {
 
 func newPrivateKey(priv *PrivateKey, privBytes []byte) (*PrivateKey, error) {
 	if l := len(privBytes); l != privateKeySize {
-		return nil, errors.New("falcon1024: bad private key length: " + strconv.Itoa(l))
+		return nil, errors.New("falcon-1024: bad private key length: " + strconv.Itoa(l))
 	}
 	// WIP
 	/*
 		if privBytes[0] != privateKeyHdr {
-			return nil, errors.New("falcon1024: bad private key")
+			return nil, errors.New("falcon-1024: bad private key")
 		}
 
 		copy(priv.raw[:], privBytes)
 
 		rawPub, err := falcontmp.PrivateKey(privBytes).Public()
 		if err != nil {
-			return nil, errors.New("falcon1024: bad private key")
+			return nil, errors.New("falcon-1024: bad private key")
 		}
 
 		if priv.pub == nil {
@@ -133,14 +136,52 @@ func newPublicKey(pub *PublicKey, pubBytes []byte) (*PublicKey, error) {
 	return pub, nil
 }
 
-func Sign(priv *PrivateKey, message []byte) []byte {
-	// WIP
-	return nil
+func Sign(random io.Reader, priv *PrivateKey, message []byte) ([]byte, error) {
+	signature := make([]byte, signatureSize)
+	return sign(random, signature, priv, message)
 }
 
-func sign(signature []byte, priv *PrivateKey, message []byte) []byte {
-	// WIP
-	return nil
+func sign(random io.Reader, signature []byte, priv *PrivateKey, message []byte) ([]byte, error) {
+	var seed [seedSize]byte
+	if _, err := io.ReadFull(random, seed[:]); err != nil {
+		return nil, err
+	}
+
+	rng := sha3.NewSHAKE256()
+	rng.Write(seed[:])
+
+	var nonce [nonceSize]byte
+	rng.Read(nonce[:])
+
+	hashData := sha3.NewSHAKE256()
+	hashData.Write(nonce[:])
+	hashData.Write(message)
+
+	c0, err := hashToPoint(hashData)
+	if err != nil {
+		return nil, err
+	}
+
+	s2, err := signTree(rng, priv, c0)
+	if err != nil {
+		return nil, err
+	}
+
+	signature[0] = signatureHeader
+	copy(signature[encodedHeaderSize:signaturePrefixSize], nonce[:])
+
+	written, err := compressedEncode(signature[signaturePrefixSize:], s2)
+	if err != nil {
+		return nil, err
+	}
+	clear(signature[signaturePrefixSize+written:]) // double check
+
+	return signature, nil
+}
+
+func signTree(rng io.Reader, priv *PrivateKey, c0 ringElement) (smallPolynomial, error) {
+	// TODO
+	return smallPolynomial{}, nil
 }
 
 func Verify(pub *PublicKey, message []byte, sig *Signature) error {

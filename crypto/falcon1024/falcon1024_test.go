@@ -97,7 +97,10 @@ func TestSignVerify(t *testing.T) {
 	public, private, _ := GenerateKey(zero)
 
 	message := []byte("test message")
-	sig := Sign(private, message)
+	sig, err := Sign(zero, private, message)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !Verify(public, message, sig) {
 		t.Errorf("valid signature rejected")
 	}
@@ -223,7 +226,7 @@ func BenchmarkSigning(b *testing.B) {
 	}
 	message := []byte("Hello, world!")
 	for b.Loop() {
-		Sign(priv, message)
+		Sign(zero, priv, message)
 	}
 }
 
@@ -234,7 +237,10 @@ func BenchmarkVerification(b *testing.B) {
 		b.Fatal(err)
 	}
 	message := []byte("Hello, world!")
-	signature := Sign(priv, message)
+	signature, err := Sign(zero, priv, message)
+	if err != nil {
+		b.Fatal(err)
+	}
 	for b.Loop() {
 		Verify(pub, message, signature)
 	}
