@@ -18,7 +18,7 @@ type PrivateKey struct {
 	pub  *PublicKey
 	seed [seedSize]byte
 	// WIP
-	// b00, b01, b10, b11 fprFullPoly
+	// b00, b01, b10, b11 fprPolynomial
 	// tree fprTree // ffLDL tree for sign_tree
 }
 
@@ -84,6 +84,7 @@ func newPrivateKey(priv *PrivateKey, privBytes []byte) (*PrivateKey, error) {
 	if l := len(privBytes); l != privateKeySize {
 		return nil, errors.New("falcon1024: bad private key length: " + strconv.Itoa(l))
 	}
+	// WIP
 	/*
 		if privBytes[0] != privateKeyHdr {
 			return nil, errors.New("falcon1024: bad private key")
@@ -133,10 +134,12 @@ func newPublicKey(pub *PublicKey, pubBytes []byte) (*PublicKey, error) {
 }
 
 func Sign(priv *PrivateKey, message []byte) []byte {
+	// WIP
 	return nil
 }
 
 func sign(signature []byte, priv *PrivateKey, message []byte) []byte {
+	// WIP
 	return nil
 }
 
