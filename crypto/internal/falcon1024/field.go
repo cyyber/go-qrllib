@@ -69,35 +69,31 @@ const hashToPointRejectThreshold = 5 * q // 61445
 
 type ringElement [n]fieldElement // modulo-q polynomial
 
-var errInvalidPublicKeyEncoding = errors.New("falcon-1024: invalid public key encoding")
-
 func polyByteDecode[T ~[n]fieldElement](b []byte) (T, error) {
 	if len(b) != modQEncodedSize {
-		return T{}, errInvalidPublicKeyEncoding
+		return T{}, errors.New("falcon-1024: invalid encoding length")
 	}
 
 	var p T
-	var acc uint32
-	accLen := 0
-	read := 0
+	for i := 0; i < n; i += 4 {
+		x := uint64(b[0])<<48 |
+			uint64(b[1])<<40 |
+			uint64(b[2])<<32 |
+			uint64(b[3])<<24 |
+			uint64(b[4])<<16 |
+			uint64(b[5])<<8 |
+			uint64(b[6])
 
-	for i := range p {
-		for accLen < modQBits {
-			acc = (acc << 8) | uint32(b[read])
-			read++
-			accLen += 8
+		p[i+0] = fieldElement((x >> 42) & 0x3FFF)
+		p[i+1] = fieldElement((x >> 28) & 0x3FFF)
+		p[i+2] = fieldElement((x >> 14) & 0x3FFF)
+		p[i+3] = fieldElement(x & 0x3FFF)
+
+		if p[i+0] >= q || p[i+1] >= q || p[i+2] >= q || p[i+3] >= q {
+			return T{}, errors.New("falcon-1024: invalid polynomial encoding")
 		}
 
-		accLen -= modQBits
-		x := (acc >> accLen) & ((1 << modQBits) - 1)
-		if x >= q {
-			return T{}, errInvalidPublicKeyEncoding
-		}
-		p[i] = fieldElement(x)
-	}
-
-	if accLen > 0 && (acc&((1<<accLen)-1)) != 0 {
-		return T{}, errInvalidPublicKeyEncoding
+		b = b[7:]
 	}
 
 	return p, nil

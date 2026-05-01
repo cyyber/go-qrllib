@@ -17,6 +17,7 @@ type PrivateKey struct {
 	raw  [privateKeySize]byte
 	pub  *PublicKey
 	seed [seedSize]byte
+	// WIP
 	// b00, b01, b10, b11 fprFullPoly
 	// tree fprTree // ffLDL tree for sign_tree
 }
@@ -113,17 +114,12 @@ func NewPublicKey(pub []byte) (*PublicKey, error) {
 	return newPublicKey(p, pub)
 }
 
-var (
-	errInvalidPublicKeyLength = errors.New("falcon-1024: invalid public key length")
-	errInvalidPublicKey       = errors.New("falcon-1024: invalid public key")
-)
-
 func newPublicKey(pub *PublicKey, pubBytes []byte) (*PublicKey, error) {
 	if l := len(pubBytes); l != publicKeySize {
-		return nil, errInvalidPublicKeyLength
+		return nil, errors.New("falcon-1024: invalid public key length")
 	}
 	if pubBytes[0] != publicKeyHeader {
-		return nil, errInvalidPublicKey
+		return nil, errors.New("falcon-1024: invalid public key")
 	}
 
 	h, err := polyByteDecode[ringElement](pubBytes[encodedHeaderSize:])
@@ -160,11 +156,6 @@ type Signature struct {
 	nonce [nonceSize]byte
 	s2    smallPolynomial
 }
-
-var (
-	errInvalidSignatureLength = errors.New("falcon-1024: invalid signature length")
-	errInvalidSignature       = errors.New("falcon-1024: invalid signature")
-)
 
 func NewSignature(sig []byte) (*Signature, error) {
 	s := &Signature{}

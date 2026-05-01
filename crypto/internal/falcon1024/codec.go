@@ -44,9 +44,7 @@ func (r *compressedBitReader) trailingBitsAreZero() bool {
 	return r.current&byte((1<<r.bits)-1) == 0
 }
 
-var (
-	errInvalidSignatureEncoding = errors.New("falcon-1024: invalid signature encoding")
-)
+var errInvalidSignatureEncoding = errors.New("falcon-1024: invalid signature encoding")
 
 func compressedDecode(src []byte) (smallPolynomial, int, error) {
 	var p smallPolynomial
