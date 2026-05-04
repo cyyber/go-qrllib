@@ -62,24 +62,6 @@ func (priv PrivateKey) Equal(x crypto.PrivateKey) bool {
 	return subtle.ConstantTimeCompare(priv, xx) == 1
 }
 
-// Seed returns the private key seed corresponding to priv.
-func (priv PrivateKey) Seed() ([]byte, error) {
-	// TODO
-	/*
-		k, err := privateKeyCache.Get(&priv[0], func() (*falcon1024.PrivateKey, error) {
-			return falcon1024.NewPrivateKey(priv)
-		}, func(k *falcon1024.PrivateKey) bool {
-			return subtle.ConstantTimeCompare(priv, k.Bytes()) == 1
-		})
-		if err != nil {
-			return nil, err
-		}
-	*/
-
-	// return append(make([]byte, 0, PublicKeySize), k.Seed()...)
-	return nil, nil
-}
-
 // privateKeyCache uses a pointer to the first byte of underlying storage as a
 // key, because [PrivateKey] is a slice header passed around by value.
 var privateKeyCache cache.Cache[byte, falcon1024.PrivateKey]

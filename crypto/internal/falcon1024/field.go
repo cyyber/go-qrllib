@@ -70,6 +70,25 @@ const hashToPointRejectThreshold = 5 * q // 61445
 
 type ringElement [n]fieldElement // modulo-q polynomial
 
+func polyByteEncode[T ~[n]fieldElement](dst []byte, p T) {
+	for i := 0; i < n; i += 4 {
+		x := uint64(p[i+0])<<42 |
+			uint64(p[i+1])<<28 |
+			uint64(p[i+2])<<14 |
+			uint64(p[i+3])
+
+		dst[0] = byte(x >> 48)
+		dst[1] = byte(x >> 40)
+		dst[2] = byte(x >> 32)
+		dst[3] = byte(x >> 24)
+		dst[4] = byte(x >> 16)
+		dst[5] = byte(x >> 8)
+		dst[6] = byte(x)
+
+		dst = dst[7:]
+	}
+}
+
 func polyByteDecode[T ~[n]fieldElement](b []byte) (T, error) {
 	if len(b) != modQEncodedSize {
 		return T{}, errors.New("falcon-1024: invalid encoding length")
@@ -201,6 +220,38 @@ func toNTTMonty(h ringElement) nttElement {
 const signatureNormBound uint64 = 70_265_242
 
 type smallPolynomial [n]int32 // signed small coefficients
+
+func sampleSmallPolynomial(rng *sha3.SHAKE) smallPolynomial {
+	// TODO
+	return smallPolynomial{}
+}
+
+func coefficientsExceedBound(p smallPolynomial, bound int32) bool {
+	for _, x := range p {
+		if x < -bound || x > bound {
+			return true
+		}
+	}
+	return false
+}
+
+func squaredNormExceedsBound(f, g smallPolynomial, bound uint32) bool {
+	return f.squaredNorm()+g.squaredNorm() > bound
+}
+
+func orthogonalizedNormExceedsBound(f, g smallPolynomial, bound float64) bool {
+	// TODO: implement Falcon's FFT-based orthogonalized norm check once the
+	// fpr/FFT helpers are moved into the active package.
+	panic("falcon-1024: orthogonalized norm check not implemented")
+}
+
+func (p smallPolynomial) squaredNorm() uint32 {
+	var n uint32
+	for _, x := range p {
+		n += uint32(x * x)
+	}
+	return n
+}
 
 func signatureNormWithinBound(s1, s2 smallPolynomial) bool {
 	var norm uint64
