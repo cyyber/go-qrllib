@@ -73,13 +73,6 @@ func newPrivateKeyFromSeed(priv *PrivateKey, seed []byte) (*PrivateKey, error) {
 	return keygen(priv, rng)
 }
 
-type privateKeyPolynomials struct {
-	f, g  smallPolynomial
-	ntruF smallPolynomial
-	ntruG smallPolynomial
-	h     ringElement
-}
-
 const (
 	fgBits  = 5
 	fgBound = 1<<(fgBits-1) - 1
@@ -151,8 +144,6 @@ func initPrivateKey(priv *PrivateKey, f, g, ntruF, ntruG smallPolynomial, h ring
 	// if err := expandPrivateKey(priv, f, g, ntruF, ntruG); err != nil {
 	// 	return nil, err
 	// }
-
-	// return priv, nil
 
 	return nil, nil
 }
