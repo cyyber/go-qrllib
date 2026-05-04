@@ -148,7 +148,44 @@ func initPrivateKey(priv *PrivateKey, f, g, ntruF, ntruG smallPolynomial, h ring
 }
 
 func expandPrivateKey(priv *PrivateKey, f, g, ntruF, ntruG smallPolynomial) error {
+	fprFromSmall(&priv.b01, f)
+	fprFromSmall(&priv.b00, g)
+	fprFromSmall(&priv.b11, ntruF)
+	fprFromSmall(&priv.b10, ntruG)
+
+	fft(&priv.b01)
+	fft(&priv.b00)
+	fft(&priv.b11)
+	fft(&priv.b10)
+
+	polyNeg(&priv.b01)
+	polyNeg(&priv.b11)
+
 	// TODO
+	// var g00, g01, g11, tmp fprPolynomial
+
+	// TODO
+	// copy(g00[:], priv.b00[:])
+	// polyMulSelfAdjFFT(&g00)
+	// copy(tmp[:], priv.b01[:])
+	// polyMulSelfAdjFFT(&tmp)
+	// polyAdd(&g00, &tmp)
+
+	// copy(g01[:], priv.b00[:])
+	// polyMulAdjFFT(&g01, &priv.b10)
+	// copy(tmp[:], priv.b01[:])
+	// polyMulAdjFFT(&tmp, &priv.b11)
+	// polyAdd(&g01, &tmp)
+
+	// copy(g11[:], priv.b10[:])
+	// polyMulSelfAdjFFT(&g11)
+	// copy(tmp[:], priv.b11[:])
+	// polyMulSelfAdjFFT(&tmp)
+	// polyAdd(&g11, &tmp)
+
+	// ffLDLFFT(priv.tree[:], &g00, &g01, &g11, logN)
+	// ffLDLBinaryNormalize(priv.tree[:], logN, logN)
+
 	return nil
 }
 
@@ -291,9 +328,51 @@ func sign(random io.Reader, signature []byte, priv *PrivateKey, message []byte) 
 	return signature, nil
 }
 
-func signTree(rng io.Reader, priv *PrivateKey, c0 ringElement) (smallPolynomial, error) {
+type samplerPRNG struct {
+	rng *sha3.SHAKE
+}
+
+func newSamplerPRNG(rng *sha3.SHAKE) *samplerPRNG {
+	return &samplerPRNG{rng: rng}
+}
+
+func (p *samplerPRNG) readByte() byte {
+	var buf [1]byte
+	p.rng.Read(buf[:])
+
+	return buf[0]
+}
+
+func (p *samplerPRNG) readUint64() uint64 {
+	var buf [8]byte
+	if _, err := p.rng.Read(buf[:]); err != nil {
+		return 0
+	}
+
+	return uint64(buf[0]) |
+		uint64(buf[1])<<8 |
+		uint64(buf[2])<<16 |
+		uint64(buf[3])<<24 |
+		uint64(buf[4])<<32 |
+		uint64(buf[5])<<40 |
+		uint64(buf[6])<<48 |
+		uint64(buf[7])<<56
+}
+
+func signTree(rng *sha3.SHAKE, priv *PrivateKey, c0 ringElement) (smallPolynomial, error) {
+	prng := newSamplerPRNG(rng)
+
+	for {
+		s2, ok := signTreeAttempt(prng, priv, c0)
+		if ok {
+			return s2, nil
+		}
+	}
+}
+
+func signTreeAttempt(prng *samplerPRNG, priv *PrivateKey, c0 ringElement) (smallPolynomial, bool) {
 	// TODO
-	return smallPolynomial{}, nil
+	return smallPolynomial{}, false
 }
 
 func Verify(pub *PublicKey, message []byte, sig *Signature) error {

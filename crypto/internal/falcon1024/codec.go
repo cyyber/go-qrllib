@@ -101,17 +101,85 @@ func compressedEncode(dst []byte, s smallPolynomial) (int, error) {
 }
 
 func skEncode(dst []byte, f, g, ntruF smallPolynomial) error {
-	// TODO
+	if len(dst) != privateKeySize {
+		return errors.New("falcon-1024: bad private key length")
+	}
+
+	dst[0] = privateKeyHeader
+	offset := encodedHeaderSize
+
+	written, err := trimI8Encode(dst[offset:], f, fgBits)
+	if err != nil {
+		return err
+	}
+	offset += written
+
+	written, err = trimI8Encode(dst[offset:], g, fgBits)
+	if err != nil {
+		return err
+	}
+	offset += written
+
+	written, err = trimI8Encode(dst[offset:], ntruF, ntruFBits)
+	if err != nil {
+		return err
+	}
+	offset += written
+
+	if offset != privateKeySize {
+		return errors.New("falcon-1024: invalid private key encoding")
+	}
+
 	return nil
 }
 
 func skDecode(src []byte) (f, g, ntruF smallPolynomial, err error) {
-	// TODO
-	return smallPolynomial{}, smallPolynomial{}, smallPolynomial{}, nil
+	if len(src) != privateKeySize {
+		return smallPolynomial{}, smallPolynomial{}, smallPolynomial{},
+			errors.New("falcon-1024: bad private key length")
+	}
+	if src[0] != privateKeyHeader {
+		return smallPolynomial{}, smallPolynomial{}, smallPolynomial{},
+			errors.New("falcon-1024: invalid private key")
+	}
+
+	offset := encodedHeaderSize
+	var written int
+
+	f, written, err = trimI8Decode(src[offset:], fgBits)
+	if err != nil {
+		return smallPolynomial{}, smallPolynomial{}, smallPolynomial{}, err
+	}
+	offset += written
+
+	g, written, err = trimI8Decode(src[offset:], fgBits)
+	if err != nil {
+		return smallPolynomial{}, smallPolynomial{}, smallPolynomial{}, err
+	}
+	offset += written
+
+	ntruF, written, err = trimI8Decode(src[offset:], ntruFBits)
+	if err != nil {
+		return smallPolynomial{}, smallPolynomial{}, smallPolynomial{}, err
+	}
+	offset += written
+
+	if offset != privateKeySize {
+		return smallPolynomial{}, smallPolynomial{}, smallPolynomial{},
+			errors.New("falcon-1024: invalid private key")
+	}
+
+	return f, g, ntruF, nil
 }
 
 func pkEncode(dst []byte, h ringElement) error {
-	// TODO
+	if len(dst) != publicKeySize {
+		return errors.New("falcon-1024: bad public key length")
+	}
+
+	dst[0] = publicKeyHeader
+	polyByteEncode(dst[encodedHeaderSize:], h)
+
 	return nil
 }
 
@@ -147,4 +215,117 @@ func sigDecode(src []byte) (nonce [nonceSize]byte, s2 smallPolynomial, err error
 	}
 
 	return nonce, s2, nil
+}
+
+func trimI8Encode(dst []byte, p smallPolynomial, bits int) (int, error) {
+	if bits < 2 || bits > 8 {
+		return 0, errors.New("falcon-1024: invalid trim_i8 bit width")
+	}
+
+	outLen := (n*bits + 7) >> 3
+	if len(dst) < outLen {
+		return 0, errors.New("falcon-1024: short trim_i8 output buffer")
+	}
+
+	bound := int32(1<<(bits-1)) - 1
+	for _, x := range p {
+		if x < -bound || x > bound {
+			return 0, errors.New("falcon-1024: trim_i8 coefficient out of range")
+		}
+	}
+
+	if bits == 8 {
+		for i, x := range p {
+			dst[i] = byte(int8(x))
+		}
+		return outLen, nil
+	}
+
+	var acc uint32
+	accBits := 0
+	written := 0
+
+	mask := uint32((1 << bits) - 1)
+	for _, x := range p {
+		acc = (acc << bits) | (uint32(x) & mask)
+		accBits += bits
+
+		for accBits >= 8 {
+			accBits -= 8
+			dst[written] = byte(acc >> accBits)
+			written++
+			acc &= (1 << accBits) - 1
+		}
+	}
+
+	if accBits > 0 {
+		dst[written] = byte(acc << (8 - accBits))
+		written++
+	}
+
+	return written, nil
+}
+
+func trimI8Decode(src []byte, bits int) (smallPolynomial, int, error) {
+	if bits < 2 || bits > 8 {
+		return smallPolynomial{}, 0, errors.New("falcon-1024: invalid trim_i8 bit width")
+	}
+
+	inLen := (n*bits + 7) >> 3
+	if len(src) < inLen {
+		return smallPolynomial{}, 0, errors.New("falcon-1024: short trim_i8 input")
+	}
+
+	var p smallPolynomial
+
+	if bits == 8 {
+		for i := range p {
+			x := int8(src[i])
+			if x == -128 {
+				return smallPolynomial{}, 0, errors.New("falcon-1024: invalid trim_i8 encoding")
+			}
+			p[i] = int32(x)
+		}
+		return p, inLen, nil
+	}
+
+	mask := uint32((1 << bits) - 1)
+	signBit := int32(1 << (bits - 1))
+	fullRange := int32(1 << bits)
+
+	var acc uint32
+	accBits := 0
+	read := 0
+
+	for i := range p {
+		for accBits < bits {
+			acc = (acc << 8) | uint32(src[read])
+			read++
+			accBits += 8
+		}
+
+		accBits -= bits
+		x := int32((acc >> accBits) & mask)
+
+		if x >= signBit {
+			if x == signBit {
+				return smallPolynomial{}, 0, errors.New("falcon-1024: invalid trim_i8 encoding")
+			}
+			x -= fullRange
+		}
+
+		p[i] = x
+
+		if accBits == 0 {
+			acc = 0
+		} else {
+			acc &= (1 << accBits) - 1
+		}
+	}
+
+	if acc != 0 {
+		return smallPolynomial{}, 0, errors.New("falcon-1024: invalid trim_i8 encoding")
+	}
+
+	return p, inLen, nil
 }
