@@ -148,7 +148,7 @@ func initPrivateKey(priv *PrivateKey, f, g, ntruF, ntruG smallPolynomial, h ring
 }
 
 func expandPrivateKey(priv *PrivateKey, f, g, ntruF, ntruG smallPolynomial) error {
-	// WIP
+	// TODO
 	return nil
 }
 
@@ -292,7 +292,7 @@ func sign(random io.Reader, signature []byte, priv *PrivateKey, message []byte) 
 }
 
 func signTree(rng io.Reader, priv *PrivateKey, c0 ringElement) (smallPolynomial, error) {
-	// WIP
+	// TODO
 	return smallPolynomial{}, nil
 }
 
