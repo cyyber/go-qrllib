@@ -39,18 +39,16 @@ type PrivateKey []byte
 
 // Public returns the [PublicKey] corresponding to priv.
 func (priv PrivateKey) Public() (crypto.PublicKey, error) {
-	// TODO
-	// k, err := privateKeyCache.Get(&priv[0], func() (*falcon1024.PrivateKey, error) {
-	// 	return falcon1024.NewPrivateKey(priv)
-	// }, func(k *falcon1024.PrivateKey) bool {
-	// 	return subtle.ConstantTimeCompare(priv, k.Bytes()) == 1
-	// })
-	// if err != nil {
-	// 	return nil, err
-	// }
+	k, err := privateKeyCache.Get(&priv[0], func() (*falcon1024.PrivateKey, error) {
+		return falcon1024.NewPrivateKey(priv)
+	}, func(k *falcon1024.PrivateKey) bool {
+		return subtle.ConstantTimeCompare(priv, k.Bytes()) == 1
+	})
+	if err != nil {
+		return nil, err
+	}
 
-	// return append(make([]byte, 0, PublicKeySize), k.PublicKey().Bytes()...)
-	return nil, nil
+	return append(make([]byte, 0, PublicKeySize), k.PublicKey()...), nil
 }
 
 // Equal reports whether priv and x have the same value.
@@ -67,18 +65,16 @@ func (priv PrivateKey) Equal(x crypto.PrivateKey) bool {
 var privateKeyCache cache.Cache[byte, falcon1024.PrivateKey]
 
 func (priv PrivateKey) Sign(rand io.Reader, message []byte) (signature []byte, err error) {
-	// TODO
-	// k, err := privateKeyCache.Get(&priv[0], func() (*falcon1024.PrivateKey, error) {
-	// 	return falcon1024.NewPrivateKey(priv)
-	// }, func(k *falcon1024.PrivateKey) bool {
-	// 	return subtle.ConstantTimeCompare(priv, k.Bytes()) == 1
-	// })
-	// if err != nil {
-	// 	return nil, err
-	// }
+	k, err := privateKeyCache.Get(&priv[0], func() (*falcon1024.PrivateKey, error) {
+		return falcon1024.NewPrivateKey(priv)
+	}, func(k *falcon1024.PrivateKey) bool {
+		return subtle.ConstantTimeCompare(priv, k.Bytes()) == 1
+	})
+	if err != nil {
+		return nil, err
+	}
 
-	// return falcon1024.Sign(k, message)
-	return nil, nil
+	return falcon1024.Sign(rand, k, message)
 }
 
 // GenerateKey generates a public/private key pair using entropy from random.
@@ -110,7 +106,7 @@ func newKeyFromSeed(publicKey, privateKey, seed []byte) {
 	if err != nil {
 		panic("falcon-1024: bad seed length: " + strconv.Itoa(len(seed)))
 	}
-	copy(publicKey, k.PublicKey().Bytes())
+	copy(publicKey, k.PublicKey())
 	copy(privateKey, k.Bytes())
 }
 

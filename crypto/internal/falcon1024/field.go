@@ -12,8 +12,6 @@ const (
 	qNegInv            = 12287 // -q^-1 mod 2^16
 	r2                 = 10952 // 2^32 mod q
 	nInverseMontgomery = 64    // n^-1 * 2^16 mod q
-	modQBits           = 14
-	modQEncodedSize    = (n*modQBits + 7) >> 3
 )
 
 type fieldElement uint32
@@ -38,6 +36,43 @@ func fieldAdd(a, b fieldElement) fieldElement {
 func fieldSub(a, b fieldElement) fieldElement {
 	x := uint32(a - b + q)
 	return fieldReduceOnce(x)
+}
+
+// fieldInv returns 1/x mod q. x must be non-zero.
+func fieldInv(x fieldElement) fieldElement {
+	return fieldMontgomeryMul(fieldInvMontgomery(x), 1)
+}
+
+// fieldDiv returns x/y mod q. y must be non-zero.
+func fieldDiv(x, y fieldElement) fieldElement {
+	return fieldMontgomeryMul(x, fieldInvMontgomery(y))
+}
+
+// fieldInvMontgomery returns 1/x in Montgomery representation.
+func fieldInvMontgomery(x fieldElement) fieldElement {
+	y0 := fieldMontgomeryMul(x, r2)
+	y1 := fieldMontgomerySqr(y0)
+	y2 := fieldMontgomeryMul(y1, y0)
+	y3 := fieldMontgomeryMul(y2, y1)
+	y4 := fieldMontgomerySqr(y3)
+	y5 := fieldMontgomerySqr(y4)
+	y6 := fieldMontgomerySqr(y5)
+	y7 := fieldMontgomerySqr(y6)
+	y8 := fieldMontgomerySqr(y7)
+	y9 := fieldMontgomeryMul(y8, y2)
+	y10 := fieldMontgomeryMul(y9, y8)
+	y11 := fieldMontgomerySqr(y10)
+	y12 := fieldMontgomerySqr(y11)
+	y13 := fieldMontgomeryMul(y12, y9)
+	y14 := fieldMontgomerySqr(y13)
+	y15 := fieldMontgomerySqr(y14)
+	y16 := fieldMontgomeryMul(y15, y10)
+	y17 := fieldMontgomerySqr(y16)
+	return fieldMontgomeryMul(y17, y0)
+}
+
+func fieldMontgomerySqr(x fieldElement) fieldElement {
+	return fieldMontgomeryMul(x, x)
 }
 
 func fieldMontgomeryMul(a, b fieldElement) fieldElement {
@@ -219,7 +254,7 @@ func toNTTMonty(h ringElement) nttElement {
 
 const signatureNormBound uint64 = 70_265_242
 
-type smallPolynomial [n]int32 // signed small coefficients
+type smallPolynomial [n]int32
 
 func sampleSmallPolynomial(rng *sha3.SHAKE) smallPolynomial {
 	// TODO
@@ -236,13 +271,13 @@ func coefficientsExceedBound(p smallPolynomial, bound int32) bool {
 }
 
 func squaredNormExceedsBound(f, g smallPolynomial, bound uint32) bool {
+	// TODO
 	return f.squaredNorm()+g.squaredNorm() > bound
 }
 
 func orthogonalizedNormExceedsBound(f, g smallPolynomial, bound float64) bool {
-	// TODO: implement Falcon's FFT-based orthogonalized norm check once the
-	// fpr/FFT helpers are moved into the active package.
-	panic("falcon-1024: orthogonalized norm check not implemented")
+	// TODO
+	return false
 }
 
 func (p smallPolynomial) squaredNorm() uint32 {

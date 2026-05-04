@@ -15,10 +15,10 @@ const (
 )
 
 type PrivateKey struct {
-	raw [privateKeySize]byte // TODO: needed?
-	pub *PublicKey
-	// b00, b01, b10, b11 fprPolynomial
-	// tree fprTree // ffLDL tree for sign_tree
+	raw                [privateKeySize]byte
+	pub                [publicKeySize]byte
+	b00, b01, b10, b11 fprPolynomial
+	tree               fprTree
 }
 
 func (priv *PrivateKey) Bytes() []byte {
@@ -27,8 +27,9 @@ func (priv *PrivateKey) Bytes() []byte {
 	return k
 }
 
-func (priv *PrivateKey) PublicKey() *PublicKey {
-	return priv.pub
+func (priv *PrivateKey) PublicKey() []byte {
+	pub := priv.pub
+	return pub[:]
 }
 
 type PublicKey struct {
@@ -41,19 +42,6 @@ func (pub *PublicKey) Bytes() []byte {
 	copy(k, pub.raw[:])
 	return k
 }
-
-// TODO
-// GenerateKey generates a new Falcon-1024 private key pair.
-// func GenerateKey() (*PrivateKey, error) {
-// 	priv := &PrivateKey{}
-// 	return generateKey(priv)
-// }
-
-// func generateKey(priv *PrivateKey) (*PrivateKey, error) {
-// 	// TODO
-// 	// precomputePrivateKey(priv)
-// 	return nil, nil
-// }
 
 const privateKeyHeader byte = 0x50 + logN
 
@@ -122,63 +110,46 @@ func keygen(priv *PrivateKey, rng *sha3.SHAKE) (*PrivateKey, error) {
 }
 
 func computePublic(f, g smallPolynomial) (ringElement, bool) {
-	// TODO
-	return ringElement{}, false
-}
+	var fModQ ringElement
+	var gModQ ringElement
 
-func solveNTRU(f, g smallPolynomial) (ntruF, ntruG smallPolynomial, ok bool) {
-	// TODO
-	return smallPolynomial{}, smallPolynomial{}, true
+	for i := range fModQ {
+		fModQ[i] = fieldFromSmall(f[i])
+		gModQ[i] = fieldFromSmall(g[i])
+	}
+
+	fNTT := ntt(fModQ)
+	hNTT := ntt(gModQ)
+
+	for i := range hNTT {
+		if fNTT[i] == 0 {
+			return ringElement{}, false
+		}
+		hNTT[i] = fieldDiv(hNTT[i], fNTT[i])
+	}
+
+	return inverseNTT(hNTT), true
 }
 
 func initPrivateKey(priv *PrivateKey, f, g, ntruF, ntruG smallPolynomial, h ringElement) (*PrivateKey, error) {
-	// if err := encodePrivateKey(priv.raw[:], f, g, ntruF); err != nil {
-	// 	return nil, err
-	// }
+	if err := skEncode(priv.raw[:], f, g, ntruF); err != nil {
+		return nil, err
+	}
 
-	// if err := encodePublicKey(priv.pub.raw[:], h); err != nil {
-	// 	return nil, err
-	// }
-	// priv.pub.hNTTMonty = toNTTMonty(h)
+	if err := pkEncode(priv.pub[:], h); err != nil {
+		return nil, err
+	}
 
-	// if err := expandPrivateKey(priv, f, g, ntruF, ntruG); err != nil {
-	// 	return nil, err
-	// }
+	if err := expandPrivateKey(priv, f, g, ntruF, ntruG); err != nil {
+		return nil, err
+	}
 
 	return nil, nil
 }
 
 func expandPrivateKey(priv *PrivateKey, f, g, ntruF, ntruG smallPolynomial) error {
-	// TODO
+	// WIP
 	return nil
-}
-
-func precomputePrivateKey(priv *PrivateKey, seed []byte) {
-	// seed -> keygen -> f,g,F,G,h
-	// encode priv.raw from f,g,F
-	// encode/expand pub from h
-	// expand priv signing state from f,g,F,G
-
-	/*
-		priv.raw[0] = privateKeyHeader
-		rng := sha3.NewSHAKE256()
-		rng.Write(seed)
-		rng.Read(priv.raw[encodedHeaderSize:])
-
-		if priv.pub == nil {
-			priv.pub = &PublicKey{}
-		}
-
-		priv.raw[0] = privateKeyHeader
-		priv.pub.raw[0] = publicKeyHeader
-
-		hash := sha3.NewSHAKE256()
-		hash.Write(priv.raw[:])
-
-		h, _ := hashToPoint(hash)
-		polyByteEncode(priv.pub.raw[encodedHeaderSize:], h)
-		priv.pub.hNTTMonty = toNTTMonty(h)
-	*/
 }
 
 func NewPrivateKey(priv []byte) (*PrivateKey, error) {
@@ -187,23 +158,74 @@ func NewPrivateKey(priv []byte) (*PrivateKey, error) {
 }
 
 func newPrivateKey(priv *PrivateKey, privBytes []byte) (*PrivateKey, error) {
-	// newPrivateKey does raw -> decode f,g,F -> complete G -> compute h -> initPrivateKey
-	// decode f,g,F from serialized private key
-	// complete G from f,g,F
-	// compute h / public key
-	// expand priv signing state from f,g,F,G
-	// copy priv.raw
-
 	if l := len(privBytes); l != privateKeySize {
 		return nil, errors.New("falcon-1024: bad private key length: " + strconv.Itoa(l))
 	}
 	if privBytes[0] != privateKeyHeader {
-		return nil, errors.New("falcon-1024: bad private key")
+		return nil, errors.New("falcon-1024: invalid private key")
 	}
-	copy(priv.raw[:], privBytes)
-	// TODO
-	// precomputePrivateKey(priv)
-	return priv, nil
+
+	f, g, ntruF, err := skDecode(privBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	ntruG, ok := completePrivate(f, g, ntruF)
+	if !ok {
+		return nil, errors.New("falcon-1024: invalid private key")
+	}
+
+	h, ok := computePublic(f, g)
+	if !ok {
+		return nil, errors.New("falcon-1024: invalid private key")
+	}
+
+	return initPrivateKey(priv, f, g, ntruF, ntruG, h)
+}
+
+func completePrivate(f, g, ntruF smallPolynomial) (smallPolynomial, bool) {
+	var gModQ ringElement
+	var ntruFModQ ringElement
+
+	for i := range gModQ {
+		gModQ[i] = fieldFromSmall(g[i])
+		ntruFModQ[i] = fieldFromSmall(ntruF[i])
+	}
+
+	gNTT := ntt(gModQ)
+	ntruFNTT := ntt(ntruFModQ)
+
+	for i := range gNTT {
+		gNTT[i] = fieldMontgomeryMul(gNTT[i], r2)
+	}
+	gNTT = nttMul(gNTT, ntruFNTT)
+
+	var fModQ ringElement
+	for i := range fModQ {
+		fModQ[i] = fieldFromSmall(f[i])
+	}
+
+	fNTT := ntt(fModQ)
+
+	for i := range gNTT {
+		if fNTT[i] == 0 {
+			return smallPolynomial{}, false
+		}
+		gNTT[i] = fieldDiv(gNTT[i], fNTT[i])
+	}
+
+	ntruGModQ := inverseNTT(gNTT)
+
+	var ntruG smallPolynomial
+	for i := range ntruG {
+		gi := fieldCenteredMod(ntruGModQ[i])
+		if gi < -ntruFBound || gi > ntruFBound {
+			return smallPolynomial{}, false
+		}
+		ntruG[i] = gi
+	}
+
+	return ntruG, true
 }
 
 const publicKeyHeader byte = 0x00 + logN
@@ -221,7 +243,7 @@ func newPublicKey(pub *PublicKey, pubBytes []byte) (*PublicKey, error) {
 		return nil, errors.New("falcon-1024: invalid public key")
 	}
 
-	h, err := polyByteDecode[ringElement](pubBytes[encodedHeaderSize:])
+	h, err := pkDecode(pubBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -262,20 +284,15 @@ func sign(random io.Reader, signature []byte, priv *PrivateKey, message []byte) 
 		return nil, err
 	}
 
-	signature[0] = signatureHeader
-	copy(signature[encodedHeaderSize:signaturePrefixSize], nonce[:])
-
-	written, err := compressedEncode(signature[signaturePrefixSize:], s2)
-	if err != nil {
+	if err := sigEncode(signature, &nonce, s2); err != nil {
 		return nil, err
 	}
-	clear(signature[signaturePrefixSize+written:]) // double check
 
 	return signature, nil
 }
 
 func signTree(rng io.Reader, priv *PrivateKey, c0 ringElement) (smallPolynomial, error) {
-	// TODO
+	// WIP
 	return smallPolynomial{}, nil
 }
 
@@ -308,19 +325,12 @@ func newSignature(sig *Signature, sigBytes []byte) (*Signature, error) {
 		return nil, errors.New("falcon-1024: invalid signature")
 	}
 
-	copy(sig.nonce[:], sigBytes[encodedHeaderSize:signaturePrefixSize])
-
-	s2, consumed, err := compressedDecode(sigBytes[signaturePrefixSize:])
+	nonce, s2, err := sigDecode(sigBytes)
 	if err != nil {
 		return nil, err
 	}
+	sig.nonce = nonce
 	sig.s2 = s2
-
-	for _, b := range sigBytes[signaturePrefixSize+consumed:] {
-		if b != 0 {
-			return nil, errors.New("falcon-1024: invalid signature")
-		}
-	}
 
 	return sig, nil
 }
