@@ -338,7 +338,7 @@ func TestKeySizeInvariants(t *testing.T) {
 }
 
 // TestAddressFormatConsistency verifies that both algorithms produce addresses
-// in the same format (Q + 40 hex chars).
+// in the same format (Q + 96 hex chars).
 func TestAddressFormatConsistency(t *testing.T) {
 	mlWallet, _ := ml_dsa_wallet.NewWallet()
 	sphincsWallet, _ := sphincs_wallet.NewWallet()

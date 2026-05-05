@@ -10,7 +10,7 @@ import (
 
 func TestIsValidAddress(t *testing.T) {
 	// Valid address: "Q" + 96 hex chars (48 bytes * 2)
-	validAddr := "Q" + strings.Repeat("ab", AddressSize) // Q + 40 hex chars
+	validAddr := "Q" + strings.Repeat("ab", AddressSize) // Q + 96 hex chars
 
 	tests := []struct {
 		name     string
