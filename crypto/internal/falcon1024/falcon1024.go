@@ -176,11 +176,18 @@ func expandPrivateKey(priv *PrivateKey, f, g, ntruF, ntruG smallPolynomial) erro
 	tmp = fftMulSelfAdj(tmp)
 	g11 = polyAdd(g11, tmp)
 
-	// TODO
-	// ffLDLFFT(priv.tree[:], &g00, &g01, &g11, logN)
-	// ffLDLBinaryNormalize(priv.tree[:], logN, logN)
+	ffLDLFFT(priv.tree[:], g00, g01, g11, logN)
+	ffLDLBinaryNormalize(priv.tree[:], logN, logN)
 
 	return nil
+}
+
+func ffLDLFFT(tree []fpr, g00, g01, g11 fftPolynomial, logn int) {
+	// TODO
+}
+
+func ffLDLBinaryNormalize(tree []fpr, origLogn, logn int) {
+	// TODO
 }
 
 func NewPrivateKey(priv []byte) (*PrivateKey, error) {
