@@ -175,12 +175,13 @@ func hashToPoint(h *sha3.SHAKE) (ringElement, error) {
 	return p, nil
 }
 
-func polySub[T ~[n]fieldElement](a, b T) (s T) {
-	for i := range s {
-		s[i] = fieldSub(a[i], b[i])
-	}
-	return s
-}
+// TODO
+// func polySub[T ~[n]fieldElement](a, b T) (s T) {
+// 	for i := range s {
+// 		s[i] = fieldSub(a[i], b[i])
+// 	}
+// 	return s
+// }
 
 type nttElement [n]fieldElement // NTT-domain modulo-q polynomial
 
@@ -515,6 +516,11 @@ const signatureNormBound uint64 = 70_265_242
 
 type smallPolynomial [n]int32
 
+func smallPolynomialFromBig(p bigPolynomial, bits int) (smallPolynomial, bool) {
+	// TODO
+	return smallPolynomial{}, false
+}
+
 func sampleSmallPolynomial(rng *sha3.SHAKE) smallPolynomial {
 	// TODO
 	return smallPolynomial{}
@@ -569,3 +575,5 @@ func signatureNormWithinBound(s1, s2 smallPolynomial) bool {
 
 	return true
 }
+
+type bigPolynomial []uint32
