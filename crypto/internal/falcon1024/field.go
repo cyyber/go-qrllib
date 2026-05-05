@@ -175,13 +175,6 @@ func hashToPoint(h *sha3.SHAKE) (ringElement, error) {
 	return p, nil
 }
 
-func polyAdd[T ~[n]fieldElement](a, b T) (s T) {
-	for i := range s {
-		s[i] = fieldAdd(a[i], b[i])
-	}
-	return s
-}
-
 func polySub[T ~[n]fieldElement](a, b T) (s T) {
 	for i := range s {
 		s[i] = fieldSub(a[i], b[i])
@@ -276,6 +269,11 @@ func squaredNormExceedsBound(f, g smallPolynomial, bound uint32) bool {
 }
 
 func orthogonalizedNormExceedsBound(f, g smallPolynomial, bound float64) bool {
+	// TODO
+	return false
+}
+
+func signatureNormExceedsPartialBound(sqn uint32, s2 smallPolynomial) bool {
 	// TODO
 	return false
 }

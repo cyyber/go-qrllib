@@ -17,7 +17,7 @@ const (
 type PrivateKey struct {
 	raw                [privateKeySize]byte
 	pub                [publicKeySize]byte
-	b00, b01, b10, b11 fprPolynomial
+	b00, b01, b10, b11 fftPolynomial
 	tree               fprTree
 }
 
@@ -148,41 +148,35 @@ func initPrivateKey(priv *PrivateKey, f, g, ntruF, ntruG smallPolynomial, h ring
 }
 
 func expandPrivateKey(priv *PrivateKey, f, g, ntruF, ntruG smallPolynomial) error {
-	fprFromSmall(&priv.b01, f)
-	fprFromSmall(&priv.b00, g)
-	fprFromSmall(&priv.b11, ntruF)
-	fprFromSmall(&priv.b10, ntruG)
+	priv.b01 = fft(fprFromSmall(f))
+	priv.b00 = fft(fprFromSmall(g))
+	priv.b11 = fft(fprFromSmall(ntruF))
+	priv.b10 = fft(fprFromSmall(ntruG))
 
-	fft(&priv.b01)
-	fft(&priv.b00)
-	fft(&priv.b11)
-	fft(&priv.b10)
+	priv.b01 = polyNeg(priv.b01)
+	priv.b11 = polyNeg(priv.b11)
 
-	polyNeg(&priv.b01)
-	polyNeg(&priv.b11)
+	var g00, g01, g11, tmp fftPolynomial
+
+	copy(g00[:], priv.b00[:])
+	g00 = fftMulSelfAdj(g00)
+	copy(tmp[:], priv.b01[:])
+	tmp = fftMulSelfAdj(tmp)
+	g00 = polyAdd(g00, tmp)
+
+	copy(g01[:], priv.b00[:])
+	g01 = fftMulSelfAdj(priv.b10)
+	copy(tmp[:], priv.b01[:])
+	tmp = fftMulSelfAdj(priv.b11)
+	g01 = polyAdd(g01, tmp)
+
+	copy(g11[:], priv.b10[:])
+	g11 = fftMulSelfAdj(g11)
+	copy(tmp[:], priv.b11[:])
+	tmp = fftMulSelfAdj(tmp)
+	g11 = polyAdd(g11, tmp)
 
 	// TODO
-	// var g00, g01, g11, tmp fprPolynomial
-
-	// TODO
-	// copy(g00[:], priv.b00[:])
-	// polyMulSelfAdjFFT(&g00)
-	// copy(tmp[:], priv.b01[:])
-	// polyMulSelfAdjFFT(&tmp)
-	// polyAdd(&g00, &tmp)
-
-	// copy(g01[:], priv.b00[:])
-	// polyMulAdjFFT(&g01, &priv.b10)
-	// copy(tmp[:], priv.b01[:])
-	// polyMulAdjFFT(&tmp, &priv.b11)
-	// polyAdd(&g01, &tmp)
-
-	// copy(g11[:], priv.b10[:])
-	// polyMulSelfAdjFFT(&g11)
-	// copy(tmp[:], priv.b11[:])
-	// polyMulSelfAdjFFT(&tmp)
-	// polyAdd(&g11, &tmp)
-
 	// ffLDLFFT(priv.tree[:], &g00, &g01, &g11, logN)
 	// ffLDLBinaryNormalize(priv.tree[:], logN, logN)
 
@@ -363,16 +357,77 @@ func signTree(rng *sha3.SHAKE, priv *PrivateKey, c0 ringElement) (smallPolynomia
 	prng := newSamplerPRNG(rng)
 
 	for {
-		s2, ok := signTreeAttempt(prng, priv, c0)
-		if ok {
+		s2, err := signTreeAttempt(prng, priv, c0)
+		if err == nil {
 			return s2, nil
 		}
+		if errors.Is(err, errRetrySigning) {
+			continue
+		}
+		return smallPolynomial{}, err
 	}
 }
 
-func signTreeAttempt(prng *samplerPRNG, priv *PrivateKey, c0 ringElement) (smallPolynomial, bool) {
-	// TODO
-	return smallPolynomial{}, false
+var errRetrySigning = errors.New("")
+
+func signTreeAttempt(prng *samplerPRNG, priv *PrivateKey, c0 ringElement) (smallPolynomial, error) {
+	var target fprPolynomial
+	for i := range target {
+		target[i] = fpr(c0[i])
+	}
+
+	t0 := fft(target)
+	var t1 fftPolynomial
+	copy(t1[:], t0[:])
+	t1 = fftMul(t1, priv.b01)
+	t1 = fftMulConst(t1, -fprInverseOfQ)
+	t0 = fftMul(t0, priv.b11)
+	t0 = fftMulConst(t0, fprInverseOfQ)
+
+	t0, t1, err := ffSamplingFFT(prng, t0, t1, priv.tree[:], logN)
+	if err != nil {
+		return smallPolynomial{}, err
+	}
+
+	var latticeX fftPolynomial
+	copy(latticeX[:], t0[:])
+	latticeX = fftMul(latticeX, priv.b00)
+
+	var tmp fftPolynomial
+	copy(tmp[:], t1[:])
+	tmp = fftMul(tmp, priv.b10)
+	latticeX = polyAdd(latticeX, tmp)
+
+	var latticeY fftPolynomial
+	copy(latticeY[:], t0[:])
+	latticeY = fftMul(latticeY, priv.b01)
+
+	copy(tmp[:], t1[:])
+	fftMul(tmp, priv.b11)
+	latticeY = polyAdd(latticeY, tmp)
+
+	x := inverseFFT(latticeX)
+	y := inverseFFT(latticeY)
+
+	var s2 smallPolynomial
+	var sqn uint32
+	var ng uint32
+
+	for i := range s2 {
+		s1 := int32(c0[i]) - int32(fprRint(x[i]))
+		sqn += uint32(s1 * s1)
+		ng |= sqn
+
+		s2[i] = -int32(fprRint(y[i]))
+	}
+
+	sqn |= -(ng >> 31)
+
+	if signatureNormExceedsPartialBound(sqn, s2) {
+		return smallPolynomial{}, errRetrySigning
+	}
+
+	return s2, nil
 }
 
 func Verify(pub *PublicKey, message []byte, sig *Signature) error {
