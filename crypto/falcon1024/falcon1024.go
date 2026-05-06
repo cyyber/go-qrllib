@@ -34,7 +34,7 @@ func (pub PublicKey) Equal(x crypto.PublicKey) bool {
 	return subtle.ConstantTimeCompare(pub, xx) == 1
 }
 
-// PrivateKey is the type of Falcon-1024 private keys. It implements [crypto.Signer].
+// PrivateKey is the type of Falcon-1024 private keys.
 type PrivateKey []byte
 
 // Public returns the [PublicKey] corresponding to priv.
@@ -66,17 +66,8 @@ func (priv PrivateKey) Equal(x crypto.PrivateKey) bool {
 // key, because [PrivateKey] is a slice header passed around by value.
 var privateKeyCache cache.Cache[byte, falcon1024.PrivateKey]
 
-func (priv PrivateKey) Sign(rand io.Reader, message []byte) (signature []byte, err error) {
-	k, err := privateKeyCache.Get(&priv[0], func() (*falcon1024.PrivateKey, error) {
-		return falcon1024.NewPrivateKey(priv)
-	}, func(k *falcon1024.PrivateKey) bool {
-		return subtle.ConstantTimeCompare(priv, k.Bytes()) == 1
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return falcon1024.Sign(rand, k, message)
+func (priv PrivateKey) Sign(random io.Reader, message []byte) (signature []byte, err error) {
+	return Sign(random, priv, message)
 }
 
 // GenerateKey generates a public/private key pair using entropy from random.
