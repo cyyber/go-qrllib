@@ -11,6 +11,7 @@ import (
 func TestSampleFFTPointReferenceKATs(t *testing.T) {
 	// Derived from Supporting_Documentation/additional/
 	// test-vector-sampler-falcon1024.txt in the Falcon submission package.
+	// Source archive: https://falcon-sign.info/falcon-round3.zip
 	testCases := []struct {
 		name   string
 		mu     fpr
@@ -332,6 +333,7 @@ func TestSampleFFTPointReferenceKATs(t *testing.T) {
 func TestGaussian0SamplerReferenceBoundaries(t *testing.T) {
 	// Derived from test_gaussian0_sampler in the Falcon reference
 	// implementation test_falcon.c.
+	// Source: https://falcon-sign.info/impl/test_falcon.c.html
 	dist := []string{
 		"1697680241746640300030",
 		"1459943456642912959616",

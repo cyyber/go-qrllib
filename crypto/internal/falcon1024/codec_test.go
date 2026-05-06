@@ -10,6 +10,7 @@ import (
 func TestPublicKeyCodecReferenceKAT(t *testing.T) {
 	// Derived from the Falcon reference implementation test_falcon.c
 	// ntru_pkey_1024 array.
+	// Source: https://falcon-sign.info/impl/test_falcon.c.html
 	want := mustDecodeHex(t, verifyRawKATPublicKeyHex)
 	if len(want) != publicKeySize {
 		t.Fatalf("reference public key length = %d, want %d", len(want), publicKeySize)
@@ -36,6 +37,7 @@ func TestPrivateKeyCodecReferencePolynomials(t *testing.T) {
 	// test_falcon.c publishes component private-key polynomials, not a
 	// serialized secret key. Use those reference polynomials to check that our
 	// private-key codec round-trips the reference components.
+	// Source: https://falcon-sign.info/impl/test_falcon.c.html
 	f := mustDecodeSmallPolynomialHex(t, ntru_f_1024Hex)
 	g := mustDecodeSmallPolynomialHex(t, ntru_g_1024Hex)
 	ntruF := mustDecodeSmallPolynomialHex(t, ntru_F_1024Hex)
@@ -59,6 +61,7 @@ func TestSignatureCodecReferenceRawS2KATs(t *testing.T) {
 	// KAT_SIG_1024 raw verify vectors. Those raw vectors use a 32-byte hash
 	// seed, not the 40-byte nonce carried by padded Falcon signatures, so the
 	// seed is zero-extended only to exercise this package's padded codec.
+	// Source: https://falcon-sign.info/impl/test_falcon.c.html
 	for _, tc := range verifyRawKATs {
 		t.Run(tc.message, func(t *testing.T) {
 			nonceBytes := mustDecodeHex(t, tc.nonceHex)
@@ -89,6 +92,7 @@ func TestSignatureCodecReferenceRawS2KATs(t *testing.T) {
 func TestCompressedEncodeReferenceRawS2KATs(t *testing.T) {
 	// The expected lengths and digests were derived from the Falcon reference
 	// implementation comp_encode applied to KAT_SIG_1024 s2 values.
+	// Source: https://falcon-sign.info/impl/test_falcon.c.html
 	expected := []struct {
 		length int
 		digest string
@@ -129,6 +133,7 @@ func TestCompressedEncodeReferenceRawS2KATs(t *testing.T) {
 func TestTrimI8EncodeReferenceKATs(t *testing.T) {
 	// The expected lengths and digests were derived from the Falcon reference
 	// implementation trim_i8_encode applied to test_falcon.c ntru_*_1024 arrays.
+	// Source: https://falcon-sign.info/impl/test_falcon.c.html
 	testCases := []struct {
 		name   string
 		p      smallPolynomial

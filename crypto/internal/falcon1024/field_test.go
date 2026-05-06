@@ -12,6 +12,7 @@ func TestHashToPointReferenceKATs(t *testing.T) {
 	// The expected digests were derived from the Falcon reference
 	// implementation hash_to_point_vartime applied to KAT_SIG_1024
 	// nonce/message pairs. Digests are over 1024 big-endian uint16 values.
+	// Source: https://falcon-sign.info/impl/test_falcon.c.html
 	expected := []string{
 		"e8332e46eeaa30a54945a14a405fcad8ef8078a87657e50e18248076bab9ecb7",
 		"5c8070d70b241263cac562873abc120d7ab1534df58675fd14bf423a3112262a",

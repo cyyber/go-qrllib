@@ -12,6 +12,7 @@ import (
 
 // Vectors are derived from the Falcon reference implementation test_falcon.c
 // ntru_pkey_1024 and KAT_SIG_1024 verify_raw tests.
+// Source: https://falcon-sign.info/impl/test_falcon.c.html
 const verifyRawKATPublicKeyHex = "0a6b251ac6d110b685263fe063ecc5a1aa4662b404f8063160325e0e27205e3b988f8d3f4c9291d6d24d084f72be8514" +
 	"d1a57a443ce64cadd03a3c4a61e68801a6946c01f05ff9901e4c20e41efe1fc01795c6d1a32070fe920f5a5d736d077b" +
 	"8c88b3460ea315fb561a476abb93a968b25aa1bf704d8a7b07155f04fd6db21e96d43b916c3c3d8ce4c5f5c5666015b0" +
@@ -562,6 +563,7 @@ func TestVerifyRawReferenceKAT(t *testing.T) {
 func TestNewPublicKeyReferenceKAT(t *testing.T) {
 	// Derived from the Falcon reference implementation test_falcon.c
 	// ntru_pkey_1024 array.
+	// Source: https://falcon-sign.info/impl/test_falcon.c.html
 	pubBytes := mustDecodeHex(t, verifyRawKATPublicKeyHex)
 	h, err := pkDecode(pubBytes)
 	if err != nil {
@@ -580,6 +582,7 @@ func TestNewPublicKeyReferenceKAT(t *testing.T) {
 func TestComputePublicReferenceKAT(t *testing.T) {
 	// Derived from the Falcon reference implementation test_falcon.c
 	// ntru_f_1024, ntru_g_1024, and ntru_pkey_1024 arrays.
+	// Source: https://falcon-sign.info/impl/test_falcon.c.html
 	f := mustDecodeSmallPolynomialHex(t, ntru_f_1024Hex)
 	g := mustDecodeSmallPolynomialHex(t, ntru_g_1024Hex)
 
@@ -609,6 +612,7 @@ func TestComputePublicReferenceKAT(t *testing.T) {
 func TestCompletePrivateReferenceKAT(t *testing.T) {
 	// Derived from the Falcon reference implementation test_falcon.c
 	// ntru_f_1024, ntru_g_1024, ntru_F_1024, and ntru_G_1024 arrays.
+	// Source: https://falcon-sign.info/impl/test_falcon.c.html
 	f := mustDecodeSmallPolynomialHex(t, ntru_f_1024Hex)
 	g := mustDecodeSmallPolynomialHex(t, ntru_g_1024Hex)
 	ntruF := mustDecodeSmallPolynomialHex(t, ntru_F_1024Hex)
@@ -627,6 +631,7 @@ func TestNewPrivateKeyReferencePolynomials(t *testing.T) {
 	// test_falcon.c publishes component private-key polynomials, not a
 	// serialized secret key. Use those reference polynomials to check that
 	// private-key reconstruction produces the reference public key.
+	// Source: https://falcon-sign.info/impl/test_falcon.c.html
 	f := mustDecodeSmallPolynomialHex(t, ntru_f_1024Hex)
 	g := mustDecodeSmallPolynomialHex(t, ntru_g_1024Hex)
 	ntruF := mustDecodeSmallPolynomialHex(t, ntru_F_1024Hex)
@@ -651,6 +656,7 @@ func TestSignTreeReferenceKeySelf(t *testing.T) {
 	// ntru_pkey_1024 arrays. The reference publishes the key components, not
 	// deterministic sign-tree outputs, so this checks that signing with that
 	// reference key produces signatures accepted by the reference public key.
+	// Source: https://falcon-sign.info/impl/test_falcon.c.html
 	f := mustDecodeSmallPolynomialHex(t, ntru_f_1024Hex)
 	g := mustDecodeSmallPolynomialHex(t, ntru_g_1024Hex)
 	ntruF := mustDecodeSmallPolynomialHex(t, ntru_F_1024Hex)
@@ -719,6 +725,7 @@ func TestNewSignatureReferenceRawS2KATs(t *testing.T) {
 	// KAT_SIG_1024 raw verify vectors. Those raw vectors use a 32-byte hash
 	// seed, not the 40-byte nonce carried by padded Falcon signatures, so the
 	// seed is zero-extended only to exercise NewSignature.
+	// Source: https://falcon-sign.info/impl/test_falcon.c.html
 	for _, tc := range verifyRawKATs {
 		t.Run(tc.message, func(t *testing.T) {
 			nonceBytes := mustDecodeHex(t, tc.nonceHex)

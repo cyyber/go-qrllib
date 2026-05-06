@@ -11,6 +11,7 @@ import (
 func TestSamplerPRNGReferenceKATs(t *testing.T) {
 	// Digests are derived from KAT_RNG_1 and KAT_RNG_2 in the Falcon
 	// reference implementation's test_falcon.c.
+	// Source: https://falcon-sign.info/impl/test_falcon.c.html
 	rng := sha3.NewSHAKE256()
 	rng.Write([]byte("rng"))
 	prng := newSamplerPRNG(rng)
