@@ -3,10 +3,11 @@ package falcon1024
 import "math"
 
 const (
-	ntruCoeffBits    = 8
-	ntruCoeffBound   = 1<<(ntruCoeffBits-1) - 1
-	depthIntFG       = 4
-	ntruScratchWords = 1 << 20
+	ntruCoeffBits      = 8
+	ntruCoeffBound     = 1<<(ntruCoeffBits-1) - 1
+	depthIntFG         = 4
+	ntruScratchWords   = 7 * n
+	makeFGScratchWords = 6 * n
 )
 
 var (
@@ -558,12 +559,14 @@ var primes = [...]smallPrime{
 
 func solveNTRU(f, g smallPolynomial) (ntruF, ntruG smallPolynomial, ok bool) {
 	tmp := make([]uint32, ntruScratchWords)
+	fgData := make([]uint32, makeFGScratchWords)
+	work := make([]uint32, polySubScaledNTTWorkspaceWords())
 
 	if !solveNTRUDeepest(f, g, tmp) {
 		return smallPolynomial{}, smallPolynomial{}, false
 	}
 	for depth := logN - 1; depth >= 2; depth-- {
-		if !solveNTRUIntermediate(f, g, depth, tmp) {
+		if !solveNTRUIntermediate(f, g, depth, tmp, fgData, work) {
 			return smallPolynomial{}, smallPolynomial{}, false
 		}
 	}
@@ -586,6 +589,20 @@ func solveNTRU(f, g smallPolynomial) (ntruF, ntruG smallPolynomial, ok bool) {
 		return smallPolynomial{}, smallPolynomial{}, false
 	}
 	return ntruF, ntruG, true
+}
+
+func polySubScaledNTTWorkspaceWords() int {
+	maxWords := 0
+	for depth := 2; depth <= depthIntFG; depth++ {
+		logn := logN - depth
+		nn := 1 << logn
+		tlen := maxBlSmall[depth] + 1
+		words := nn * (tlen + 3)
+		if words > maxWords {
+			maxWords = words
+		}
+	}
+	return maxWords
 }
 
 func checkNTRUEquation(f, g, ntruF, ntruG smallPolynomial) bool {
@@ -853,7 +870,7 @@ func polySubScaledNTT(F []uint32, Flen, Fstride int, f []uint32, flen, fstride i
 	}
 }
 
-func solveNTRUIntermediate(f, g smallPolynomial, depth int, tmp []uint32) bool {
+func solveNTRUIntermediate(f, g smallPolynomial, depth int, tmp, fgData, work []uint32) bool {
 	logn := logN - depth
 	nn := 1 << logn
 	hn := nn >> 1
@@ -864,7 +881,6 @@ func solveNTRUIntermediate(f, g smallPolynomial, depth int, tmp []uint32) bool {
 	Fd := append([]uint32(nil), tmp[:dlen*hn]...)
 	Gd := append([]uint32(nil), tmp[dlen*hn:2*dlen*hn]...)
 
-	fgData := make([]uint32, ntruScratchWords)
 	makeFG(fgData, f, g, depth, true)
 	ft := append([]uint32(nil), fgData[:nn*slen]...)
 	gt := append([]uint32(nil), fgData[nn*slen:2*nn*slen]...)
@@ -998,7 +1014,6 @@ func solveNTRUIntermediate(f, g smallPolynomial, depth int, tmp []uint32) bool {
 
 		sch := uint32(scaleK / 31)
 		scl := uint32(scaleK % 31)
-		work := make([]uint32, ntruScratchWords)
 		if depth <= depthIntFG {
 			polySubScaledNTT(Ft, FGlen, llen, ft, slen, slen, k, sch, scl, logn, work)
 			polySubScaledNTT(Gt, FGlen, llen, gt, slen, slen, k, sch, scl, logn, work)
