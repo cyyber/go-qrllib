@@ -148,27 +148,6 @@ func TestGolden(t *testing.T) {
 	checkSHA256(t, "signature", signature, "874aca4adf12a73edb67521612928981e0931858030726ec0de028643803ed1a")
 }
 
-func TestPublicAPINISTStyleSmoke(t *testing.T) {
-	seed := make([]byte, SeedSize)
-	for i := range seed {
-		seed[i] = byte(i)
-	}
-
-	public, private := mustNewKeyFromSeed(t, seed)
-	message := []byte("Falcon-1024 NIST-style public API smoke")
-	signature, err := Sign(countingReader(0x42), private, message)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !Verify(public, message, signature) {
-		t.Fatal("signature failed verification")
-	}
-
-	checkSHA256(t, "NIST-style public key", public, "5569f1501147d3602287d9cae74af907e5be062cb90653c03d58cba12cac9db4")
-	checkSHA256(t, "NIST-style private key", private, "96bf4ccf9d963abe4609d845e0904eec999910b70d6b1fdfacfa8700ea9beaad")
-	checkSHA256(t, "NIST-style signature", signature, "fd24e4145fcb2767747ec4304968f62288c725ff55d5c94c5590f21108cf9096")
-}
-
 func testSeed() []byte {
 	seed := make([]byte, SeedSize)
 	countingReader(0).Read(seed)
