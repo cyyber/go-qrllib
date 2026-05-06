@@ -552,7 +552,7 @@ func TestVerifyRawReferenceKAT(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if !verifyRaw(c0, s2, pub.hNTTMonty) {
+			if !verifyRaw(c0, s2, pub.h) {
 				t.Fatal("reference verify_raw vector rejected")
 			}
 		})
@@ -572,8 +572,8 @@ func TestNewPublicKeyReferenceKAT(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if pub.hNTTMonty != toNTTMonty(h) {
-		t.Fatal("NewPublicKey cached unexpected NTT-domain public key")
+	if pub.h != h {
+		t.Fatal("NewPublicKey decoded unexpected public key polynomial")
 	}
 }
 
@@ -707,7 +707,7 @@ func TestSignTreeReferenceKeySelf(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if !verifyRaw(c0, s2, pub.hNTTMonty) {
+			if !verifyRaw(c0, s2, pub.h) {
 				t.Fatal("signTree output failed verifyRaw")
 			}
 		})

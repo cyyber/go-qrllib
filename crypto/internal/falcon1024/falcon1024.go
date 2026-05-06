@@ -34,8 +34,8 @@ func (priv *PrivateKey) PublicKey() []byte {
 }
 
 type PublicKey struct {
-	raw       [publicKeySize]byte
-	hNTTMonty nttElement
+	raw [publicKeySize]byte
+	h   ringElement
 }
 
 func (pub *PublicKey) Bytes() []byte {
@@ -358,7 +358,7 @@ func newPublicKey(pub *PublicKey, pubBytes []byte) (*PublicKey, error) {
 	}
 
 	copy(pub.raw[:], pubBytes)
-	pub.hNTTMonty = toNTTMonty(h)
+	pub.h = h
 	return pub, nil
 }
 
@@ -525,21 +525,21 @@ func verify(pub *PublicKey, message []byte, sig *Signature) error {
 		return err
 	}
 
-	if !verifyRaw(c0, sig.s2, pub.hNTTMonty) {
+	if !verifyRaw(c0, sig.s2, pub.h) {
 		return errors.New("falcon-1024: invalid signature")
 	}
 
 	return nil
 }
 
-func verifyRaw(c0 ringElement, s2 smallPolynomial, h nttElement) bool {
+func verifyRaw(c0 ringElement, s2 smallPolynomial, h ringElement) bool {
 	var t ringElement
 	for i := range t {
 		t[i] = fieldFromSmall(s2[i])
 	}
 
 	tNTT := ntt(t)
-	tNTT = nttMul(tNTT, h)
+	tNTT = nttMul(tNTT, toNTTMonty(h))
 	t = inverseNTT(tNTT)
 
 	var s1 smallPolynomial
