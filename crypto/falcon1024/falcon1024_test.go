@@ -2,6 +2,7 @@ package falcon1024
 
 import (
 	"bytes"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"log"
@@ -26,17 +27,16 @@ func Example_falcon1024() {
 	}
 }
 
-type countingReader byte
+type zeroReader struct{}
 
-func (r countingReader) Read(buf []byte) (int, error) {
-	for i := range buf {
-		buf[i] = byte(r) + byte(i)
-	}
+func (zeroReader) Read(buf []byte) (int, error) {
+	clear(buf)
 	return len(buf), nil
 }
 
 func TestGenerateKey(t *testing.T) {
-	public, private, err := GenerateKey(countingReader(0))
+	var zero zeroReader
+	public, private, err := GenerateKey(zero)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,7 +57,7 @@ func TestGenerateKey(t *testing.T) {
 	}
 
 	seed := make([]byte, SeedSize)
-	countingReader(0).Read(seed)
+	_, _ = zero.Read(seed)
 	publicFromSeed, privateFromSeed := mustNewKeyFromSeed(t, seed)
 	if !bytes.Equal(publicFromSeed, public) {
 		t.Fatal("GenerateKey and NewKeyFromSeed returned different public keys")
@@ -68,10 +68,14 @@ func TestGenerateKey(t *testing.T) {
 }
 
 func TestSignVerify(t *testing.T) {
-	public, private := mustNewKeyFromSeed(t, testSeed())
+	var zero zeroReader
+	public, private, err := GenerateKey(zero)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	message := []byte("test message")
-	sig, err := Sign(countingReader(0xa5), private, message)
+	sig, err := Sign(zero, private, message)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,10 +96,15 @@ func TestSignVerify(t *testing.T) {
 }
 
 func TestPrivateKeySign(t *testing.T) {
-	public, private := mustNewKeyFromSeed(t, testSeed())
+	var zero zeroReader
+	public, private, err := GenerateKey(zero)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	message := []byte("PrivateKey.Sign message")
 
-	sig, err := private.Sign(countingReader(0x5a), message)
+	sig, err := private.Sign(zero, message)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -105,8 +114,14 @@ func TestPrivateKeySign(t *testing.T) {
 }
 
 func TestNewKeyFromSeedInvalidSeed(t *testing.T) {
-	if _, _, err := NewKeyFromSeed(nil); err == nil {
-		t.Fatal("NewKeyFromSeed accepted invalid seed")
+	for _, seed := range [][]byte{
+		nil,
+		make([]byte, SeedSize-1),
+		make([]byte, SeedSize+1),
+	} {
+		if _, _, err := NewKeyFromSeed(seed); err == nil {
+			t.Fatalf("NewKeyFromSeed accepted seed with length %d", len(seed))
+		}
 	}
 }
 
@@ -131,11 +146,50 @@ func TestVerifyInvalidInputs(t *testing.T) {
 	}
 }
 
-func TestGolden(t *testing.T) {
-	public, private := mustNewKeyFromSeed(t, testSeed())
+func TestEqual(t *testing.T) {
+	public, private, err := GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !public.Equal(public) {
+		t.Errorf("public key is not equal to itself: %q", public)
+	}
+	derivedPublic, err := private.Public()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !public.Equal(derivedPublic) {
+		t.Errorf("private.Public() is not Equal to public: %q", public)
+	}
+	if !private.Equal(private) {
+		t.Errorf("private key is not equal to itself: %q", private)
+	}
+
+	otherPub, otherPriv, err := GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if public.Equal(otherPub) {
+		t.Errorf("different public keys are Equal")
+	}
+	if private.Equal(otherPriv) {
+		t.Errorf("different private keys are Equal")
+	}
+}
+
+func TestPublicAPIRegression(t *testing.T) {
+	// These package-local golden digests are derived from GenerateKey(zeroReader{})
+	// and Sign(zeroReader{}, ...).
+	// Reference Falcon KATs are covered in crypto/internal/falcon1024.
+	var zero zeroReader
+	public, private, err := GenerateKey(zero)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	message := []byte("Falcon-1024 public API golden test")
-	signature, err := Sign(countingReader(0xa5), private, message)
+	signature, err := Sign(zero, private, message)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -143,15 +197,9 @@ func TestGolden(t *testing.T) {
 		t.Fatal("golden signature failed verification")
 	}
 
-	checkSHA256(t, "public key", public, "5569f1501147d3602287d9cae74af907e5be062cb90653c03d58cba12cac9db4")
-	checkSHA256(t, "private key", private, "96bf4ccf9d963abe4609d845e0904eec999910b70d6b1fdfacfa8700ea9beaad")
-	checkSHA256(t, "signature", signature, "874aca4adf12a73edb67521612928981e0931858030726ec0de028643803ed1a")
-}
-
-func testSeed() []byte {
-	seed := make([]byte, SeedSize)
-	countingReader(0).Read(seed)
-	return seed
+	checkSHA256(t, "public key", public, "e6002a1133c82aa79254740e864960db9724b3f042ea8798d14cabddb8ef56be")
+	checkSHA256(t, "private key", private, "8692afea3c1d5cfcbb76f9867b30cc11bc6eca980a1f21abd7f2935a607d986b")
+	checkSHA256(t, "signature", signature, "31112e24ca1ed78a60fb2812591ce471dab85a77bda9d1b1af0fe7d52e92e35f")
 }
 
 func mustNewKeyFromSeed(t testing.TB, seed []byte) (PublicKey, PrivateKey) {
@@ -174,36 +222,47 @@ func checkSHA256(t *testing.T, name string, got []byte, want string) {
 }
 
 func BenchmarkKeyGeneration(b *testing.B) {
+	var zero zeroReader
 	for b.Loop() {
-		if _, _, err := GenerateKey(countingReader(0)); err != nil {
+		if _, _, err := GenerateKey(zero); err != nil {
 			b.Fatal(err)
 		}
 	}
 }
 
 func BenchmarkNewKeyFromSeed(b *testing.B) {
-	seed := testSeed()
+	seed := make([]byte, SeedSize)
 	for b.Loop() {
-		if _, _, err := NewKeyFromSeed(seed); err != nil {
+		_, _, err := NewKeyFromSeed(seed)
+		if err != nil {
 			b.Fatal(err)
 		}
 	}
 }
 
 func BenchmarkSigning(b *testing.B) {
-	_, priv := mustNewKeyFromSeed(b, testSeed())
+	var zero zeroReader
+	_, priv, err := GenerateKey(zero)
+	if err != nil {
+		b.Fatal(err)
+	}
 	message := []byte("Hello, world!")
 	for b.Loop() {
-		if _, err := Sign(countingReader(0), priv, message); err != nil {
+		_, err := Sign(zero, priv, message)
+		if err != nil {
 			b.Fatal(err)
 		}
 	}
 }
 
 func BenchmarkVerification(b *testing.B) {
-	pub, priv := mustNewKeyFromSeed(b, testSeed())
+	var zero zeroReader
+	pub, priv, err := GenerateKey(zero)
+	if err != nil {
+		b.Fatal(err)
+	}
 	message := []byte("Hello, world!")
-	signature, err := Sign(countingReader(0), priv, message)
+	signature, err := Sign(zero, priv, message)
 	if err != nil {
 		b.Fatal(err)
 	}
