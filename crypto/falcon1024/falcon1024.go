@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"crypto/subtle"
 	"io"
-	"strconv"
 
 	"github.com/theQRL/go-qrllib/crypto/internal/cache"
 	"github.com/theQRL/go-qrllib/crypto/internal/falcon1024"
@@ -37,13 +36,10 @@ func (pub PublicKey) Equal(x crypto.PublicKey) bool {
 // PrivateKey is the type of Falcon-1024 private keys.
 type PrivateKey []byte
 
-// Public returns the [PublicKey] corresponding to priv.
+// Public returns the [PublicKey] corresponding to priv, or an error if priv is
+// invalid.
 func (priv PrivateKey) Public() (crypto.PublicKey, error) {
-	k, err := privateKeyCache.Get(&priv[0], func() (*falcon1024.PrivateKey, error) {
-		return falcon1024.NewPrivateKey(priv)
-	}, func(k *falcon1024.PrivateKey) bool {
-		return subtle.ConstantTimeCompare(priv, k.Bytes()) == 1
-	})
+	k, err := cachedPrivateKey(priv)
 	if err != nil {
 		return nil, err
 	}
@@ -66,6 +62,18 @@ func (priv PrivateKey) Equal(x crypto.PrivateKey) bool {
 // key, because [PrivateKey] is a slice header passed around by value.
 var privateKeyCache cache.Cache[byte, falcon1024.PrivateKey]
 
+func cachedPrivateKey(privateKey PrivateKey) (*falcon1024.PrivateKey, error) {
+	if len(privateKey) != PrivateKeySize {
+		return falcon1024.NewPrivateKey(privateKey)
+	}
+
+	return privateKeyCache.Get(&privateKey[0], func() (*falcon1024.PrivateKey, error) {
+		return falcon1024.NewPrivateKey(privateKey)
+	}, func(k *falcon1024.PrivateKey) bool {
+		return subtle.ConstantTimeCompare(privateKey, k.Bytes()) == 1
+	})
+}
+
 func (priv PrivateKey) Sign(random io.Reader, message []byte) (signature []byte, err error) {
 	return Sign(random, priv, message)
 }
@@ -81,30 +89,32 @@ func GenerateKey(random io.Reader) (PublicKey, PrivateKey, error) {
 		return nil, nil, err
 	}
 
-	publicKey, privateKey := NewKeyFromSeed(seed)
+	return NewKeyFromSeed(seed)
+}
+
+// NewKeyFromSeed generates a public/private key pair from a seed.
+func NewKeyFromSeed(seed []byte) (PublicKey, PrivateKey, error) {
+	privateKey := make([]byte, PrivateKeySize)
+	publicKey := make([]byte, PublicKeySize)
+	if err := newKeyFromSeed(publicKey, privateKey, seed); err != nil {
+		return nil, nil, err
+	}
 	return publicKey, privateKey, nil
 }
 
-// NewKeyFromSeed generates a public/private key pair from a seed. It will panic if
-// len(seed) is not [SeedSize].
-func NewKeyFromSeed(seed []byte) (PublicKey, PrivateKey) {
-	privateKey := make([]byte, PrivateKeySize)
-	publicKey := make([]byte, PublicKeySize)
-	newKeyFromSeed(publicKey, privateKey, seed)
-	return publicKey, privateKey
-}
-
-func newKeyFromSeed(publicKey, privateKey, seed []byte) {
+func newKeyFromSeed(publicKey, privateKey, seed []byte) error {
 	k, err := falcon1024.NewPrivateKeyFromSeed(seed)
 	if err != nil {
-		panic("falcon-1024: bad seed length: " + strconv.Itoa(len(seed)))
+		return err
 	}
 	copy(publicKey, k.PublicKey())
 	copy(privateKey, k.Bytes())
+	return nil
 }
 
-// Sign signs the message with privateKey and returns a signature. It will
-// panic if len(privateKey) is not [PrivateKeySize].
+// Sign signs the message with privateKey and returns a signature.
+//
+// It returns an error if privateKey is invalid or random fails.
 func Sign(random io.Reader, privateKey PrivateKey, message []byte) ([]byte, error) {
 	if random == nil {
 		random = rand.Reader
@@ -117,13 +127,9 @@ func Sign(random io.Reader, privateKey PrivateKey, message []byte) ([]byte, erro
 }
 
 func sign(random io.Reader, signature []byte, privateKey PrivateKey, message []byte) error {
-	k, err := privateKeyCache.Get(&privateKey[0], func() (*falcon1024.PrivateKey, error) {
-		return falcon1024.NewPrivateKey(privateKey)
-	}, func(k *falcon1024.PrivateKey) bool {
-		return subtle.ConstantTimeCompare(privateKey, k.Bytes()) == 1
-	})
+	k, err := cachedPrivateKey(privateKey)
 	if err != nil {
-		panic("falcon-1024: bad private key: " + err.Error())
+		return err
 	}
 	sig, err := falcon1024.Sign(random, k, message)
 	if err != nil {
@@ -133,17 +139,12 @@ func sign(random io.Reader, signature []byte, privateKey PrivateKey, message []b
 	return nil
 }
 
-// Verify reports whether sig is a valid signature of message by publicKey. It
-// will panic if len(publicKey) is not [PublicKeySize].
+// Verify reports whether sig is a valid signature of message by publicKey.
 func Verify(publicKey PublicKey, message, sig []byte) bool {
 	return verify(publicKey, message, sig) == nil
 }
 
 func verify(publicKey PublicKey, message, sig []byte) error {
-	if l := len(publicKey); l != PublicKeySize {
-		panic("falcon-1024: bad public key length: " + strconv.Itoa(l))
-	}
-
 	k, err := falcon1024.NewPublicKey(publicKey)
 	if err != nil {
 		return err

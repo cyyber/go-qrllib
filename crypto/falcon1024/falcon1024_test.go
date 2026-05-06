@@ -58,7 +58,7 @@ func TestGenerateKey(t *testing.T) {
 
 	seed := make([]byte, SeedSize)
 	countingReader(0).Read(seed)
-	publicFromSeed, privateFromSeed := NewKeyFromSeed(seed)
+	publicFromSeed, privateFromSeed := mustNewKeyFromSeed(t, seed)
 	if !bytes.Equal(publicFromSeed, public) {
 		t.Fatal("GenerateKey and NewKeyFromSeed returned different public keys")
 	}
@@ -68,7 +68,7 @@ func TestGenerateKey(t *testing.T) {
 }
 
 func TestSignVerify(t *testing.T) {
-	public, private := NewKeyFromSeed(testSeed())
+	public, private := mustNewKeyFromSeed(t, testSeed())
 
 	message := []byte("test message")
 	sig, err := Sign(countingReader(0xa5), private, message)
@@ -92,7 +92,7 @@ func TestSignVerify(t *testing.T) {
 }
 
 func TestPrivateKeySign(t *testing.T) {
-	public, private := NewKeyFromSeed(testSeed())
+	public, private := mustNewKeyFromSeed(t, testSeed())
 	message := []byte("PrivateKey.Sign message")
 
 	sig, err := private.Sign(countingReader(0x5a), message)
@@ -104,8 +104,35 @@ func TestPrivateKeySign(t *testing.T) {
 	}
 }
 
+func TestNewKeyFromSeedInvalidSeed(t *testing.T) {
+	if _, _, err := NewKeyFromSeed(nil); err == nil {
+		t.Fatal("NewKeyFromSeed accepted invalid seed")
+	}
+}
+
+func TestInvalidPrivateKeyReturnsErrors(t *testing.T) {
+	var private PrivateKey
+	message := []byte("test message")
+
+	if _, err := private.Public(); err == nil {
+		t.Fatal("PrivateKey.Public accepted invalid private key")
+	}
+	if _, err := private.Sign(nil, message); err == nil {
+		t.Fatal("PrivateKey.Sign accepted invalid private key")
+	}
+	if _, err := Sign(nil, private, message); err == nil {
+		t.Fatal("Sign accepted invalid private key")
+	}
+}
+
+func TestVerifyInvalidInputs(t *testing.T) {
+	if Verify(PublicKey{}, nil, nil) {
+		t.Fatal("Verify accepted invalid public key")
+	}
+}
+
 func TestGolden(t *testing.T) {
-	public, private := NewKeyFromSeed(testSeed())
+	public, private := mustNewKeyFromSeed(t, testSeed())
 
 	message := []byte("Falcon-1024 public API golden test")
 	signature, err := Sign(countingReader(0xa5), private, message)
@@ -127,7 +154,7 @@ func TestPublicAPINISTStyleSmoke(t *testing.T) {
 		seed[i] = byte(i)
 	}
 
-	public, private := NewKeyFromSeed(seed)
+	public, private := mustNewKeyFromSeed(t, seed)
 	message := []byte("Falcon-1024 NIST-style public API smoke")
 	signature, err := Sign(countingReader(0x42), private, message)
 	if err != nil {
@@ -146,6 +173,16 @@ func testSeed() []byte {
 	seed := make([]byte, SeedSize)
 	countingReader(0).Read(seed)
 	return seed
+}
+
+func mustNewKeyFromSeed(t testing.TB, seed []byte) (PublicKey, PrivateKey) {
+	t.Helper()
+
+	public, private, err := NewKeyFromSeed(seed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return public, private
 }
 
 func checkSHA256(t *testing.T, name string, got []byte, want string) {
@@ -168,12 +205,14 @@ func BenchmarkKeyGeneration(b *testing.B) {
 func BenchmarkNewKeyFromSeed(b *testing.B) {
 	seed := testSeed()
 	for b.Loop() {
-		_, _ = NewKeyFromSeed(seed)
+		if _, _, err := NewKeyFromSeed(seed); err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
 func BenchmarkSigning(b *testing.B) {
-	_, priv := NewKeyFromSeed(testSeed())
+	_, priv := mustNewKeyFromSeed(b, testSeed())
 	message := []byte("Hello, world!")
 	for b.Loop() {
 		if _, err := Sign(countingReader(0), priv, message); err != nil {
@@ -183,7 +222,7 @@ func BenchmarkSigning(b *testing.B) {
 }
 
 func BenchmarkVerification(b *testing.B) {
-	pub, priv := NewKeyFromSeed(testSeed())
+	pub, priv := mustNewKeyFromSeed(b, testSeed())
 	message := []byte("Hello, world!")
 	signature, err := Sign(countingReader(0), priv, message)
 	if err != nil {
