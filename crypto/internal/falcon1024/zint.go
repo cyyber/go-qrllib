@@ -1,5 +1,8 @@
 package falcon1024
 
+// zint values are little-endian arrays of 31-bit limbs. Callers own scratch
+// allocation and length invariants; these helpers assume correctly sized
+// buffers and keep limbs reduced under zintWordMask.
 const zintWordMask = 0x7FFFFFFF
 
 func zintSub(a, b []uint32, ctl uint32) uint32 {
