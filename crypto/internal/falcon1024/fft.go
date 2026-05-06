@@ -7,8 +7,25 @@ const fprInverseOfQ fpr = 1.0 / q
 type fpr float64
 
 func fprRint(x fpr) int64 {
-	// TODO
-	return 0
+	const twoTo52 = 4503599627370496.0
+
+	v := float64(x)
+	sx := int64(v - 1.0)
+	tx := int64(v)
+	rp := int64(v+twoTo52) - twoTo52
+	rn := int64(v-twoTo52) + twoTo52
+
+	m := sx >> 63
+	rn &= m
+	rp &= ^m
+
+	ub := uint32(uint64(tx) >> 52)
+	m = -int64(((((ub + 1) & 0xFFF) - 2) >> 31))
+	rp &= m
+	rn &= m
+	tx &= ^m
+
+	return tx | rn | rp
 }
 
 type fprPolynomial [n]fpr
@@ -39,6 +56,9 @@ const (
 	falconInv2SqrSigma0 fpr = 0.150865048875372721532312163019
 	falconInvSqrt2      fpr = 0.707106781186547524400844362105
 	falconInvSqrt8      fpr = 0.353553390593273762200422181052
+	falconLog2          fpr = 0.693147180559945309417232121458176568
+	falconInvLog2       fpr = 1.44269504088896340735992468100189214
+	falconPtwo63        fpr = 9223372036854775808
 )
 
 type u72 struct {
@@ -48,7 +68,20 @@ type u72 struct {
 
 var (
 	fftGMRe, fftGMIm = initFFTGM()
-	gaussian0CDF     = [...]u72{
+	falconInvSigma   = [...]fpr{
+		0,
+		0.00690547932959408896,
+		0.00681022677671779767,
+		0.00671881019107227126,
+		0.00658833543700736678,
+		0.00646517812076029003,
+		0.00634867888280789966,
+		0.00623825865290843738,
+		0.00613340650209302611,
+		0.00603366966815772378,
+		0.00593864530953311636,
+	}
+	gaussian0CDF = [...]u72{
 		{hi: 0x00, lo: 0x0000000000000000},
 		{hi: 0x00, lo: 0x00000000000000c5},
 		{hi: 0x00, lo: 0x0000000000007097},
@@ -73,16 +106,9 @@ var (
 
 func initFFTGM() ([n]fpr, [n]fpr) {
 	var re, im [n]fpr
-	for j := 0; j < n; j++ {
-		rev := 0
-		x := j
-		for i := 0; i < logN; i++ {
-			rev = (rev << 1) | (x & 1)
-			x >>= 1
-		}
-		sin, cos := math.Sincos(math.Pi * float64(rev) / float64(n))
-		re[j] = fpr(cos)
-		im[j] = fpr(sin)
+	for j := range n {
+		re[j] = fpr(math.Float64frombits(falconGMTabBits[(j<<1)+0]))
+		im[j] = fpr(math.Float64frombits(falconGMTabBits[(j<<1)+1]))
 	}
 	return re, im
 }
@@ -99,15 +125,70 @@ func gaussian0Sample(prng *samplerPRNG) int {
 }
 
 func berExp(prng *samplerPRNG, x, ccs fpr) bool {
-	p := float64(ccs) * math.Exp(-float64(x))
-	if p >= 1 {
-		return true
+	s := int(fprTrunc(x * falconInvLog2))
+	r := x - fpr(s)*falconLog2
+
+	sw := uint32(s)
+	sw ^= (sw ^ 63) & -((63 - sw) >> 31)
+	s = int(sw)
+
+	z := ((fprExpmP63(r, ccs) << 1) - 1) >> uint(s)
+
+	i := 64
+	var w uint32
+	for {
+		i -= 8
+		w = uint32(prng.readByte()) - (uint32(z>>uint(i)) & 0xFF)
+		if w != 0 || i == 0 {
+			break
+		}
 	}
-	if p <= 0 {
-		return false
+	return w>>31 != 0
+}
+
+func fprTrunc(x fpr) int64 {
+	return int64(math.Trunc(float64(x)))
+}
+
+func fprExpmP63(x, ccs fpr) uint64 {
+	c := [...]uint64{
+		0x00000004741183A3,
+		0x00000036548CFC06,
+		0x0000024FDCBF140A,
+		0x0000171D939DE045,
+		0x0000D00CF58F6F84,
+		0x000680681CF796E3,
+		0x002D82D8305B0FEA,
+		0x011111110E066FD0,
+		0x0555555555070F00,
+		0x155555555581FF00,
+		0x400000000002B400,
+		0x7FFFFFFFFFFF4800,
+		0x8000000000000000,
 	}
-	const inv53 = 1.0 / 9007199254740992.0
-	return float64(prng.readUint64()>>11)*inv53 < p
+
+	y := c[0]
+	z := uint64(fprTrunc(x*falconPtwo63)) << 1
+	for _, ci := range c[1:] {
+		y = ci - mul64High(z, y)
+	}
+
+	z = uint64(fprTrunc(ccs*falconPtwo63)) << 1
+	return mul64High(z, y)
+}
+
+func mul64High(x, y uint64) uint64 {
+	x0 := uint32(x)
+	x1 := uint32(x >> 32)
+	y0 := uint32(y)
+	y1 := uint32(y >> 32)
+
+	a := uint64(x0)*uint64(y1) + ((uint64(x0) * uint64(y0)) >> 32)
+	b := uint64(x1) * uint64(y0)
+	z := (a >> 32) + (b >> 32)
+	z += (uint64(uint32(a)) + uint64(uint32(b))) >> 32
+	z += uint64(x1) * uint64(y1)
+	return z
 }
 
 func sampleFFTPoint(prng *samplerPRNG, mu, isigma fpr) fpr {
@@ -135,7 +216,7 @@ func ffLDLTreeSize(logn int) int {
 
 func mulFFTSlice(a, b []fpr) {
 	hn := len(a) >> 1
-	for u := 0; u < hn; u++ {
+	for u := range hn {
 		aRe := a[u]
 		aIm := a[u+hn]
 		bRe := b[u]
@@ -152,8 +233,7 @@ func splitFFTSlice(f0, f1, f []fpr, logn int) {
 
 	f0[0] = f[0]
 	f1[0] = f[hn]
-
-	for u := 0; u < qn; u++ {
+	for u := range qn {
 		aRe := f[(u<<1)+0]
 		aIm := f[(u<<1)+0+hn]
 		bRe := f[(u<<1)+1]
@@ -180,8 +260,7 @@ func mergeFFTSlice(f, f0, f1 []fpr, logn int) {
 
 	f[0] = f0[0]
 	f[hn] = f1[0]
-
-	for u := 0; u < qn; u++ {
+	for u := range qn {
 		aRe := f0[u]
 		aIm := f0[u+qn]
 		bRe := f1[u]
@@ -350,11 +429,11 @@ func ffSamplingFFTRecursive(prng *samplerPRNG, z0, z1, tree, t0, t1, tmp []fpr, 
 	mergeFFTSlice(z1[:nn], tmp[:hn], tmp[hn:nn], logn)
 
 	copy(tmp[:nn], t1[:nn])
-	for i := 0; i < nn; i++ {
+	for i := range nn {
 		tmp[i] -= z1[i]
 	}
 	mulFFTSlice(tmp[:nn], tree[:nn])
-	for i := 0; i < nn; i++ {
+	for i := range nn {
 		tmp[i] += t0[i]
 	}
 
@@ -364,28 +443,198 @@ func ffSamplingFFTRecursive(prng *samplerPRNG, z0, z1, tree, t0, t1, tmp []fpr, 
 }
 
 func fft(f fprPolynomial) fftPolynomial {
-	// TODO
-	return fftPolynomial{}
+	var out fftPolynomial
+	copy(out[:], f[:])
+	fftSlice(out[:], logN)
+	return out
 }
 
-func inverseFFT(fftPolynomial) fprPolynomial {
-	// TODO
-	return fprPolynomial{}
+func inverseFFT(f fftPolynomial) fprPolynomial {
+	var out fprPolynomial
+	copy(out[:], f[:])
+	inverseFFTSlice(out[:], logN)
+	return out
 }
 
 func fftMul(a, b fftPolynomial) (p fftPolynomial) {
-	// TODO
-	return a
+	for i := range n / 2 {
+		aRe := a[i]
+		aIm := a[i+n/2]
+		bRe := b[i]
+		bIm := b[i+n/2]
+		p[i] = aRe*bRe - aIm*bIm
+		p[i+n/2] = aRe*bIm + aIm*bRe
+	}
+	return p
 }
 
 func fftMulConst(a fftPolynomial, x fpr) (p fftPolynomial) {
-	// TODO
-	return a
+	for i := range p {
+		p[i] = a[i] * x
+	}
+	return p
 }
 
 func fftMulSelfAdj(a fftPolynomial) (p fftPolynomial) {
-	// TODO
-	return a
+	for i := range n / 2 {
+		aRe := a[i]
+		aIm := a[i+n/2]
+		p[i] = aRe*aRe + aIm*aIm
+	}
+	return p
+}
+
+func fftSlice(f []fpr, logn int) {
+	if logn == 0 {
+		return
+	}
+	hn := 1 << (logn - 1)
+	t := hn
+	for u, m := 1, 2; u < logn; u, m = u+1, m<<1 {
+		ht := t >> 1
+		hm := m >> 1
+		for i1, j1 := 0, 0; i1 < hm; i1, j1 = i1+1, j1+t {
+			j2 := j1 + ht
+			sRe := fftGMRe[m+i1]
+			sIm := fftGMIm[m+i1]
+			for j := j1; j < j2; j++ {
+				xRe := f[j]
+				xIm := f[j+hn]
+				yRe := f[j+ht]
+				yIm := f[j+ht+hn]
+				yRe, yIm = yRe*sRe-yIm*sIm, yRe*sIm+yIm*sRe
+				f[j] = xRe + yRe
+				f[j+hn] = xIm + yIm
+				f[j+ht] = xRe - yRe
+				f[j+ht+hn] = xIm - yIm
+			}
+		}
+		t = ht
+	}
+}
+
+func inverseFFTSlice(f []fpr, logn int) {
+	if logn == 0 {
+		return
+	}
+	hn := 1 << (logn - 1)
+	t := 1
+	m := 1 << logn
+	for u := logn; u > 1; u-- {
+		hm := m >> 1
+		dt := t << 1
+		for i1, j1 := 0, 0; j1 < hn; i1, j1 = i1+1, j1+dt {
+			j2 := j1 + t
+			sRe := fftGMRe[hm+i1]
+			sIm := -fftGMIm[hm+i1]
+			for j := j1; j < j2; j++ {
+				xRe := f[j]
+				xIm := f[j+hn]
+				yRe := f[j+t]
+				yIm := f[j+t+hn]
+				f[j] = xRe + yRe
+				f[j+hn] = xIm + yIm
+				xRe, xIm = xRe-yRe, xIm-yIm
+				f[j+t] = xRe*sRe - xIm*sIm
+				f[j+t+hn] = xRe*sIm + xIm*sRe
+			}
+		}
+		t = dt
+		m = hm
+	}
+
+	denom := 1 << (logn - 1)
+	scale := fpr(1.0 / float64(denom))
+	for i := range 1 << logn {
+		f[i] *= scale
+	}
+}
+
+func fftInvNorm2(dst, a, b []fpr, logn int) {
+	hn := 1 << (logn - 1)
+	for i := range hn {
+		aRe := a[i]
+		aIm := a[i+hn]
+		bRe := b[i]
+		bIm := b[i+hn]
+		dst[i] = 1 / (aRe*aRe + aIm*aIm + bRe*bRe + bIm*bIm)
+	}
+}
+
+func fftAdj(a []fpr, logn int) {
+	nn := 1 << logn
+	hn := nn >> 1
+	for i := hn; i < nn; i++ {
+		a[i] = -a[i]
+	}
+}
+
+func fftMulSlice(a, b []fpr, logn int) {
+	hn := 1 << (logn - 1)
+	for i := range hn {
+		aRe := a[i]
+		aIm := a[i+hn]
+		bRe := b[i]
+		bIm := b[i+hn]
+		a[i] = aRe*bRe - aIm*bIm
+		a[i+hn] = aRe*bIm + aIm*bRe
+	}
+}
+
+func fftMulAdj(dst, a, b []fpr, logn int) {
+	hn := 1 << (logn - 1)
+	for i := range hn {
+		aRe := a[i]
+		aIm := a[i+hn]
+		bRe := b[i]
+		bIm := -b[i+hn]
+		dst[i] = aRe*bRe - aIm*bIm
+		dst[i+hn] = aRe*bIm + aIm*bRe
+	}
+}
+
+func fftMulAutoAdj(a, b []fpr, logn int) {
+	hn := 1 << (logn - 1)
+	for i := range hn {
+		a[i] *= b[i]
+		a[i+hn] *= b[i]
+	}
+}
+
+func fftAdd(a, b []fpr, logn int) {
+	for i := range 1 << logn {
+		a[i] += b[i]
+	}
+}
+
+func fftSub(a, b []fpr, logn int) {
+	for i := range 1 << logn {
+		a[i] -= b[i]
+	}
+}
+
+func fftAddMulAdj(dst, F, G, f, g []fpr, logn int) {
+	hn := 1 << (logn - 1)
+	for i := range hn {
+		FRe := F[i]
+		FIm := F[i+hn]
+		GRe := G[i]
+		GIm := G[i+hn]
+		fRe := f[i]
+		fIm := -f[i+hn]
+		gRe := g[i]
+		gIm := -g[i+hn]
+		dst[i] = FRe*fRe - FIm*fIm + GRe*gRe - GIm*gIm
+		dst[i+hn] = FRe*fIm + FIm*fRe + GRe*gIm + GIm*gRe
+	}
+}
+
+func fftDivAutoAdj(a, b []fpr, logn int) {
+	hn := 1 << (logn - 1)
+	for i := range hn {
+		a[i] /= b[i]
+		a[i+hn] /= b[i]
+	}
 }
 
 func ffSamplingFFT(prng *samplerPRNG, t0, t1 fftPolynomial, tree []fpr, logn int) (fftPolynomial, fftPolynomial, error) {

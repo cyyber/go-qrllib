@@ -1,8 +1,12 @@
 package falcon1024
 
 import (
+	"bytes"
+	"crypto/aes"
+	"crypto/sha1"
 	"crypto/sha3"
 	"encoding/hex"
+	"hash"
 	"testing"
 )
 
@@ -555,6 +559,189 @@ func TestVerifyRawReferenceKAT(t *testing.T) {
 	}
 }
 
+func TestNewPublicKeyReferenceKAT(t *testing.T) {
+	// Derived from the Falcon reference implementation test_falcon.c
+	// ntru_pkey_1024 array.
+	pubBytes := mustDecodeHex(t, verifyRawKATPublicKeyHex)
+	h, err := pkDecode(pubBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pub, err := NewPublicKey(pubBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pub.hNTTMonty != toNTTMonty(h) {
+		t.Fatal("NewPublicKey cached unexpected NTT-domain public key")
+	}
+}
+
+func TestComputePublicReferenceKAT(t *testing.T) {
+	// Derived from the Falcon reference implementation test_falcon.c
+	// ntru_f_1024, ntru_g_1024, and ntru_pkey_1024 arrays.
+	f := mustDecodeSmallPolynomialHex(t, ntru_f_1024Hex)
+	g := mustDecodeSmallPolynomialHex(t, ntru_g_1024Hex)
+
+	wantBytes := mustDecodeHex(t, verifyRawKATPublicKeyHex)
+	wantH, err := pkDecode(wantBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	gotH, ok := computePublic(f, g)
+	if !ok {
+		t.Fatal("computePublic rejected reference f/g pair")
+	}
+	if gotH != wantH {
+		t.Fatal("computePublic returned unexpected public key polynomial")
+	}
+
+	gotBytes := make([]byte, publicKeySize)
+	if err := pkEncode(gotBytes, gotH); err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(gotBytes, wantBytes) {
+		t.Fatal("computePublic encoded public key does not match reference ntru_pkey_1024")
+	}
+}
+
+func TestCompletePrivateReferenceKAT(t *testing.T) {
+	// Derived from the Falcon reference implementation test_falcon.c
+	// ntru_f_1024, ntru_g_1024, ntru_F_1024, and ntru_G_1024 arrays.
+	f := mustDecodeSmallPolynomialHex(t, ntru_f_1024Hex)
+	g := mustDecodeSmallPolynomialHex(t, ntru_g_1024Hex)
+	ntruF := mustDecodeSmallPolynomialHex(t, ntru_F_1024Hex)
+	wantG := mustDecodeSmallPolynomialHex(t, ntru_G_1024Hex)
+
+	gotG, ok := completePrivate(f, g, ntruF)
+	if !ok {
+		t.Fatal("completePrivate rejected reference f/g/F tuple")
+	}
+	if gotG != wantG {
+		t.Fatal("completePrivate returned unexpected G")
+	}
+}
+
+func TestNewPrivateKeyReferencePolynomials(t *testing.T) {
+	// test_falcon.c publishes component private-key polynomials, not a
+	// serialized secret key. Use those reference polynomials to check that
+	// private-key reconstruction produces the reference public key.
+	f := mustDecodeSmallPolynomialHex(t, ntru_f_1024Hex)
+	g := mustDecodeSmallPolynomialHex(t, ntru_g_1024Hex)
+	ntruF := mustDecodeSmallPolynomialHex(t, ntru_F_1024Hex)
+
+	sk := make([]byte, privateKeySize)
+	if err := skEncode(sk, f, g, ntruF); err != nil {
+		t.Fatal(err)
+	}
+
+	priv, err := NewPrivateKey(sk)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := mustDecodeHex(t, verifyRawKATPublicKeyHex); !bytes.Equal(priv.PublicKey(), want) {
+		t.Fatal("private key reconstructed unexpected public key")
+	}
+}
+
+func TestSignTreeReferenceKeySelf(t *testing.T) {
+	// Derived from the Falcon reference implementation test_falcon.c
+	// ntru_f_1024, ntru_g_1024, ntru_F_1024, ntru_G_1024, and
+	// ntru_pkey_1024 arrays. The reference publishes the key components, not
+	// deterministic sign-tree outputs, so this checks that signing with that
+	// reference key produces signatures accepted by the reference public key.
+	f := mustDecodeSmallPolynomialHex(t, ntru_f_1024Hex)
+	g := mustDecodeSmallPolynomialHex(t, ntru_g_1024Hex)
+	ntruF := mustDecodeSmallPolynomialHex(t, ntru_F_1024Hex)
+	ntruG := mustDecodeSmallPolynomialHex(t, ntru_G_1024Hex)
+
+	h, ok := computePublic(f, g)
+	if !ok {
+		t.Fatal("computePublic rejected reference f/g pair")
+	}
+
+	priv := &PrivateKey{}
+	if _, err := initPrivateKey(priv, f, g, ntruF, ntruG, h); err != nil {
+		t.Fatal(err)
+	}
+
+	pub, err := NewPublicKey(mustDecodeHex(t, verifyRawKATPublicKeyHex))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	testCases := []struct {
+		name    string
+		message string
+		seed    string
+	}{
+		{
+			name:    "sample-0",
+			message: "reference sign tree sample 0",
+			seed:    "sign tree rng 0",
+		},
+		{
+			name:    "sample-1",
+			message: "reference sign tree sample 1",
+			seed:    "sign tree rng 1",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			hashData := sha3.NewSHAKE256()
+			if _, err := hashData.Write([]byte(tc.message)); err != nil {
+				t.Fatal(err)
+			}
+			c0, err := hashToPoint(hashData)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			rng := sha3.NewSHAKE256()
+			if _, err := rng.Write([]byte(tc.seed)); err != nil {
+				t.Fatal(err)
+			}
+			s2, err := signTree(rng, priv, c0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !verifyRaw(c0, s2, pub.hNTTMonty) {
+				t.Fatal("signTree output failed verifyRaw")
+			}
+		})
+	}
+}
+
+func TestNewSignatureReferenceRawS2KATs(t *testing.T) {
+	// The s2 vectors are decoded from the Falcon reference implementation
+	// KAT_SIG_1024 raw verify vectors. Those raw vectors use a 32-byte hash
+	// seed, not the 40-byte nonce carried by padded Falcon signatures, so the
+	// seed is zero-extended only to exercise NewSignature.
+	for _, tc := range verifyRawKATs {
+		t.Run(tc.message, func(t *testing.T) {
+			nonceBytes := mustDecodeHex(t, tc.nonceHex)
+			var nonce [nonceSize]byte
+			copy(nonce[:], nonceBytes)
+			wantS2 := decodeVerifyRawKATSignature(t, mustDecodeHex(t, tc.signatureHex))
+
+			sigBytes := make([]byte, signatureSize)
+			if err := sigEncode(sigBytes, &nonce, wantS2); err != nil {
+				t.Fatal(err)
+			}
+
+			sig, err := NewSignature(sigBytes)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if sig.nonce != nonce || sig.s2 != wantS2 {
+				t.Fatal("NewSignature returned unexpected parsed signature")
+			}
+		})
+	}
+}
+
 func mustDecodeHex(t *testing.T, s string) []byte {
 	t.Helper()
 	b, err := hex.DecodeString(s)
@@ -579,4 +766,212 @@ func decodeVerifyRawKATSignature(t *testing.T, sig []byte) smallPolynomial {
 		s2[i] = int32(int16(uint16(sig[j])<<8 | uint16(sig[j+1])))
 	}
 	return s2
+}
+
+const nistKATOverheadSize = 1330
+
+type nistDRBG struct {
+	key [32]byte
+	v   [16]byte
+}
+
+type nistDRBGState struct {
+	key [32]byte
+	v   [16]byte
+}
+
+func newNISTDRBG(entropy []byte) *nistDRBG {
+	d := &nistDRBG{}
+	d.update(entropy)
+	return d
+}
+
+func (d *nistDRBG) read(buf []byte) {
+	block, err := aes.NewCipher(d.key[:])
+	if err != nil {
+		panic(err)
+	}
+
+	for len(buf) > 0 {
+		d.increment()
+
+		var tmp [aes.BlockSize]byte
+		block.Encrypt(tmp[:], d.v[:])
+
+		n := copy(buf, tmp[:])
+		buf = buf[n:]
+	}
+
+	d.update(nil)
+}
+
+func (d *nistDRBG) update(provided []byte) {
+	block, err := aes.NewCipher(d.key[:])
+	if err != nil {
+		panic(err)
+	}
+
+	var tmp [48]byte
+	for i := range 3 {
+		d.increment()
+		block.Encrypt(tmp[i*aes.BlockSize:], d.v[:])
+	}
+	for i, b := range provided {
+		tmp[i] ^= b
+	}
+
+	copy(d.key[:], tmp[:32])
+	copy(d.v[:], tmp[32:])
+}
+
+func (d *nistDRBG) increment() {
+	for i := len(d.v) - 1; i >= 0; i-- {
+		d.v[i]++
+		if d.v[i] != 0 {
+			return
+		}
+	}
+}
+
+func (d *nistDRBG) save() nistDRBGState {
+	return nistDRBGState{
+		key: d.key,
+		v:   d.v,
+	}
+}
+
+func (d *nistDRBG) restore(state nistDRBGState) {
+	d.key = state.key
+	d.v = state.v
+}
+
+func TestGolden(t *testing.T) {
+	t.Run("NISTKATDigest", testNISTKATDigest)
+}
+
+func testNISTKATDigest(t *testing.T) {
+	var entropy [seedSize]byte
+	for i := range entropy {
+		entropy[i] = byte(i)
+	}
+
+	drbg := newNISTDRBG(entropy[:])
+	h := sha1.New()
+
+	sha1PrintLineWithInt(h, "# Falcon-", n)
+	sha1PrintLine(h, "")
+
+	for count := range 100 {
+		t.Logf("NIST KAT count %d", count)
+
+		var seed [seedSize]byte
+		drbg.read(seed[:])
+
+		msg := make([]byte, 33*(count+1))
+		drbg.read(msg)
+
+		state := drbg.save()
+		drbg = newNISTDRBG(seed[:])
+
+		var keySeed [seedSize]byte
+		drbg.read(keySeed[:])
+
+		priv, err := NewPrivateKeyFromSeed(keySeed[:])
+		if err != nil {
+			t.Fatalf("NewPrivateKeyFromSeed: %v", err)
+		}
+		pub := priv.PublicKey()
+		sk := priv.Bytes()
+
+		var nonce [nonceSize]byte
+		drbg.read(nonce[:])
+
+		hashData := sha3.NewSHAKE256()
+		hashData.Write(nonce[:])
+		hashData.Write(msg)
+
+		c0, err := hashToPoint(hashData)
+		if err != nil {
+			t.Fatalf("hashToPoint: %v", err)
+		}
+
+		var signSeed [seedSize]byte
+		drbg.read(signSeed[:])
+		signRNG := sha3.NewSHAKE256()
+		signRNG.Write(signSeed[:])
+
+		s2, err := signTree(signRNG, priv, c0)
+		if err != nil {
+			t.Fatalf("signTree: %v", err)
+		}
+
+		comp := make([]byte, nistKATOverheadSize-43)
+		written, err := compressedEncode(comp, s2)
+		if err != nil {
+			t.Fatalf("compressedEncode: %v", err)
+		}
+
+		sigLen := 1 + written
+		smLen := 42 + len(msg) + sigLen
+		sm := make([]byte, smLen)
+		sm[0] = byte(sigLen >> 8)
+		sm[1] = byte(sigLen)
+		copy(sm[2:], nonce[:])
+		copy(sm[42:], msg)
+		sm[42+len(msg)] = 0x20 + logN
+		copy(sm[43+len(msg):], comp[:written])
+
+		drbg.restore(state)
+
+		sha1PrintLineWithInt(h, "count = ", count)
+		sha1PrintLineWithHex(h, "seed = ", seed[:])
+		sha1PrintLineWithInt(h, "mlen = ", len(msg))
+		sha1PrintLineWithHex(h, "msg = ", msg)
+		sha1PrintLineWithHex(h, "pk = ", pub)
+		sha1PrintLineWithHex(h, "sk = ", sk)
+		sha1PrintLineWithInt(h, "smlen = ", smLen)
+		sha1PrintLineWithHex(h, "sm = ", sm)
+		sha1PrintLine(h, "")
+	}
+
+	if got := h.Sum(nil); hex.EncodeToString(got) != "affdeb3aa83bf9a2039fa9c17d65fd3e3b9828e2" {
+		t.Fatalf("NIST KAT digest mismatch: %x", got)
+	}
+}
+
+func sha1PrintLine(h hash.Hash, s string) {
+	h.Write([]byte(s))
+	h.Write([]byte{'\n'})
+}
+
+func sha1PrintLineWithInt(h hash.Hash, s string, x int) {
+	h.Write([]byte(s))
+	if x == 0 {
+		h.Write([]byte{'0', '\n'})
+		return
+	}
+
+	var tmp [30]byte
+	i := len(tmp)
+	tmp[i-1] = '\n'
+	i--
+	for x != 0 {
+		i--
+		tmp[i] = byte('0' + x%10)
+		x /= 10
+	}
+	h.Write(tmp[i:])
+}
+
+func sha1PrintLineWithHex(h hash.Hash, s string, data []byte) {
+	const hextab = "0123456789ABCDEF"
+
+	h.Write([]byte(s))
+	var buf [2]byte
+	for _, b := range data {
+		buf[0] = hextab[b>>4]
+		buf[1] = hextab[b&0x0f]
+		h.Write(buf[:])
+	}
+	h.Write([]byte{'\n'})
 }

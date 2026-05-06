@@ -4,6 +4,7 @@ import (
 	"crypto/sha3"
 	"errors"
 	"io"
+	"math"
 	"strconv"
 )
 
@@ -144,7 +145,7 @@ func initPrivateKey(priv *PrivateKey, f, g, ntruF, ntruG smallPolynomial, h ring
 		return nil, err
 	}
 
-	return nil, nil
+	return priv, nil
 }
 
 func expandPrivateKey(priv *PrivateKey, f, g, ntruF, ntruG smallPolynomial) error {
@@ -165,9 +166,8 @@ func expandPrivateKey(priv *PrivateKey, f, g, ntruF, ntruG smallPolynomial) erro
 	g00 = polyAdd(g00, tmp)
 
 	copy(g01[:], priv.b00[:])
-	g01 = fftMulSelfAdj(priv.b10)
-	copy(tmp[:], priv.b01[:])
-	tmp = fftMulSelfAdj(priv.b11)
+	fftMulAdj(g01[:], g01[:], priv.b10[:], logN)
+	fftMulAdj(tmp[:], priv.b01[:], priv.b11[:], logN)
 	g01 = polyAdd(g01, tmp)
 
 	copy(g11[:], priv.b10[:])
@@ -183,11 +183,82 @@ func expandPrivateKey(priv *PrivateKey, f, g, ntruF, ntruG smallPolynomial) erro
 }
 
 func ffLDLFFT(tree []fpr, g00, g01, g11 fftPolynomial, logn int) {
-	// TODO
+	ffLDLFFTSlice(tree, g00[:], g01[:], g11[:], logn)
+}
+
+func ffLDLFFTSlice(tree, g00, g01, g11 []fpr, logn int) {
+	nn := 1 << logn
+	if nn == 1 {
+		tree[0] = g00[0]
+		return
+	}
+
+	hn := nn >> 1
+	d00 := make([]fpr, nn)
+	d11 := make([]fpr, nn)
+	tmp := make([]fpr, nn)
+
+	copy(d00, g00[:nn])
+	fftLDLMV(d11, tree[:nn], g00[:nn], g01[:nn], g11[:nn], logn)
+
+	splitFFTSlice(tmp[:hn], tmp[hn:nn], d00, logn)
+	splitFFTSlice(d00[:hn], d00[hn:nn], d11, logn)
+	copy(d11, tmp)
+
+	ffLDLFFTInner(tree[nn:], d11[:hn], d11[hn:nn], logn-1, tmp)
+	ffLDLFFTInner(tree[nn+ffLDLTreeSize(logn-1):], d00[:hn], d00[hn:nn], logn-1, tmp)
+}
+
+func ffLDLFFTInner(tree, g0, g1 []fpr, logn int, tmp []fpr) {
+	nn := 1 << logn
+	if nn == 1 {
+		tree[0] = g0[0]
+		return
+	}
+
+	hn := nn >> 1
+	fftLDLMV(tmp[:nn], tree[:nn], g0[:nn], g1[:nn], g0[:nn], logn)
+
+	splitFFTSlice(g1[:hn], g1[hn:nn], g0[:nn], logn)
+	splitFFTSlice(g0[:hn], g0[hn:nn], tmp[:nn], logn)
+
+	ffLDLFFTInner(tree[nn:], g1[:hn], g1[hn:nn], logn-1, tmp)
+	ffLDLFFTInner(tree[nn+ffLDLTreeSize(logn-1):], g0[:hn], g0[hn:nn], logn-1, tmp)
+}
+
+func fftLDLMV(d11, l10, g00, g01, g11 []fpr, logn int) {
+	hn := 1 << (logn - 1)
+	for i := range hn {
+		g00Re := g00[i]
+		g00Im := g00[i+hn]
+		g01Re := g01[i]
+		g01Im := g01[i+hn]
+		g11Re := g11[i]
+		g11Im := g11[i+hn]
+
+		den := g00Re*g00Re + g00Im*g00Im
+		muRe := (g01Re*g00Re + g01Im*g00Im) / den
+		muIm := (g01Im*g00Re - g01Re*g00Im) / den
+
+		xiRe := muRe*g01Re + muIm*g01Im
+		xiIm := muIm*g01Re - muRe*g01Im
+
+		d11[i] = g11Re - xiRe
+		d11[i+hn] = g11Im - xiIm
+		l10[i] = muRe
+		l10[i+hn] = -muIm
+	}
 }
 
 func ffLDLBinaryNormalize(tree []fpr, origLogn, logn int) {
-	// TODO
+	nn := 1 << logn
+	if nn == 1 {
+		tree[0] = fpr(math.Sqrt(float64(tree[0]))) * falconInvSigma[origLogn]
+		return
+	}
+
+	ffLDLBinaryNormalize(tree[nn:], origLogn, logn-1)
+	ffLDLBinaryNormalize(tree[nn+ffLDLTreeSize(logn-1):], origLogn, logn-1)
 }
 
 func NewPrivateKey(priv []byte) (*PrivateKey, error) {
@@ -329,41 +400,9 @@ func sign(random io.Reader, signature []byte, priv *PrivateKey, message []byte) 
 	return signature, nil
 }
 
-type samplerPRNG struct {
-	rng *sha3.SHAKE
-}
-
-func newSamplerPRNG(rng *sha3.SHAKE) *samplerPRNG {
-	return &samplerPRNG{rng: rng}
-}
-
-func (p *samplerPRNG) readByte() byte {
-	var buf [1]byte
-	p.rng.Read(buf[:])
-
-	return buf[0]
-}
-
-func (p *samplerPRNG) readUint64() uint64 {
-	var buf [8]byte
-	if _, err := p.rng.Read(buf[:]); err != nil {
-		return 0
-	}
-
-	return uint64(buf[0]) |
-		uint64(buf[1])<<8 |
-		uint64(buf[2])<<16 |
-		uint64(buf[3])<<24 |
-		uint64(buf[4])<<32 |
-		uint64(buf[5])<<40 |
-		uint64(buf[6])<<48 |
-		uint64(buf[7])<<56
-}
-
 func signTree(rng *sha3.SHAKE, priv *PrivateKey, c0 ringElement) (smallPolynomial, error) {
-	prng := newSamplerPRNG(rng)
-
 	for {
+		prng := newSamplerPRNG(rng)
 		s2, err := signTreeAttempt(prng, priv, c0)
 		if err == nil {
 			return s2, nil
@@ -410,7 +449,7 @@ func signTreeAttempt(prng *samplerPRNG, priv *PrivateKey, c0 ringElement) (small
 	latticeY = fftMul(latticeY, priv.b01)
 
 	copy(tmp[:], t1[:])
-	fftMul(tmp, priv.b11)
+	tmp = fftMul(tmp, priv.b11)
 	latticeY = polyAdd(latticeY, tmp)
 
 	x := inverseFFT(latticeX)

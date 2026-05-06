@@ -1,76 +1,31 @@
 package falcon1024
 
-const ntruCoeffBits = 8
+import "math"
 
-func solveNTRU(f, g smallPolynomial) (ntruF, ntruG smallPolynomial, ok bool) {
-	bigF, bigG, ok := solveNTRUDeepest(f, g)
-	if !ok {
-		return smallPolynomial{}, smallPolynomial{}, false
+const (
+	ntruCoeffBits    = 8
+	ntruCoeffBound   = 1<<(ntruCoeffBits-1) - 1
+	depthIntFG       = 4
+	ntruScratchWords = 1 << 20
+)
+
+var (
+	maxBlSmall = [...]int{1, 1, 2, 2, 4, 7, 14, 27, 53, 106, 209}
+	maxBlLarge = [...]int{2, 2, 5, 7, 12, 21, 40, 78, 157, 308}
+	bitLength  = [...]struct{ avg, std int }{
+		{4, 0},
+		{11, 1},
+		{24, 1},
+		{50, 1},
+		{102, 1},
+		{202, 2},
+		{401, 4},
+		{794, 5},
+		{1577, 8},
+		{3138, 13},
+		{6308, 25},
 	}
-
-	for depth := logN - 1; depth >= 1; depth-- {
-		bigF, bigG, ok = solveNTRUIntermediate(f, g, depth, bigF, bigG)
-		if !ok {
-			return smallPolynomial{}, smallPolynomial{}, false
-		}
-	}
-
-	bigF, bigG, ok = solveNTRUBinaryDepth1(f, g, bigF, bigG)
-	if !ok {
-		return smallPolynomial{}, smallPolynomial{}, false
-	}
-
-	bigF, bigG, ok = solveNTRUBinaryDepth0(f, g, bigF, bigG)
-	if !ok {
-		return smallPolynomial{}, smallPolynomial{}, false
-	}
-
-	ntruF, ok = smallPolynomialFromBig(bigF, ntruCoeffBits)
-	if !ok {
-		return smallPolynomial{}, smallPolynomial{}, false
-	}
-
-	ntruG, ok = smallPolynomialFromBig(bigG, ntruCoeffBits)
-	if !ok {
-		return smallPolynomial{}, smallPolynomial{}, false
-	}
-
-	if !checkNTRUEquation(f, g, ntruF, ntruG) {
-		return smallPolynomial{}, smallPolynomial{}, false
-	}
-
-	return ntruF, ntruG, true
-}
-
-func solveNTRUDeepest(f, g smallPolynomial) (zintF, zintG bigPolynomial, ok bool) {
-	// TODO
-	return zintF, zintG, ok
-}
-
-func solveNTRUIntermediate(
-	f, g smallPolynomial,
-	depth int,
-	prevF, prevG bigPolynomial,
-) (nextF, nextG bigPolynomial, ok bool) {
-	// TODO
-	return nextF, nextG, ok
-}
-
-func solveNTRUBinaryDepth1(
-	f, g smallPolynomial,
-	prevF, prevG bigPolynomial,
-) (nextF, nextG bigPolynomial, ok bool) {
-	// TODO
-	return nextF, nextG, ok
-}
-
-func solveNTRUBinaryDepth0(
-	f, g smallPolynomial,
-	prevF, prevG bigPolynomial,
-) (bigF, bigG bigPolynomial, ok bool) {
-	// TODO
-	return bigF, bigG, ok
-}
+)
 
 type smallPrime struct {
 	p, g, s uint32
@@ -601,7 +556,741 @@ var primes = [...]smallPrime{
 	{p: 0, g: 0, s: 0},
 }
 
+func solveNTRU(f, g smallPolynomial) (ntruF, ntruG smallPolynomial, ok bool) {
+	tmp := make([]uint32, ntruScratchWords)
+
+	if !solveNTRUDeepest(f, g, tmp) {
+		return smallPolynomial{}, smallPolynomial{}, false
+	}
+	for depth := logN - 1; depth >= 2; depth-- {
+		if !solveNTRUIntermediate(f, g, depth, tmp) {
+			return smallPolynomial{}, smallPolynomial{}, false
+		}
+	}
+	if !solveNTRUBinaryDepth1(f, g, tmp) {
+		return smallPolynomial{}, smallPolynomial{}, false
+	}
+	if !solveNTRUBinaryDepth0(f, g, tmp) {
+		return smallPolynomial{}, smallPolynomial{}, false
+	}
+
+	ntruF, ok = polyBigToSmall(tmp[:n], ntruCoeffBound)
+	if !ok {
+		return smallPolynomial{}, smallPolynomial{}, false
+	}
+	ntruG, ok = polyBigToSmall(tmp[n:2*n], ntruCoeffBound)
+	if !ok {
+		return smallPolynomial{}, smallPolynomial{}, false
+	}
+	if !checkNTRUEquation(f, g, ntruF, ntruG) {
+		return smallPolynomial{}, smallPolynomial{}, false
+	}
+	return ntruF, ntruG, true
+}
+
 func checkNTRUEquation(f, g, ntruF, ntruG smallPolynomial) bool {
-	// TODO
-	return false
+	p := primes[0].p
+	p0i := modPNInv31(p)
+	gm := make([]uint32, n)
+	igm := make([]uint32, n)
+	modPMkgm2(gm, igm, primes[0].g, p, p0i)
+
+	ft := make([]uint32, n)
+	gt := make([]uint32, n)
+	Ft := make([]uint32, n)
+	Gt := make([]uint32, n)
+	for i := range n {
+		ft[i] = modPSet(f[i], p)
+		gt[i] = modPSet(g[i], p)
+		Ft[i] = modPSet(ntruF[i], p)
+		Gt[i] = modPSet(ntruG[i], p)
+	}
+
+	modPNTT2(ft, gm, p, p0i)
+	modPNTT2(gt, gm, p, p0i)
+	modPNTT2(Ft, gm, p, p0i)
+	modPNTT2(Gt, gm, p, p0i)
+
+	target := modPMontyMul(q, 1, p, p0i)
+	for i := range n {
+		z := modPSub(
+			modPMontyMul(ft[i], Gt[i], p, p0i),
+			modPMontyMul(gt[i], Ft[i], p, p0i),
+			p,
+		)
+		if z != target {
+			return false
+		}
+	}
+	return true
+}
+
+func makeFG(data []uint32, f, g smallPolynomial, depth int, outNTT bool) {
+	nn := 1 << logN
+	ft := data[:nn]
+	gt := data[nn : 2*nn]
+	p0 := primes[0].p
+	for i := range nn {
+		ft[i] = modPSet(f[i], p0)
+		gt[i] = modPSet(g[i], p0)
+	}
+
+	if depth == 0 && outNTT {
+		p := primes[0].p
+		p0i := modPNInv31(p)
+		gm := data[2*nn : 3*nn]
+		igm := data[3*nn : 4*nn]
+		modPMkgm2(gm, igm, primes[0].g, p, p0i)
+		modPNTT2(ft, gm, p, p0i)
+		modPNTT2(gt, gm, p, p0i)
+		return
+	}
+	for d := range depth {
+		makeFGStep(data, logN-d, d, d != 0, (d+1) < depth || outNTT)
+	}
+}
+
+func makeFGStep(data []uint32, logn, depth int, inNTT, outNTT bool) {
+	nn := 1 << logn
+	hn := nn >> 1
+	slen := maxBlSmall[depth]
+	tlen := maxBlSmall[depth+1]
+
+	fd := data[:hn*tlen]
+	gd := data[hn*tlen : 2*hn*tlen]
+	fs := data[2*hn*tlen : 2*hn*tlen+nn*slen]
+	gs := data[2*hn*tlen+nn*slen : 2*hn*tlen+2*nn*slen]
+	gm := data[2*hn*tlen+2*nn*slen : 2*hn*tlen+2*nn*slen+nn]
+	igm := data[2*hn*tlen+2*nn*slen+nn : 2*hn*tlen+2*nn*slen+2*nn]
+	t1 := data[2*hn*tlen+2*nn*slen+2*nn : 2*hn*tlen+2*nn*slen+3*nn]
+
+	copy(data[2*hn*tlen:2*hn*tlen+2*nn*slen], data[:2*nn*slen])
+	for u := range slen {
+		p := primes[u].p
+		p0i := modPNInv31(p)
+		r2 := modPR2(p, p0i)
+		modPMkgm2(gm, igm, primes[u].g, p, p0i)
+
+		for v, x := 0, u; v < nn; v, x = v+1, x+slen {
+			t1[v] = fs[x]
+		}
+		if !inNTT {
+			modPNTT2(t1, gm, p, p0i)
+		}
+		for v, x := 0, u; v < hn; v, x = v+1, x+tlen {
+			w0 := t1[(v<<1)+0]
+			w1 := t1[(v<<1)+1]
+			fd[x] = modPMontyMul(modPMontyMul(w0, w1, p, p0i), r2, p, p0i)
+		}
+		if inNTT {
+			modPINTT2Ext(fs[u:], slen, igm, p, p0i)
+		}
+
+		for v, x := 0, u; v < nn; v, x = v+1, x+slen {
+			t1[v] = gs[x]
+		}
+		if !inNTT {
+			modPNTT2(t1, gm, p, p0i)
+		}
+		for v, x := 0, u; v < hn; v, x = v+1, x+tlen {
+			w0 := t1[(v<<1)+0]
+			w1 := t1[(v<<1)+1]
+			gd[x] = modPMontyMul(modPMontyMul(w0, w1, p, p0i), r2, p, p0i)
+		}
+		if inNTT {
+			modPINTT2Ext(gs[u:], slen, igm, p, p0i)
+		}
+
+		if !outNTT {
+			modPINTT2Ext(fd[u:], tlen, igm, p, p0i)
+			modPINTT2Ext(gd[u:], tlen, igm, p, p0i)
+		}
+	}
+
+	crtScratch := make([]uint32, slen)
+	zintRebuildCRT(fs, slen, slen, nn, primes[:], true, crtScratch)
+	zintRebuildCRT(gs, slen, slen, nn, primes[:], true, crtScratch)
+
+	for u := slen; u < tlen; u++ {
+		p := primes[u].p
+		p0i := modPNInv31(p)
+		r2 := modPR2(p, p0i)
+		rx := modPRx(slen, p, p0i, r2)
+		modPMkgm2(gm, igm, primes[u].g, p, p0i)
+
+		for v, x := 0, 0; v < nn; v, x = v+1, x+slen {
+			t1[v] = zintModSmallSigned(fs[x:x+slen], p, p0i, r2, rx)
+		}
+		modPNTT2(t1, gm, p, p0i)
+		for v, x := 0, u; v < hn; v, x = v+1, x+tlen {
+			w0 := t1[(v<<1)+0]
+			w1 := t1[(v<<1)+1]
+			fd[x] = modPMontyMul(modPMontyMul(w0, w1, p, p0i), r2, p, p0i)
+		}
+
+		for v, x := 0, 0; v < nn; v, x = v+1, x+slen {
+			t1[v] = zintModSmallSigned(gs[x:x+slen], p, p0i, r2, rx)
+		}
+		modPNTT2(t1, gm, p, p0i)
+		for v, x := 0, u; v < hn; v, x = v+1, x+tlen {
+			w0 := t1[(v<<1)+0]
+			w1 := t1[(v<<1)+1]
+			gd[x] = modPMontyMul(modPMontyMul(w0, w1, p, p0i), r2, p, p0i)
+		}
+
+		if !outNTT {
+			modPINTT2Ext(fd[u:], tlen, igm, p, p0i)
+			modPINTT2Ext(gd[u:], tlen, igm, p, p0i)
+		}
+	}
+}
+
+func solveNTRUDeepest(f, g smallPolynomial, tmp []uint32) bool {
+	wordLen := maxBlSmall[logN]
+	bigF := tmp[:wordLen]
+	bigG := tmp[wordLen : 2*wordLen]
+	fg := tmp[2*wordLen : 4*wordLen]
+	ff := fg[:wordLen]
+	gg := fg[wordLen : 2*wordLen]
+	scratch := tmp[4*wordLen:]
+
+	makeFG(tmp[2*wordLen:], f, g, logN, false)
+	zintRebuildCRT(fg, wordLen, wordLen, 2, primes[:], false, scratch)
+
+	if !zintBezout(bigG, bigF, ff, gg, scratch) {
+		return false
+	}
+
+	return zintMulSmall(bigF, q) == 0 && zintMulSmall(bigG, q) == 0
+}
+
+func polyBigToFP(dst []fpr, src []uint32, wordLen, stride, logn int) {
+	nn := 1 << logn
+	if wordLen == 0 {
+		clear(dst[:nn])
+		return
+	}
+	for i := range nn {
+		x := src[i*stride:]
+		neg := -(x[wordLen-1] >> 30)
+		xm := neg >> 1
+		cc := neg & 1
+		var y fpr
+		scale := fpr(1)
+		for j := range wordLen {
+			w := (x[j] ^ xm) + cc
+			cc = w >> 31
+			w &= zintWordMask
+			w -= (w << 1) & neg
+			y += fpr(int32(w)) * scale
+			scale *= 2147483648.0
+		}
+		dst[i] = y
+	}
+}
+
+func polyBigToSmall(src []uint32, bound int) (smallPolynomial, bool) {
+	var dst smallPolynomial
+	for i := range dst {
+		x := zintOneToPlain(src[i])
+		if x < int32(-bound) || x > int32(bound) {
+			return smallPolynomial{}, false
+		}
+		dst[i] = x
+	}
+	return dst, true
+}
+
+func polySubScaled(F []uint32, Flen, Fstride int, f []uint32, flen, fstride int, k []int32, sch, scl uint32, logn int) {
+	nn := 1 << logn
+	for u := range nn {
+		kf := -k[u]
+		x := u * Fstride
+		for v := range nn {
+			zintAddScaledMulSmall(F[x:x+Flen], f[v*fstride:v*fstride+flen], kf, sch, scl)
+			if u+v == nn-1 {
+				x = 0
+				kf = -kf
+			} else {
+				x += Fstride
+			}
+		}
+	}
+}
+
+func polySubScaledNTT(F []uint32, Flen, Fstride int, f []uint32, flen, fstride int, k []int32, sch, scl uint32, logn int, tmp []uint32) {
+	nn := 1 << logn
+	tlen := flen + 1
+	gm := tmp[:nn]
+	igm := tmp[nn : 2*nn]
+	fk := tmp[2*nn : 2*nn+nn*tlen]
+	t1 := tmp[2*nn+nn*tlen : 3*nn+nn*tlen]
+	for u := range tlen {
+		p := primes[u].p
+		p0i := modPNInv31(p)
+		r2 := modPR2(p, p0i)
+		rx := modPRx(flen, p, p0i, r2)
+		modPMkgm2(gm, igm, primes[u].g, p, p0i)
+		for v := range nn {
+			t1[v] = modPSet(k[v], p)
+		}
+		modPNTT2(t1, gm, p, p0i)
+
+		for v, x := 0, u; v < nn; v, x = v+1, x+tlen {
+			fk[x] = zintModSmallSigned(f[v*fstride:v*fstride+flen], p, p0i, r2, rx)
+		}
+		modPNTT2Ext(fk[u:], tlen, gm, p, p0i)
+
+		for v, x := 0, u; v < nn; v, x = v+1, x+tlen {
+			fk[x] = modPMontyMul(modPMontyMul(t1[v], fk[x], p, p0i), r2, p, p0i)
+		}
+		modPINTT2Ext(fk[u:], tlen, igm, p, p0i)
+	}
+
+	zintRebuildCRT(fk, tlen, tlen, nn, primes[:], true, t1)
+	for u := range nn {
+		zintSubScaled(F[u*Fstride:u*Fstride+Flen], fk[u*tlen:u*tlen+tlen], sch, scl)
+	}
+}
+
+func solveNTRUIntermediate(f, g smallPolynomial, depth int, tmp []uint32) bool {
+	logn := logN - depth
+	nn := 1 << logn
+	hn := nn >> 1
+	slen := maxBlSmall[depth]
+	dlen := maxBlSmall[depth+1]
+	llen := maxBlLarge[depth]
+
+	Fd := append([]uint32(nil), tmp[:dlen*hn]...)
+	Gd := append([]uint32(nil), tmp[dlen*hn:2*dlen*hn]...)
+
+	fgData := make([]uint32, ntruScratchWords)
+	makeFG(fgData, f, g, depth, true)
+	ft := append([]uint32(nil), fgData[:nn*slen]...)
+	gt := append([]uint32(nil), fgData[nn*slen:2*nn*slen]...)
+
+	Ft := make([]uint32, nn*llen)
+	Gt := make([]uint32, nn*llen)
+	for u := range llen {
+		p := primes[u].p
+		p0i := modPNInv31(p)
+		r2 := modPR2(p, p0i)
+		rx := modPRx(dlen, p, p0i, r2)
+		for v := range hn {
+			Ft[v*llen+u] = zintModSmallSigned(Fd[v*dlen:v*dlen+dlen], p, p0i, r2, rx)
+			Gt[v*llen+u] = zintModSmallSigned(Gd[v*dlen:v*dlen+dlen], p, p0i, r2, rx)
+		}
+	}
+	for u := range llen {
+		p := primes[u].p
+		p0i := modPNInv31(p)
+		r2 := modPR2(p, p0i)
+		gm := make([]uint32, nn)
+		igm := make([]uint32, nn)
+		fx := make([]uint32, nn)
+		gx := make([]uint32, nn)
+		modPMkgm2(gm, igm, primes[u].g, p, p0i)
+
+		if u == slen {
+			scratch := make([]uint32, slen)
+			zintRebuildCRT(ft, slen, slen, nn, primes[:], true, scratch)
+			zintRebuildCRT(gt, slen, slen, nn, primes[:], true, scratch)
+		}
+
+		if u < slen {
+			for v := range nn {
+				fx[v] = ft[v*slen+u]
+				gx[v] = gt[v*slen+u]
+			}
+			modPINTT2Ext(ft[u:], slen, igm, p, p0i)
+			modPINTT2Ext(gt[u:], slen, igm, p, p0i)
+		} else {
+			rx := modPRx(slen, p, p0i, r2)
+			for v := range nn {
+				fx[v] = zintModSmallSigned(ft[v*slen:v*slen+slen], p, p0i, r2, rx)
+				gx[v] = zintModSmallSigned(gt[v*slen:v*slen+slen], p, p0i, r2, rx)
+			}
+			modPNTT2(fx, gm, p, p0i)
+			modPNTT2(gx, gm, p, p0i)
+		}
+
+		Fp := make([]uint32, hn)
+		Gp := make([]uint32, hn)
+		for v := range hn {
+			Fp[v] = Ft[v*llen+u]
+			Gp[v] = Gt[v*llen+u]
+		}
+		modPNTT2(Fp, gm, p, p0i)
+		modPNTT2(Gp, gm, p, p0i)
+		for v := range hn {
+			ftA := fx[(v<<1)+0]
+			ftB := fx[(v<<1)+1]
+			gtA := gx[(v<<1)+0]
+			gtB := gx[(v<<1)+1]
+			mFp := modPMontyMul(Fp[v], r2, p, p0i)
+			mGp := modPMontyMul(Gp[v], r2, p, p0i)
+			Ft[(v<<1)*llen+u] = modPMontyMul(gtB, mFp, p, p0i)
+			Ft[((v<<1)+1)*llen+u] = modPMontyMul(gtA, mFp, p, p0i)
+			Gt[(v<<1)*llen+u] = modPMontyMul(ftB, mGp, p, p0i)
+			Gt[((v<<1)+1)*llen+u] = modPMontyMul(ftA, mGp, p, p0i)
+		}
+		modPINTT2Ext(Ft[u:], llen, igm, p, p0i)
+		modPINTT2Ext(Gt[u:], llen, igm, p, p0i)
+	}
+
+	scratch := make([]uint32, llen)
+	zintRebuildCRT(Ft, llen, llen, nn, primes[:], true, scratch)
+	zintRebuildCRT(Gt, llen, llen, nn, primes[:], true, scratch)
+
+	rlen := slen
+	if rlen > 10 {
+		rlen = 10
+	}
+	rt3 := make([]fpr, nn)
+	rt4 := make([]fpr, nn)
+	rt5 := make([]fpr, nn>>1)
+	polyBigToFP(rt3, ft[slen-rlen:], rlen, slen, logn)
+	polyBigToFP(rt4, gt[slen-rlen:], rlen, slen, logn)
+	scaleFGBase := 31 * (slen - rlen)
+
+	minBitsFG := bitLength[depth].avg - 6*bitLength[depth].std
+	maxBitsFG := bitLength[depth].avg + 6*bitLength[depth].std
+
+	fftSlice(rt3, logn)
+	fftSlice(rt4, logn)
+	fftInvNorm2(rt5, rt3, rt4, logn)
+	fftAdj(rt3, logn)
+	fftAdj(rt4, logn)
+
+	FGlen := llen
+	maxBitsFGSolution := 31 * llen
+	scaleK := maxBitsFGSolution - minBitsFG
+	k := make([]int32, nn)
+
+	for {
+		rlen = FGlen
+		if rlen > 10 {
+			rlen = 10
+		}
+		scaleFGSolution := 31 * (FGlen - rlen)
+		rt1 := make([]fpr, nn)
+		rt2 := make([]fpr, nn)
+		polyBigToFP(rt1, Ft[FGlen-rlen:], rlen, llen, logn)
+		polyBigToFP(rt2, Gt[FGlen-rlen:], rlen, llen, logn)
+
+		fftSlice(rt1, logn)
+		fftSlice(rt2, logn)
+		fftMulSlice(rt1, rt3, logn)
+		fftMulSlice(rt2, rt4, logn)
+		fftAdd(rt2, rt1, logn)
+		fftMulAutoAdj(rt2, rt5, logn)
+		inverseFFTSlice(rt2, logn)
+
+		scaleCorrection := scaleK - scaleFGSolution + scaleFGBase
+		pdc := fpr(math.Ldexp(1, -scaleCorrection))
+		for i := range nn {
+			x := rt2[i] * pdc
+			if !(-2147483647.0 < x) || !(x < 2147483647.0) {
+				return false
+			}
+			k[i] = int32(fprRint(x))
+		}
+
+		sch := uint32(scaleK / 31)
+		scl := uint32(scaleK % 31)
+		work := make([]uint32, ntruScratchWords)
+		if depth <= depthIntFG {
+			polySubScaledNTT(Ft, FGlen, llen, ft, slen, slen, k, sch, scl, logn, work)
+			polySubScaledNTT(Gt, FGlen, llen, gt, slen, slen, k, sch, scl, logn, work)
+		} else {
+			polySubScaled(Ft, FGlen, llen, ft, slen, slen, k, sch, scl, logn)
+			polySubScaled(Gt, FGlen, llen, gt, slen, slen, k, sch, scl, logn)
+		}
+
+		newMaxBitsFGSolution := scaleK + maxBitsFG + 10
+		if newMaxBitsFGSolution < maxBitsFGSolution {
+			maxBitsFGSolution = newMaxBitsFGSolution
+			if FGlen*31 >= maxBitsFGSolution+31 {
+				FGlen--
+			}
+		}
+
+		if scaleK <= 0 {
+			break
+		}
+		scaleK -= 25
+		if scaleK < 0 {
+			scaleK = 0
+		}
+	}
+
+	if FGlen < slen {
+		for i := range nn {
+			Fw := -(Ft[i*llen+FGlen-1] >> 30) >> 1
+			Gw := -(Gt[i*llen+FGlen-1] >> 30) >> 1
+			for j := FGlen; j < slen; j++ {
+				Ft[i*llen+j] = Fw
+				Gt[i*llen+j] = Gw
+			}
+		}
+	}
+	for i := range nn {
+		copy(tmp[i*slen:(i+1)*slen], Ft[i*llen:i*llen+slen])
+		copy(tmp[(nn+i)*slen:(nn+i+1)*slen], Gt[i*llen:i*llen+slen])
+	}
+	return true
+}
+
+func solveNTRUBinaryDepth0(f, g smallPolynomial, tmp []uint32) bool {
+	nn := n
+	hn := nn >> 1
+	p := primes[0].p
+	p0i := modPNInv31(p)
+	r2 := modPR2(p, p0i)
+
+	prevF := append([]uint32(nil), tmp[:hn]...)
+	prevG := append([]uint32(nil), tmp[hn:nn]...)
+	Fp := make([]uint32, nn)
+	Gp := make([]uint32, nn)
+	ft := make([]uint32, nn)
+	gt := make([]uint32, nn)
+	gm := make([]uint32, nn)
+	igm := make([]uint32, nn)
+
+	modPMkgm2(gm, igm, primes[0].g, p, p0i)
+	for i := range hn {
+		prevF[i] = modPSet(zintOneToPlain(prevF[i]), p)
+		prevG[i] = modPSet(zintOneToPlain(prevG[i]), p)
+	}
+	modPNTT2(prevF, gm, p, p0i)
+	modPNTT2(prevG, gm, p, p0i)
+	for i := range nn {
+		ft[i] = modPSet(f[i], p)
+		gt[i] = modPSet(g[i], p)
+	}
+	modPNTT2(ft, gm, p, p0i)
+	modPNTT2(gt, gm, p, p0i)
+
+	for i := 0; i < nn; i += 2 {
+		ftA := ft[i+0]
+		ftB := ft[i+1]
+		gtA := gt[i+0]
+		gtB := gt[i+1]
+		mFp := modPMontyMul(prevF[i>>1], r2, p, p0i)
+		mGp := modPMontyMul(prevG[i>>1], r2, p, p0i)
+		Fp[i+0] = modPMontyMul(gtB, mFp, p, p0i)
+		Fp[i+1] = modPMontyMul(gtA, mFp, p, p0i)
+		Gp[i+0] = modPMontyMul(ftB, mGp, p, p0i)
+		Gp[i+1] = modPMontyMul(ftA, mGp, p, p0i)
+	}
+	modPINTT2(Fp, igm, p, p0i)
+	modPINTT2(Gp, igm, p, p0i)
+
+	modPNTT2(Fp, gm, p, p0i)
+	modPNTT2(Gp, gm, p, p0i)
+
+	t2 := make([]uint32, nn)
+	t3 := make([]uint32, nn)
+	t4 := make([]uint32, nn)
+	t5 := make([]uint32, nn)
+
+	t4[0] = modPSet(f[0], p)
+	t5[0] = t4[0]
+	for i := 1; i < nn; i++ {
+		t4[i] = modPSet(f[i], p)
+		t5[nn-i] = modPSet(-f[i], p)
+	}
+	modPNTT2(t4, gm, p, p0i)
+	modPNTT2(t5, gm, p, p0i)
+	for i := range nn {
+		w := modPMontyMul(t5[i], r2, p, p0i)
+		t2[i] = modPMontyMul(w, Fp[i], p, p0i)
+		t3[i] = modPMontyMul(w, t4[i], p, p0i)
+	}
+
+	t4[0] = modPSet(g[0], p)
+	t5[0] = t4[0]
+	for i := 1; i < nn; i++ {
+		t4[i] = modPSet(g[i], p)
+		t5[nn-i] = modPSet(-g[i], p)
+	}
+	modPNTT2(t4, gm, p, p0i)
+	modPNTT2(t5, gm, p, p0i)
+	for i := range nn {
+		w := modPMontyMul(t5[i], r2, p, p0i)
+		t2[i] = modPAdd(t2[i], modPMontyMul(w, Gp[i], p, p0i), p)
+		t3[i] = modPAdd(t3[i], modPMontyMul(w, t4[i], p, p0i), p)
+	}
+
+	modPINTT2(t2, igm, p, p0i)
+	modPINTT2(t3, igm, p, p0i)
+
+	num := make([]fpr, nn)
+	den := make([]fpr, hn)
+	work := make([]fpr, nn)
+	for i := range nn {
+		work[i] = fpr(modPNorm(t3[i], p))
+	}
+	fftSlice(work, logN)
+	copy(den, work[:hn])
+	for i := range nn {
+		num[i] = fpr(modPNorm(t2[i], p))
+	}
+	fftSlice(num, logN)
+	fftDivAutoAdj(num, den, logN)
+	inverseFFTSlice(num, logN)
+	for i := range nn {
+		t2[i] = modPSet(int32(fprRint(num[i])), p)
+	}
+	for i := range nn {
+		t4[i] = modPSet(f[i], p)
+		t5[i] = modPSet(g[i], p)
+	}
+	modPNTT2(t2, gm, p, p0i)
+	modPNTT2(t4, gm, p, p0i)
+	modPNTT2(t5, gm, p, p0i)
+	for i := range nn {
+		kw := modPMontyMul(t2[i], r2, p, p0i)
+		Fp[i] = modPSub(Fp[i], modPMontyMul(kw, t4[i], p, p0i), p)
+		Gp[i] = modPSub(Gp[i], modPMontyMul(kw, t5[i], p, p0i), p)
+	}
+	modPINTT2(Fp, igm, p, p0i)
+	modPINTT2(Gp, igm, p, p0i)
+	for i := range nn {
+		tmp[i] = uint32(modPNorm(Fp[i], p))
+		tmp[nn+i] = uint32(modPNorm(Gp[i], p))
+	}
+	return true
+}
+
+func solveNTRUBinaryDepth1(f, g smallPolynomial, tmp []uint32) bool {
+	depth := 1
+	logn := logN - depth
+	nn := 1 << logn
+	hn := nn >> 1
+	slen := maxBlSmall[depth]
+	dlen := maxBlSmall[depth+1]
+	llen := maxBlLarge[depth]
+
+	Fd := append([]uint32(nil), tmp[:dlen*hn]...)
+	Gd := append([]uint32(nil), tmp[dlen*hn:2*dlen*hn]...)
+	Ft := make([]uint32, nn*llen)
+	Gt := make([]uint32, nn*llen)
+	ft := make([]uint32, nn*slen)
+	gt := make([]uint32, nn*slen)
+	for u := range llen {
+		p := primes[u].p
+		p0i := modPNInv31(p)
+		r2 := modPR2(p, p0i)
+		rx := modPRx(dlen, p, p0i, r2)
+		for v := range hn {
+			Ft[v*llen+u] = zintModSmallSigned(Fd[v*dlen:v*dlen+dlen], p, p0i, r2, rx)
+			Gt[v*llen+u] = zintModSmallSigned(Gd[v*dlen:v*dlen+dlen], p, p0i, r2, rx)
+		}
+	}
+	for u := range llen {
+		p := primes[u].p
+		p0i := modPNInv31(p)
+		r2 := modPR2(p, p0i)
+		gmFull := make([]uint32, n)
+		igmFull := make([]uint32, n)
+		fx := make([]uint32, n)
+		gx := make([]uint32, n)
+
+		modPMkgm2(gmFull, igmFull, primes[u].g, p, p0i)
+		for v := range n {
+			fx[v] = modPSet(f[v], p)
+			gx[v] = modPSet(g[v], p)
+		}
+		modPNTT2(fx, gmFull, p, p0i)
+		modPNTT2(gx, gmFull, p, p0i)
+		for e := logN; e > logn; e-- {
+			modPPolyRecRes(fx, e, p, p0i, r2)
+			modPPolyRecRes(gx, e, p, p0i, r2)
+		}
+
+		gm := gmFull[:nn]
+		igm := igmFull[:nn]
+		Fp := make([]uint32, hn)
+		Gp := make([]uint32, hn)
+		for v := range hn {
+			Fp[v] = Ft[v*llen+u]
+			Gp[v] = Gt[v*llen+u]
+		}
+		modPNTT2(Fp, gm, p, p0i)
+		modPNTT2(Gp, gm, p, p0i)
+		for v := range hn {
+			ftA := fx[(v<<1)+0]
+			ftB := fx[(v<<1)+1]
+			gtA := gx[(v<<1)+0]
+			gtB := gx[(v<<1)+1]
+			mFp := modPMontyMul(Fp[v], r2, p, p0i)
+			mGp := modPMontyMul(Gp[v], r2, p, p0i)
+			Ft[(v<<1)*llen+u] = modPMontyMul(gtB, mFp, p, p0i)
+			Ft[((v<<1)+1)*llen+u] = modPMontyMul(gtA, mFp, p, p0i)
+			Gt[(v<<1)*llen+u] = modPMontyMul(ftB, mGp, p, p0i)
+			Gt[((v<<1)+1)*llen+u] = modPMontyMul(ftA, mGp, p, p0i)
+		}
+		modPINTT2Ext(Ft[u:], llen, igm, p, p0i)
+		modPINTT2Ext(Gt[u:], llen, igm, p, p0i)
+
+		if u < slen {
+			modPINTT2(fx[:nn], igm, p, p0i)
+			modPINTT2(gx[:nn], igm, p, p0i)
+			for v := range nn {
+				ft[v*slen+u] = fx[v]
+				gt[v*slen+u] = gx[v]
+			}
+		}
+	}
+
+	scratch := make([]uint32, max(llen, slen))
+	zintRebuildCRT(Ft, llen, llen, nn, primes[:], true, scratch)
+	zintRebuildCRT(Gt, llen, llen, nn, primes[:], true, scratch)
+	zintRebuildCRT(ft, slen, slen, nn, primes[:], true, scratch)
+	zintRebuildCRT(gt, slen, slen, nn, primes[:], true, scratch)
+
+	rt1 := make([]fpr, nn)
+	rt2 := make([]fpr, nn)
+	rt3 := make([]fpr, nn)
+	rt4 := make([]fpr, nn)
+	polyBigToFP(rt1, Ft, llen, llen, logn)
+	polyBigToFP(rt2, Gt, llen, llen, logn)
+	polyBigToFP(rt3, ft, slen, slen, logn)
+	polyBigToFP(rt4, gt, slen, slen, logn)
+
+	fftSlice(rt1, logn)
+	fftSlice(rt2, logn)
+	fftSlice(rt3, logn)
+	fftSlice(rt4, logn)
+
+	rt5 := make([]fpr, nn)
+	rt6 := make([]fpr, nn>>1)
+	fftAddMulAdj(rt5, rt1, rt2, rt3, rt4, logn)
+	fftInvNorm2(rt6, rt3, rt4, logn)
+	fftMulAutoAdj(rt5, rt6, logn)
+
+	inverseFFTSlice(rt5, logn)
+	for i := range nn {
+		z := rt5[i]
+		if !(z < 9223372036854775807.0) || !(-9223372036854775807.0 < z) {
+			return false
+		}
+		rt5[i] = fpr(fprRint(z))
+	}
+	fftSlice(rt5, logn)
+
+	kf := append([]fpr(nil), rt3...)
+	kg := append([]fpr(nil), rt4...)
+	fftMulSlice(kf, rt5, logn)
+	fftMulSlice(kg, rt5, logn)
+	fftSub(rt1, kf, logn)
+	fftSub(rt2, kg, logn)
+	inverseFFTSlice(rt1, logn)
+	inverseFFTSlice(rt2, logn)
+	for i := range nn {
+		tmp[i] = uint32(fprRint(rt1[i]))
+		tmp[nn+i] = uint32(fprRint(rt2[i]))
+	}
+	return true
 }

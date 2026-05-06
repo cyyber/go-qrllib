@@ -96,8 +96,55 @@ func compressedDecode(src []byte) (smallPolynomial, int, error) {
 }
 
 func compressedEncode(dst []byte, s smallPolynomial) (int, error) {
-	// TODO
-	return 0, nil
+	var acc uint32
+	accBits := 0
+	written := 0
+
+	for _, x := range s {
+		if x < -maxCompressedCoefficient || x > maxCompressedCoefficient {
+			return 0, errors.New("falcon-1024: compressed coefficient out of range")
+		}
+
+		t := x
+		sign := uint32(0)
+		if t < 0 {
+			t = -t
+			sign = 0x80
+		}
+
+		low := sign | (uint32(t) & 0x7F)
+		high := uint32(t) >> 7
+
+		acc = (acc << 8) | low
+		accBits += 8
+
+		acc = (acc << (high + 1)) | 1
+		accBits += int(high) + 1
+
+		for accBits >= 8 {
+			accBits -= 8
+			if written >= len(dst) {
+				return 0, errors.New("falcon-1024: compressed signature buffer too small")
+			}
+			dst[written] = byte(acc >> accBits)
+			written++
+			if accBits == 0 {
+				acc = 0
+			} else {
+				acc &= (1 << accBits) - 1
+			}
+		}
+	}
+
+	if accBits > 0 {
+		if written >= len(dst) {
+			return 0, errors.New("falcon-1024: compressed signature buffer too small")
+		}
+		dst[written] = byte(acc << (8 - accBits))
+		written++
+	}
+
+	return written, nil
 }
 
 func skEncode(dst []byte, f, g, ntruF smallPolynomial) error {

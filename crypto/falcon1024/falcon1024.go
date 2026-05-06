@@ -48,7 +48,9 @@ func (priv PrivateKey) Public() (crypto.PublicKey, error) {
 		return nil, err
 	}
 
-	return append(make([]byte, 0, PublicKeySize), k.PublicKey()...), nil
+	pub := make(PublicKey, PublicKeySize)
+	copy(pub, k.PublicKey())
+	return pub, nil
 }
 
 // Equal reports whether priv and x have the same value.
@@ -134,7 +136,7 @@ func sign(random io.Reader, signature []byte, privateKey PrivateKey, message []b
 	}
 	sig, err := falcon1024.Sign(random, k, message)
 	if err != nil {
-		return nil
+		return err
 	}
 	copy(signature, sig)
 	return nil

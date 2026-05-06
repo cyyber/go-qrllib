@@ -2,6 +2,7 @@ package falcon1024
 
 import (
 	"crypto/sha3"
+	"encoding/binary"
 	"errors"
 )
 
@@ -174,14 +175,6 @@ func hashToPoint(h *sha3.SHAKE) (ringElement, error) {
 
 	return p, nil
 }
-
-// TODO
-// func polySub[T ~[n]fieldElement](a, b T) (s T) {
-// 	for i := range s {
-// 		s[i] = fieldSub(a[i], b[i])
-// 	}
-// 	return s
-// }
 
 type nttElement [n]fieldElement // NTT-domain modulo-q polynomial
 
@@ -516,14 +509,67 @@ const signatureNormBound uint64 = 70_265_242
 
 type smallPolynomial [n]int32
 
-func smallPolynomialFromBig(p bigPolynomial, bits int) (smallPolynomial, bool) {
-	// TODO
-	return smallPolynomial{}, false
+var gauss1024_12289 = [...]uint64{
+	1283868770400643928, 6416574995475331444, 4078260278032692663,
+	2353523259288686585, 1227179971273316331, 575931623374121527,
+	242543240509105209, 91437049221049666, 30799446349977173,
+	9255276791179340, 2478152334826140, 590642893610164,
+	125206034929641, 23590435911403, 3948334035941,
+	586753615614, 77391054539, 9056793210,
+	940121950, 86539696, 7062824,
+	510971, 32764, 1862,
+	94, 4, 0,
 }
 
 func sampleSmallPolynomial(rng *sha3.SHAKE) smallPolynomial {
-	// TODO
-	return smallPolynomial{}
+	var p smallPolynomial
+	var parity int32
+
+	for i := 0; i < n; {
+		x := sampleKeygenGaussian(rng)
+		if x < -ntruFBound || x > ntruFBound {
+			continue
+		}
+
+		if i == n-1 {
+			if (parity ^ (x & 1)) == 0 {
+				continue
+			}
+		} else {
+			parity ^= x & 1
+		}
+
+		p[i] = x
+		i++
+	}
+
+	return p
+}
+
+func sampleKeygenGaussian(rng *sha3.SHAKE) int32 {
+	r := readShakeUint64(rng)
+	neg := uint32(r >> 63)
+	r &^= uint64(1) << 63
+	f := uint32((r - gauss1024_12289[0]) >> 63)
+
+	r = readShakeUint64(rng)
+	r &^= uint64(1) << 63
+
+	var v uint32
+	for k := uint32(1); k < uint32(len(gauss1024_12289)); k++ {
+		t := uint32(((r - gauss1024_12289[k]) >> 63) ^ 1)
+		v |= k & -(t & (f ^ 1))
+		f |= t
+	}
+
+	v = (v ^ -neg) + neg
+	return int32(v)
+}
+
+func readShakeUint64(rng *sha3.SHAKE) uint64 {
+	var buf [8]byte
+	rng.Read(buf[:])
+	return binary.LittleEndian.Uint64(buf[:])
 }
 
 func coefficientsExceedBound(p smallPolynomial, bound int32) bool {
@@ -536,17 +582,52 @@ func coefficientsExceedBound(p smallPolynomial, bound int32) bool {
 }
 
 func squaredNormExceedsBound(f, g smallPolynomial, bound uint32) bool {
-	// TODO
-	return f.squaredNorm()+g.squaredNorm() > bound
+	return f.squaredNorm()+g.squaredNorm() >= bound
 }
 
 func orthogonalizedNormExceedsBound(f, g smallPolynomial, bound float64) bool {
-	// TODO
-	return false
+	rf := fft(fprFromSmall(f))
+	rg := fft(fprFromSmall(g))
+
+	var invNorm fftPolynomial
+	fftInvNorm2(invNorm[:], rf[:], rg[:], logN)
+
+	fftAdj(rf[:], logN)
+	fftAdj(rg[:], logN)
+
+	for i := range rf {
+		rf[i] *= q
+		rg[i] *= q
+	}
+
+	fftMulAutoAdj(rf[:], invNorm[:], logN)
+	fftMulAutoAdj(rg[:], invNorm[:], logN)
+
+	fp := inverseFFT(rf)
+	gp := inverseFFT(rg)
+
+	var norm float64
+	for i := range fp {
+		norm += float64(fp[i]*fp[i] + gp[i]*gp[i])
+	}
+
+	return norm >= bound
 }
 
 func signatureNormExceedsPartialBound(sqn uint32, s2 smallPolynomial) bool {
-	// TODO
+	norm := uint64(sqn)
+	if norm > signatureNormBound {
+		return true
+	}
+
+	for _, x := range s2 {
+		y := int64(x)
+		norm += uint64(y * y)
+		if norm > signatureNormBound {
+			return true
+		}
+	}
+
 	return false
 }
 
@@ -575,5 +656,3 @@ func signatureNormWithinBound(s1, s2 smallPolynomial) bool {
 
 	return true
 }
-
-type bigPolynomial []uint32
