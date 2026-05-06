@@ -45,7 +45,7 @@ func ExampleNewWallet() {
 		return
 	}
 
-	// Get the QRL address (Q + hex-encoded descriptor + checksum)
+	// Get the QRL address (Q + 96 hex characters, no embedded checksum)
 	address := wallet.GetAddressStr()
 	fmt.Println("Address length:", len(address))
 	// Output: Address length: 97
