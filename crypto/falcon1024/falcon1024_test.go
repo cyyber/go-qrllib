@@ -57,7 +57,10 @@ func TestGenerateKey(t *testing.T) {
 
 	seed := make([]byte, SeedSize)
 	_, _ = zero.Read(seed)
-	publicFromSeed, privateFromSeed := mustNewKeyFromSeed(t, seed)
+	publicFromSeed, privateFromSeed, err := NewKeyFromSeed(seed)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !bytes.Equal(publicFromSeed, public) {
 		t.Fatal("GenerateKey and NewKeyFromSeed returned different public keys")
 	}
@@ -230,16 +233,6 @@ func TestPublicAPIRegression(t *testing.T) {
 	checkSHA256(t, "public key", public, "e6002a1133c82aa79254740e864960db9724b3f042ea8798d14cabddb8ef56be")
 	checkSHA256(t, "private key", private, "8692afea3c1d5cfcbb76f9867b30cc11bc6eca980a1f21abd7f2935a607d986b")
 	checkSHA256(t, "signature", signature, "31112e24ca1ed78a60fb2812591ce471dab85a77bda9d1b1af0fe7d52e92e35f")
-}
-
-func mustNewKeyFromSeed(t testing.TB, seed []byte) (PublicKey, PrivateKey) {
-	t.Helper()
-
-	public, private, err := NewKeyFromSeed(seed)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return public, private
 }
 
 func checkSHA256(t *testing.T, name string, got []byte, want string) {
