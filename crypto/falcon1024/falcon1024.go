@@ -4,6 +4,7 @@ import (
 	"crypto"
 	"crypto/rand"
 	"crypto/subtle"
+	"errors"
 	"io"
 
 	"github.com/theQRL/go-qrllib/crypto/internal/cache"
@@ -64,7 +65,7 @@ var privateKeyCache cache.Cache[byte, falcon1024.PrivateKey]
 
 func cachedPrivateKey(privateKey PrivateKey) (*falcon1024.PrivateKey, error) {
 	if len(privateKey) != PrivateKeySize {
-		return falcon1024.NewPrivateKey(privateKey)
+		return nil, errors.New("falcon-1024: invalid private key length")
 	}
 
 	return privateKeyCache.Get(&privateKey[0], func() (*falcon1024.PrivateKey, error) {
@@ -74,6 +75,7 @@ func cachedPrivateKey(privateKey PrivateKey) (*falcon1024.PrivateKey, error) {
 	})
 }
 
+// Sign signs the message with priv and returns a signature.
 func (priv PrivateKey) Sign(random io.Reader, message []byte) (signature []byte, err error) {
 	return Sign(random, priv, message)
 }
