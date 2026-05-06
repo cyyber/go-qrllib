@@ -47,7 +47,6 @@ func TestGenerateKey(t *testing.T) {
 	if len(private) != PrivateKeySize {
 		t.Fatalf("private key has wrong size: got %d, want %d", len(private), PrivateKeySize)
 	}
-
 	cpublic, err := private.Public()
 	if err != nil {
 		t.Fatal(err)
@@ -64,6 +63,37 @@ func TestGenerateKey(t *testing.T) {
 	}
 	if !bytes.Equal(privateFromSeed, private) {
 		t.Fatal("GenerateKey and NewKeyFromSeed returned different private keys")
+	}
+
+	_, k2, err := GenerateKey(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Equal(private, k2) {
+		t.Errorf("GenerateKey returned the same private key twice")
+	}
+
+	_, k3, err := GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Equal(private, k3) {
+		t.Errorf("GenerateKey returned the same private key twice")
+	}
+
+	// GenerateKey is documented to be the same as NewKeyFromSeed.
+	seed = make([]byte, SeedSize)
+	rand.Read(seed)
+	_, k4, err := GenerateKey(bytes.NewReader(seed))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, k4n, err := NewKeyFromSeed(seed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(k4, k4n) {
+		t.Errorf("GenerateKey with seed gave different private key")
 	}
 }
 
