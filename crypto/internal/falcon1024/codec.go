@@ -48,7 +48,10 @@ func (r *compressedBitReader) trailingBitsAreZero() bool {
 	return r.current&byte((1<<r.bits)-1) == 0
 }
 
-var errInvalidSignatureEncoding = errors.New("falcon-1024: invalid signature encoding")
+var (
+	errInvalidSignatureEncoding    = errors.New("falcon-1024: invalid signature encoding")
+	errCompressedSignatureTooLarge = errors.New("falcon-1024: compressed signature too large")
+)
 
 func compressedDecode(src []byte) (smallPolynomial, int, error) {
 	var p smallPolynomial
@@ -124,7 +127,7 @@ func compressedEncode(dst []byte, s smallPolynomial) (int, error) {
 		for accBits >= 8 {
 			accBits -= 8
 			if written >= len(dst) {
-				return 0, errors.New("falcon-1024: compressed signature buffer too small")
+				return 0, errCompressedSignatureTooLarge
 			}
 			dst[written] = byte(acc >> accBits)
 			written++
@@ -138,7 +141,7 @@ func compressedEncode(dst []byte, s smallPolynomial) (int, error) {
 
 	if accBits > 0 {
 		if written >= len(dst) {
-			return 0, errors.New("falcon-1024: compressed signature buffer too small")
+			return 0, errCompressedSignatureTooLarge
 		}
 		dst[written] = byte(acc << (8 - accBits))
 		written++

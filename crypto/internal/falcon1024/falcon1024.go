@@ -374,16 +374,21 @@ func sign(random io.Reader, signature []byte, priv *PrivateKey, message []byte) 
 		return nil, err
 	}
 
-	s2, err := signTree(rng, priv, c0)
-	if err != nil {
-		return nil, err
-	}
+	for {
+		s2, err := signTree(rng, priv, c0)
+		if err != nil {
+			return nil, err
+		}
 
-	if err := sigEncode(signature, &nonce, s2); err != nil {
-		return nil, err
-	}
+		if err := sigEncode(signature, &nonce, s2); err != nil {
+			if errors.Is(err, errCompressedSignatureTooLarge) {
+				continue
+			}
+			return nil, err
+		}
 
-	return signature, nil
+		return signature, nil
+	}
 }
 
 func signTree(rng *sha3.SHAKE, priv *PrivateKey, c0 ringElement) (smallPolynomial, error) {
