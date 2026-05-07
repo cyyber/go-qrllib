@@ -133,7 +133,6 @@ func zintCoReduce(a, b []uint32, xa, xb, ya, yb int64) uint32 {
 	return nega | (negb << 1)
 }
 
-// TODO
 func zintFinishMod(a, m []uint32, neg uint32) {
 	var cc uint32
 	for i := range a {
@@ -174,6 +173,7 @@ func zintCoReduceMod(a, b, m []uint32, m0i uint32, xa, xb, ya, yb int64) {
 	zintFinishMod(b, m, uint32(uint64(ccb)>>63))
 }
 
+// TODO
 func zintBezout(u, v, x, y []uint32, tmp []uint32) bool {
 	length := len(x)
 	if length == 0 {
@@ -200,8 +200,8 @@ func zintBezout(u, v, x, y []uint32, tmp []uint32) bool {
 	v1[0]--
 
 	for num := uint32(62*length + 30); num >= 30; num -= 30 {
-		c0 := uint32(^uint32(0))
-		c1 := uint32(^uint32(0))
+		c0 := ^uint32(0)
+		c1 := ^uint32(0)
 		var a0, a1, b0, b1 uint32
 		for j := length; j > 0; {
 			j--

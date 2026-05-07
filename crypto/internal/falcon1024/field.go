@@ -39,11 +39,6 @@ func fieldSub(a, b fieldElement) fieldElement {
 	return fieldReduceOnce(x)
 }
 
-// fieldInv returns 1/x mod q. x must be non-zero.
-func fieldInv(x fieldElement) fieldElement {
-	return fieldMontgomeryMul(fieldInvMontgomery(x), 1)
-}
-
 // fieldDiv returns x/y mod q. y must be non-zero.
 func fieldDiv(x, y fieldElement) fieldElement {
 	return fieldMontgomeryMul(x, fieldInvMontgomery(y))
@@ -87,11 +82,6 @@ func fieldMontgomeryReduce(x uint32) fieldElement {
 	x -= q
 	x += q & -(x >> 31)
 	return fieldElement(x)
-}
-
-func fieldMontgomeryMulSub(a, b, c fieldElement) fieldElement {
-	x := uint32(a) * uint32(b-c+q)
-	return fieldMontgomeryReduce(x)
 }
 
 func fieldCenteredMod(x fieldElement) int32 {
