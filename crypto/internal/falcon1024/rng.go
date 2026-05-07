@@ -8,7 +8,7 @@ import (
 )
 
 type samplerPRNG struct {
-	r       io.Reader
+	reader  io.Reader
 	buf     [512]byte
 	ptr     int
 	state   [12]uint32
@@ -30,11 +30,11 @@ func newSamplerPRNG(rng *sha3.SHAKE) *samplerPRNG {
 }
 
 func newSamplerPRNGFromReader(r io.Reader) *samplerPRNG {
-	return &samplerPRNG{r: r}
+	return &samplerPRNG{reader: r}
 }
 
 func (p *samplerPRNG) readByte() byte {
-	if p.r != nil {
+	if p.reader != nil {
 		var buf [1]byte
 		p.read(buf[:])
 		return buf[0]
@@ -49,7 +49,7 @@ func (p *samplerPRNG) readByte() byte {
 }
 
 func (p *samplerPRNG) readUint64() uint64 {
-	if p.r != nil {
+	if p.reader != nil {
 		var buf [8]byte
 		p.read(buf[:])
 		return binary.LittleEndian.Uint64(buf[:])
@@ -64,28 +64,28 @@ func (p *samplerPRNG) readUint64() uint64 {
 }
 
 func (p *samplerPRNG) read(buf []byte) {
-	if _, err := io.ReadFull(p.r, buf); err != nil {
+	if _, err := io.ReadFull(p.reader, buf); err != nil {
 		panic("falcon1024: short sampler PRNG reader")
 	}
 }
 
-func (p *samplerPRNG) refill() {
-	const (
-		cw0 uint32 = 0x61707865
-		cw1 uint32 = 0x3320646e
-		cw2 uint32 = 0x79622d32
-		cw3 uint32 = 0x6b206574
-	)
+const (
+	cw0 uint32 = 0x61707865
+	cw1 uint32 = 0x3320646e
+	cw2 uint32 = 0x79622d32
+	cw3 uint32 = 0x6b206574
+)
 
-	cc := p.counter
-	for u := range 8 {
+func (p *samplerPRNG) refill() {
+	counter := p.counter
+	for block := range 8 {
 		state := [16]uint32{
 			cw0, cw1, cw2, cw3,
 			p.state[0], p.state[1], p.state[2], p.state[3],
 			p.state[4], p.state[5], p.state[6], p.state[7],
 			p.state[8], p.state[9],
-			p.state[10] ^ uint32(cc),
-			p.state[11] ^ uint32(cc>>32),
+			p.state[10] ^ uint32(counter),
+			p.state[11] ^ uint32(counter>>32),
 		}
 
 		for range 10 {
@@ -106,16 +106,16 @@ func (p *samplerPRNG) refill() {
 		for v := 4; v < 14; v++ {
 			state[v] += p.state[v-4]
 		}
-		state[14] += p.state[10] ^ uint32(cc)
-		state[15] += p.state[11] ^ uint32(cc>>32)
-		cc++
+		state[14] += p.state[10] ^ uint32(counter)
+		state[15] += p.state[11] ^ uint32(counter>>32)
+		counter++
 
-		for v := range state {
-			binary.LittleEndian.PutUint32(p.buf[(u<<2)+(v<<5):], state[v])
+		for word := range state {
+			binary.LittleEndian.PutUint32(p.buf[(block<<2)+(word<<5):], state[word])
 		}
 	}
 
-	p.counter = cc
+	p.counter = counter
 	p.ptr = 0
 }
 
