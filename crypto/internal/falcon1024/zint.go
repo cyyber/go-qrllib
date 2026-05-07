@@ -59,29 +59,29 @@ func zintAddMulSmall(x, y []uint32, s uint32) {
 
 func zintNormZero(x, p []uint32) {
 	var r, bb uint32
-	for i := len(x) - 1; i >= 0; i-- {
+	for i := len(x); i > 0; {
+		i--
 		wx := x[i]
 		wp := (p[i] >> 1) | (bb << 30)
 		bb = p[i] & 1
 		cc := wp - wx
 		cc = ((-cc) >> 31) | -(cc >> 31)
 		r |= cc & ((r & 1) - 1)
-		if i == 0 {
-			break
-		}
 	}
 	zintSub(x, p, r>>31)
 }
 
-func zintRebuildCRT(xx []uint32, xlen, xstride, count int, primes []smallPrime, signed bool, tmp []uint32) {
+func zintRebuildCRT(xx []uint32, xlen, xstride, count int, primes []smallPrime, normalizeSigned bool, tmp []uint32) {
 	tmp[0] = primes[0].p
+
 	for u := 1; u < xlen; u++ {
 		p := primes[u].p
 		s := primes[u].s
 		p0i := modPNInv31(p)
 		r2 := modPR2(p, p0i)
+
 		for v := range count {
-			x := xx[v*xstride:]
+			x := xx[v*xstride : v*xstride+xlen]
 			xp := x[u]
 			xq := zintModSmallUnsigned(x[:u], p, p0i, r2)
 			xr := modPMontyMul(s, modPSub(xp, xq, p), p, p0i)
@@ -91,10 +91,10 @@ func zintRebuildCRT(xx []uint32, xlen, xstride, count int, primes []smallPrime, 
 		tmp[u] = zintMulSmall(tmp[:u], p)
 	}
 
-	if signed {
+	if normalizeSigned {
 		for u := range count {
-			x := xx[u*xstride:]
-			zintNormZero(x[:xlen], tmp[:xlen])
+			x := xx[u*xstride : u*xstride+xlen]
+			zintNormZero(x, tmp[:xlen])
 		}
 	}
 }
@@ -133,6 +133,7 @@ func zintCoReduce(a, b []uint32, xa, xb, ya, yb int64) uint32 {
 	return nega | (negb << 1)
 }
 
+// TODO
 func zintFinishMod(a, m []uint32, neg uint32) {
 	var cc uint32
 	for i := range a {
@@ -202,7 +203,8 @@ func zintBezout(u, v, x, y []uint32, tmp []uint32) bool {
 		c0 := uint32(^uint32(0))
 		c1 := uint32(^uint32(0))
 		var a0, a1, b0, b1 uint32
-		for j := length - 1; j >= 0; j-- {
+		for j := length; j > 0; {
+			j--
 			aw := a[j]
 			bw := b[j]
 			a0 ^= (a0 ^ aw) & c0
@@ -211,9 +213,6 @@ func zintBezout(u, v, x, y []uint32, tmp []uint32) bool {
 			b1 ^= (b1 ^ bw) & c1
 			c1 = c0
 			c0 &= (((aw | bw) + zintWordMask) >> 31) - 1
-			if j == 0 {
-				break
-			}
 		}
 
 		a1 |= a0 & c1
