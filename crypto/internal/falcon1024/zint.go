@@ -29,14 +29,12 @@ func zintMulSmall(m []uint32, x uint32) uint32 {
 
 func zintModSmallUnsigned(d []uint32, p, p0i, r2 uint32) uint32 {
 	var x uint32
-	for i := len(d) - 1; i >= 0; i-- {
+	for i := len(d); i > 0; {
+		i--
 		x = modPMontyMul(x, r2, p, p0i)
 		w := d[i] - p
 		w += p & -(w >> 31)
 		x = modPAdd(x, w, p)
-		if i == 0 {
-			break
-		}
 	}
 	return x
 }
