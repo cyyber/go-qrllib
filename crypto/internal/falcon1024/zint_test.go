@@ -378,7 +378,6 @@ func TestZintCoReduce(t *testing.T) {
 	}
 }
 
-// TODO
 func TestZintFinishMod(t *testing.T) {
 	for _, tc := range []struct {
 		name string

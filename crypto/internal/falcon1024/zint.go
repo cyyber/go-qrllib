@@ -173,7 +173,6 @@ func zintCoReduceMod(a, b, m []uint32, m0i uint32, xa, xb, ya, yb int64) {
 	zintFinishMod(b, m, uint32(uint64(ccb)>>63))
 }
 
-// TODO
 func zintBezout(u, v, x, y []uint32, tmp []uint32) bool {
 	length := len(x)
 	if length == 0 {
