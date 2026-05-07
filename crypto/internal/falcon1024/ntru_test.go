@@ -25,7 +25,7 @@ var ntruReferenceKATs = []struct {
 	},
 }
 
-func TestSolveNTRUReferenceKATs(t *testing.T) {
+func TestSolveNTRU(t *testing.T) {
 	for _, tc := range ntruReferenceKATs {
 		t.Run(tc.name, func(t *testing.T) {
 			f := mustDecodeSmallPolynomialHex(t, tc.f)
