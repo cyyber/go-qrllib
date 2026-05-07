@@ -90,6 +90,47 @@ func TestPrivateKeyCodecReferencePolynomials(t *testing.T) {
 	}
 }
 
+func TestPrivateKeyCodecRejectsInvalidInput(t *testing.T) {
+	f := mustDecodeSmallPolynomialHex(t, ntru_f_1024Hex)
+	g := mustDecodeSmallPolynomialHex(t, ntru_g_1024Hex)
+	ntruF := mustDecodeSmallPolynomialHex(t, ntru_F_1024Hex)
+
+	sk := make([]byte, privateKeySize)
+	if err := skEncode(sk, f, g, ntruF); err != nil {
+		t.Fatal(err)
+	}
+
+	testCases := []struct {
+		name string
+		in   []byte
+	}{
+		{
+			name: "short",
+			in:   sk[:privateKeySize-1],
+		},
+		{
+			name: "long",
+			in:   append(bytes.Clone(sk), 0),
+		},
+		{
+			name: "invalid header",
+			in: func() []byte {
+				in := bytes.Clone(sk)
+				in[0] ^= 0xff
+				return in
+			}(),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, _, _, err := skDecode(tc.in); err == nil {
+				t.Fatal("skDecode accepted invalid private key")
+			}
+		})
+	}
+}
+
 func TestSignatureCodecReferenceRawS2KATs(t *testing.T) {
 	// The s2 vectors are decoded from the Falcon reference implementation
 	// KAT_SIG_1024 raw verify vectors. Those raw vectors use a 32-byte hash
