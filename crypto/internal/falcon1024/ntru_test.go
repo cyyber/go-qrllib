@@ -5,6 +5,10 @@ import (
 	"testing"
 )
 
+// These vectors are derived from the Falcon reference implementation
+// test_falcon.c ntru_f_1024, ntru_g_1024, ntru_F_1024, and ntru_G_1024
+// arrays.
+// Source: https://falcon-sign.info/impl/test_falcon.c.html
 var ntruReferenceKATs = []struct {
 	name string
 	f    string
@@ -12,10 +16,6 @@ var ntruReferenceKATs = []struct {
 	F    string
 	G    string
 }{
-	// These vectors are derived from the Falcon reference implementation
-	// test_falcon.c ntru_f_1024, ntru_g_1024, ntru_F_1024, and ntru_G_1024
-	// arrays.
-	// Source: https://falcon-sign.info/impl/test_falcon.c.html
 	{
 		name: "Falcon-1024/test_falcon.c",
 		f:    ntru_f_1024Hex,
