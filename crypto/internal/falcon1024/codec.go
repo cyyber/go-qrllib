@@ -231,6 +231,13 @@ func pkEncode(dst []byte, h ringElement) error {
 }
 
 func pkDecode(src []byte) (h ringElement, err error) {
+	if len(src) != publicKeySize {
+		return ringElement{}, errors.New("falcon-1024: invalid public key length")
+	}
+	if src[0] != publicKeyHeader {
+		return ringElement{}, errors.New("falcon-1024: invalid public key")
+	}
+
 	return polyByteDecode[ringElement](src[encodedHeaderSize:])
 }
 
@@ -248,6 +255,13 @@ func sigEncode(dst []byte, nonce *[nonceSize]byte, s2 smallPolynomial) error {
 }
 
 func sigDecode(src []byte) (nonce [nonceSize]byte, s2 smallPolynomial, err error) {
+	if len(src) != signatureSize {
+		return nonce, smallPolynomial{}, errors.New("falcon-1024: bad signature length")
+	}
+	if src[0] != signatureHeader {
+		return nonce, smallPolynomial{}, errors.New("falcon-1024: invalid signature")
+	}
+
 	copy(nonce[:], src[encodedHeaderSize:signaturePrefixSize])
 
 	s2, consumed, err := compressedDecode(src[signaturePrefixSize:])

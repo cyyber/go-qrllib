@@ -267,13 +267,6 @@ func NewPrivateKey(priv []byte) (*PrivateKey, error) {
 }
 
 func newPrivateKey(priv *PrivateKey, privBytes []byte) (*PrivateKey, error) {
-	if l := len(privBytes); l != privateKeySize {
-		return nil, errors.New("falcon-1024: bad private key length: " + strconv.Itoa(l))
-	}
-	if privBytes[0] != privateKeyHeader {
-		return nil, errors.New("falcon-1024: invalid private key")
-	}
-
 	f, g, ntruF, err := skDecode(privBytes)
 	if err != nil {
 		return nil, err
@@ -345,13 +338,6 @@ func NewPublicKey(pub []byte) (*PublicKey, error) {
 }
 
 func newPublicKey(pub *PublicKey, pubBytes []byte) (*PublicKey, error) {
-	if l := len(pubBytes); l != publicKeySize {
-		return nil, errors.New("falcon-1024: invalid public key length")
-	}
-	if pubBytes[0] != publicKeyHeader {
-		return nil, errors.New("falcon-1024: invalid public key")
-	}
-
 	h, err := pkDecode(pubBytes)
 	if err != nil {
 		return nil, err
@@ -498,13 +484,6 @@ func NewSignature(sig []byte) (*Signature, error) {
 }
 
 func newSignature(sig *Signature, sigBytes []byte) (*Signature, error) {
-	if l := len(sigBytes); l != signatureSize {
-		return nil, errors.New("falcon-1024: bad signature length: " + strconv.Itoa(l))
-	}
-	if sigBytes[0] != signatureHeader {
-		return nil, errors.New("falcon-1024: invalid signature")
-	}
-
 	nonce, s2, err := sigDecode(sigBytes)
 	if err != nil {
 		return nil, err
