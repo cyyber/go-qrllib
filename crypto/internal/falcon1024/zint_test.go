@@ -49,9 +49,7 @@ func TestZintSub(t *testing.T) {
 			if gotCarry := zintSub(a, tc.b, tc.ctl); gotCarry != tc.wantCarry {
 				t.Fatalf("zintSub carry = %d, want %d", gotCarry, tc.wantCarry)
 			}
-			if !slices.Equal(a, tc.want) {
-				t.Fatalf("zintSub result = %v, want %v", a, tc.want)
-			}
+			requireEqualWords(t, "zintSub", a, tc.want)
 		})
 	}
 }
@@ -91,9 +89,7 @@ func TestZintMulSmall(t *testing.T) {
 			if gotCarry := zintMulSmall(m, tc.x); gotCarry != tc.wantCarry {
 				t.Fatalf("zintMulSmall carry = %d, want %d", gotCarry, tc.wantCarry)
 			}
-			if !slices.Equal(m, tc.want) {
-				t.Fatalf("zintMulSmall result = %v, want %v", m, tc.want)
-			}
+			requireEqualWords(t, "zintMulSmall", m, tc.want)
 		})
 	}
 }
@@ -143,9 +139,7 @@ func TestZintModSmallUnsigned(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			p := primes[tc.primeIndex].p
-			p0i := modPNInv31(p)
-			r2 := modPR2(p, p0i)
+			p, p0i, r2 := zintPrimeParams(tc.primeIndex)
 			if got := zintModSmallUnsigned(tc.d, p, p0i, r2); got != tc.want {
 				t.Fatalf("zintModSmallUnsigned = %d, want %d", got, tc.want)
 			}
@@ -154,6 +148,13 @@ func TestZintModSmallUnsigned(t *testing.T) {
 }
 
 func TestZintModSmallSigned(t *testing.T) {
+	t.Run("empty", func(t *testing.T) {
+		p, p0i, r2 := zintPrimeParams(0)
+		if got := zintModSmallSigned(nil, p, p0i, r2, 0); got != 0 {
+			t.Fatalf("zintModSmallSigned = %d, want 0", got)
+		}
+	})
+
 	for _, tc := range []struct {
 		name       string
 		d          []uint32
@@ -256,27 +257,27 @@ func TestZintNormZero(t *testing.T) {
 
 func TestZintRebuildCRT(t *testing.T) {
 	for _, tc := range []struct {
-		name   string
-		xx     []uint32
-		signed bool
-		want   []uint32
+		name            string
+		xx              []uint32
+		normalizeSigned bool
+		want            []uint32
 	}{
 		{
-			name:   "unsigned",
-			xx:     []uint32{1, 2, 3, 123, 456, 789},
-			signed: false,
-			want:   []uint32{116849192, 1180448205, 612339150, 1776501976, 1643101678, 2064339632},
+			name:            "unsigned",
+			xx:              []uint32{1, 2, 3, 123, 456, 789},
+			normalizeSigned: false,
+			want:            []uint32{116849192, 1180448205, 612339150, 1776501976, 1643101678, 2064339632},
 		},
 		{
-			name:   "signed",
-			xx:     []uint32{1, 2, 3, 123, 456, 789},
-			signed: true,
-			want:   []uint32{116849192, 1180448205, 612339150, 1495684311, 1362527950, 2064540328},
+			name:            "signed",
+			xx:              []uint32{1, 2, 3, 123, 456, 789},
+			normalizeSigned: true,
+			want:            []uint32{116849192, 1180448205, 612339150, 1495684311, 1362527950, 2064540328},
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			xx := slices.Clone(tc.xx)
-			zintRebuildCRT(xx, 3, 3, 2, primes[:], tc.signed, make([]uint32, 3))
+			zintRebuildCRT(xx, 3, 3, 2, primes[:], tc.normalizeSigned, make([]uint32, 3))
 			requireEqualWords(t, "zintRebuildCRT", xx, tc.want)
 		})
 	}
@@ -466,6 +467,12 @@ func TestZintCoReduceMod(t *testing.T) {
 }
 
 func TestZintBezout(t *testing.T) {
+	t.Run("empty", func(t *testing.T) {
+		if zintBezout(nil, nil, nil, nil, nil) {
+			t.Fatal("zintBezout returned true for empty inputs")
+		}
+	})
+
 	for _, tc := range []struct {
 		name  string
 		x     []uint32
@@ -513,6 +520,13 @@ func TestZintBezout(t *testing.T) {
 }
 
 func TestZintAddScaledMulSmall(t *testing.T) {
+	t.Run("empty y", func(t *testing.T) {
+		x := []uint32{1, 2, 3}
+		want := slices.Clone(x)
+		zintAddScaledMulSmall(x, nil, 11, 1, 3)
+		requireEqualWords(t, "zintAddScaledMulSmall", x, want)
+	})
+
 	for _, tc := range []struct {
 		name string
 		x    []uint32
@@ -559,6 +573,13 @@ func TestZintAddScaledMulSmall(t *testing.T) {
 }
 
 func TestZintSubScaled(t *testing.T) {
+	t.Run("empty y", func(t *testing.T) {
+		x := []uint32{1, 2, 3}
+		want := slices.Clone(x)
+		zintSubScaled(x, nil, 1, 3)
+		requireEqualWords(t, "zintSubScaled", x, want)
+	})
+
 	for _, tc := range []struct {
 		name string
 		x    []uint32
