@@ -29,9 +29,9 @@ func (r *compressedBitReader) readBit() (uint32, bool) {
 	return uint32(r.current>>r.bits) & 1, true
 }
 
-func (r *compressedBitReader) readBits(n int) (uint32, bool) {
+func (r *compressedBitReader) readBits(bitCount int) (uint32, bool) {
 	var v uint32
-	for range n {
+	for range bitCount {
 		bit, ok := r.readBit()
 		if !ok {
 			return 0, false
@@ -149,7 +149,7 @@ func compressedEncode(dst []byte, s smallPolynomial) (int, error) {
 
 func skEncode(dst []byte, f, g, ntruF smallPolynomial) error {
 	if len(dst) != privateKeySize {
-		return errors.New("falcon-1024: bad private key length")
+		return errors.New("falcon-1024: invalid private key length")
 	}
 
 	dst[0] = privateKeyHeader
@@ -183,7 +183,7 @@ func skEncode(dst []byte, f, g, ntruF smallPolynomial) error {
 func skDecode(src []byte) (f, g, ntruF smallPolynomial, err error) {
 	if len(src) != privateKeySize {
 		return smallPolynomial{}, smallPolynomial{}, smallPolynomial{},
-			errors.New("falcon-1024: bad private key length")
+			errors.New("falcon-1024: invalid private key length")
 	}
 	if src[0] != privateKeyHeader {
 		return smallPolynomial{}, smallPolynomial{}, smallPolynomial{},
@@ -221,7 +221,7 @@ func skDecode(src []byte) (f, g, ntruF smallPolynomial, err error) {
 
 func pkEncode(dst []byte, h ringElement) error {
 	if len(dst) != publicKeySize {
-		return errors.New("falcon-1024: bad public key length")
+		return errors.New("falcon-1024: invalid public key length")
 	}
 
 	dst[0] = publicKeyHeader
@@ -256,7 +256,7 @@ func sigEncode(dst []byte, nonce *[nonceSize]byte, s2 smallPolynomial) error {
 
 func sigDecode(src []byte) (nonce [nonceSize]byte, s2 smallPolynomial, err error) {
 	if len(src) != signatureSize {
-		return nonce, smallPolynomial{}, errors.New("falcon-1024: bad signature length")
+		return nonce, smallPolynomial{}, errors.New("falcon-1024: invalid signature length")
 	}
 	if src[0] != signatureHeader {
 		return nonce, smallPolynomial{}, errors.New("falcon-1024: invalid signature")

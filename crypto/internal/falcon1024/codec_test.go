@@ -33,6 +33,40 @@ func TestPublicKeyCodecReferenceKAT(t *testing.T) {
 	}
 }
 
+func TestPublicKeyCodecRejectsInvalidInput(t *testing.T) {
+	pub := mustDecodeHex(t, verifyRawKATPublicKeyHex)
+
+	testCases := []struct {
+		name string
+		in   []byte
+	}{
+		{
+			name: "short",
+			in:   pub[:publicKeySize-1],
+		},
+		{
+			name: "long",
+			in:   append(bytes.Clone(pub), 0),
+		},
+		{
+			name: "invalid header",
+			in: func() []byte {
+				in := bytes.Clone(pub)
+				in[0] ^= 0xff
+				return in
+			}(),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := pkDecode(tc.in); err == nil {
+				t.Fatal("pkDecode accepted invalid public key")
+			}
+		})
+	}
+}
+
 func TestPrivateKeyCodecReferencePolynomials(t *testing.T) {
 	// test_falcon.c publishes component private-key polynomials, not a
 	// serialized secret key. Use those reference polynomials to check that our
@@ -84,6 +118,49 @@ func TestSignatureCodecReferenceRawS2KATs(t *testing.T) {
 			}
 			if gotS2 != wantS2 {
 				t.Fatal("sigDecode returned unexpected s2")
+			}
+		})
+	}
+}
+
+func TestSignatureCodecRejectsInvalidInput(t *testing.T) {
+	tc := verifyRawKATs[0]
+	nonceBytes := mustDecodeHex(t, tc.nonceHex)
+	var nonce [nonceSize]byte
+	copy(nonce[:], nonceBytes)
+	s2 := decodeVerifyRawKATSignature(t, mustDecodeHex(t, tc.signatureHex))
+
+	sig := make([]byte, signatureSize)
+	if err := sigEncode(sig, &nonce, s2); err != nil {
+		t.Fatal(err)
+	}
+
+	testCases := []struct {
+		name string
+		in   []byte
+	}{
+		{
+			name: "short",
+			in:   sig[:signatureSize-1],
+		},
+		{
+			name: "long",
+			in:   append(bytes.Clone(sig), 0),
+		},
+		{
+			name: "invalid header",
+			in: func() []byte {
+				in := bytes.Clone(sig)
+				in[0] ^= 0xff
+				return in
+			}(),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, _, err := sigDecode(tc.in); err == nil {
+				t.Fatal("sigDecode accepted invalid signature")
 			}
 		})
 	}

@@ -53,7 +53,7 @@ func NewPrivateKeyFromSeed(seed []byte) (*PrivateKey, error) {
 
 func newPrivateKeyFromSeed(priv *PrivateKey, seed []byte) (*PrivateKey, error) {
 	if l := len(seed); l != seedSize {
-		return nil, errors.New("ed25519: bad seed length: " + strconv.Itoa(l))
+		return nil, errors.New("falcon-1024: invalid seed length: " + strconv.Itoa(l))
 	}
 
 	rng := sha3.NewSHAKE256()
