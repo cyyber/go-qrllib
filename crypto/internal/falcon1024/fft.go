@@ -639,14 +639,14 @@ func fftDivAutoAdj(a, b []fpr, logn int) {
 	}
 }
 
-func ffSamplingFFT(prng *samplerPRNG, t0, t1 fftPolynomial, tree []fpr, logn int) (fftPolynomial, fftPolynomial, error) {
+func ffSamplingFFT(prng *samplerPRNG, t0, t1 fftPolynomial, tree []fpr, logn int) (fftPolynomial, fftPolynomial) {
 	var z0, z1 fftPolynomial
 	var tmp [2 * n]fpr
 
 	nn := 1 << logn
 	ffSamplingFFTRecursive(prng, z0[:nn], z1[:nn], tree, t0[:nn], t1[:nn], tmp[:nn<<1], logn)
 
-	return z0, z1, nil
+	return z0, z1
 }
 
 func polyAdd[T ~[n]fpr](a, b T) (s T) {

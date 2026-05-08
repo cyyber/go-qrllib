@@ -141,14 +141,12 @@ func initPrivateKey(priv *PrivateKey, f, g, ntruF, ntruG smallPolynomial, h ring
 		return nil, err
 	}
 
-	if err := expandPrivateKey(priv, f, g, ntruF, ntruG); err != nil {
-		return nil, err
-	}
+	expandPrivateKey(priv, f, g, ntruF, ntruG)
 
 	return priv, nil
 }
 
-func expandPrivateKey(priv *PrivateKey, f, g, ntruF, ntruG smallPolynomial) error {
+func expandPrivateKey(priv *PrivateKey, f, g, ntruF, ntruG smallPolynomial) {
 	priv.b01 = fft(fprFromSmall(f))
 	priv.b00 = fft(fprFromSmall(g))
 	priv.b11 = fft(fprFromSmall(ntruF))
@@ -179,8 +177,6 @@ func expandPrivateKey(priv *PrivateKey, f, g, ntruF, ntruG smallPolynomial) erro
 	var ldlScratch [3 * n]fpr
 	ffLDLFFT(priv.tree[:], g00, g01, g11, logN, ldlScratch[:])
 	ffLDLBinaryNormalize(priv.tree[:], logN, logN)
-
-	return nil
 }
 
 func ffLDLFFT(tree []fpr, g00, g01, g11 fftPolynomial, logn int, tmp []fpr) {
@@ -373,16 +369,10 @@ func sign(random io.Reader, signature []byte, priv *PrivateKey, message []byte) 
 	hashData.Write(nonce[:])
 	hashData.Write(message)
 
-	c0, err := hashToPoint(hashData)
-	if err != nil {
-		return nil, err
-	}
+	c0 := hashToPoint(hashData)
 
 	for {
-		s2, err := signTree(rng, priv, c0)
-		if err != nil {
-			return nil, err
-		}
+		s2 := signTree(rng, priv, c0)
 
 		if err := sigEncode(signature, &nonce, s2); err != nil {
 			if errors.Is(err, errCompressedSignatureTooLarge) ||
@@ -396,23 +386,17 @@ func sign(random io.Reader, signature []byte, priv *PrivateKey, message []byte) 
 	}
 }
 
-func signTree(rng *sha3.SHAKE, priv *PrivateKey, c0 ringElement) (smallPolynomial, error) {
+func signTree(rng *sha3.SHAKE, priv *PrivateKey, c0 ringElement) smallPolynomial {
 	for {
 		prng := newSamplerPRNG(rng)
-		s2, err := signTreeAttempt(prng, priv, c0)
-		if err == nil {
-			return s2, nil
+		s2, ok := signTreeAttempt(prng, priv, c0)
+		if ok {
+			return s2
 		}
-		if errors.Is(err, errSignatureNormExceedsBound) {
-			continue
-		}
-		return smallPolynomial{}, err
 	}
 }
 
-var errSignatureNormExceedsBound = errors.New("falcon-1024: signature norm exceeds bound")
-
-func signTreeAttempt(prng *samplerPRNG, priv *PrivateKey, c0 ringElement) (smallPolynomial, error) {
+func signTreeAttempt(prng *samplerPRNG, priv *PrivateKey, c0 ringElement) (smallPolynomial, bool) {
 	var target fprPolynomial
 	for i := range target {
 		target[i] = fpr(c0[i])
@@ -426,11 +410,7 @@ func signTreeAttempt(prng *samplerPRNG, priv *PrivateKey, c0 ringElement) (small
 	t0 = fftMul(t0, priv.b11)
 	t0 = fftMulConst(t0, fprInverseOfQ)
 
-	// TODO: does not return error, maybe we can return a bool
-	t0, t1, err := ffSamplingFFT(prng, t0, t1, priv.tree[:], logN)
-	if err != nil {
-		return smallPolynomial{}, err
-	}
+	t0, t1 = ffSamplingFFT(prng, t0, t1, priv.tree[:], logN)
 
 	var latticeX fftPolynomial
 	copy(latticeX[:], t0[:])
@@ -467,10 +447,10 @@ func signTreeAttempt(prng *samplerPRNG, priv *PrivateKey, c0 ringElement) (small
 	sqn |= -(ng >> 31)
 
 	if signatureNormExceedsPartialBound(sqn, s2) {
-		return smallPolynomial{}, errSignatureNormExceedsBound
+		return smallPolynomial{}, false
 	}
 
-	return s2, nil
+	return s2, true
 }
 
 func Verify(pub *PublicKey, message []byte, sig *Signature) error {
@@ -510,10 +490,7 @@ func verify(pub *PublicKey, message []byte, sig *Signature) error {
 	h.Write(sig.nonce[:])
 	h.Write(message)
 
-	c0, err := hashToPoint(h)
-	if err != nil {
-		return err
-	}
+	c0 := hashToPoint(h)
 
 	if !verifyRaw(c0, sig.s2, pub.h) {
 		return errors.New("falcon-1024: invalid signature")

@@ -148,14 +148,12 @@ func polyByteDecode[T ~[n]fieldElement](b []byte) (T, error) {
 	return p, nil
 }
 
-func hashToPoint(h *sha3.SHAKE) (ringElement, error) {
+func hashToPoint(h *sha3.SHAKE) ringElement {
 	var p ringElement
 	var buf [2]byte
 
 	for i := 0; i < n; {
-		if _, err := h.Read(buf[:]); err != nil {
-			return ringElement{}, err
-		}
+		_, _ = h.Read(buf[:])
 
 		w := uint32(buf[0])<<8 | uint32(buf[1])
 		if w >= hashToPointRejectThreshold {
@@ -166,7 +164,7 @@ func hashToPoint(h *sha3.SHAKE) (ringElement, error) {
 		i++
 	}
 
-	return p, nil
+	return p
 }
 
 type nttElement [n]fieldElement // NTT-domain modulo-q polynomial

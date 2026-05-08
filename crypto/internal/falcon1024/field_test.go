@@ -32,10 +32,7 @@ func TestHashToPointReferenceKATs(t *testing.T) {
 			h.Write(mustDecodeHex(t, tc.nonceHex))
 			h.Write([]byte(tc.message))
 
-			p, err := hashToPoint(h)
-			if err != nil {
-				t.Fatal(err)
-			}
+			p := hashToPoint(h)
 
 			var b [2 * n]byte
 			for j, x := range p {

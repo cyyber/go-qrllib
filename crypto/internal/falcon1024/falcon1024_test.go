@@ -549,10 +549,7 @@ func TestVerifyRawReferenceKAT(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			c0, err := hashToPoint(h)
-			if err != nil {
-				t.Fatal(err)
-			}
+			c0 := hashToPoint(h)
 			if !verifyRaw(c0, s2, pub.h) {
 				t.Fatal("reference verify_raw vector rejected")
 			}
@@ -700,19 +697,13 @@ func TestSignTreeReferenceKeySelf(t *testing.T) {
 			if _, err := hashData.Write([]byte(tc.message)); err != nil {
 				t.Fatal(err)
 			}
-			c0, err := hashToPoint(hashData)
-			if err != nil {
-				t.Fatal(err)
-			}
+			c0 := hashToPoint(hashData)
 
 			rng := sha3.NewSHAKE256()
 			if _, err := rng.Write([]byte(tc.seed)); err != nil {
 				t.Fatal(err)
 			}
-			s2, err := signTree(rng, priv, c0)
-			if err != nil {
-				t.Fatal(err)
-			}
+			s2 := signTree(rng, priv, c0)
 			if !verifyRaw(c0, s2, pub.h) {
 				t.Fatal("signTree output failed verifyRaw")
 			}
@@ -888,20 +879,14 @@ func testNISTKATDigest(t *testing.T) {
 		hashData.Write(nonce[:])
 		hashData.Write(msg)
 
-		c0, err := hashToPoint(hashData)
-		if err != nil {
-			t.Fatalf("hashToPoint: %v", err)
-		}
+		c0 := hashToPoint(hashData)
 
 		var signSeed [seedSize]byte
 		drbg.read(signSeed[:])
 		signRNG := sha3.NewSHAKE256()
 		signRNG.Write(signSeed[:])
 
-		s2, err := signTree(signRNG, priv, c0)
-		if err != nil {
-			t.Fatalf("signTree: %v", err)
-		}
+		s2 := signTree(signRNG, priv, c0)
 
 		comp := make([]byte, nistKATOverheadSize-43)
 		written, err := compressedEncode(comp, s2)
