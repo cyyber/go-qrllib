@@ -244,94 +244,96 @@ func TestSignatureCodec(t *testing.T) {
 	})
 }
 
-func TestCompressedEncode(t *testing.T) {
-	// The expected lengths and digests were derived from the Falcon reference
-	// implementation comp_encode applied to KAT_SIG_1024 s2 values.
-	// Source: https://falcon-sign.info/impl/test_falcon.c.html
-	expected := []struct {
-		length int
-		digest string
-	}{
-		{1231, "d44837d1e8addd9a6ff73afd7ff585dc82d17e07e9167dc6a567633acdc4fd92"},
-		{1234, "9003f73ea73862807846698a9bf2e7bde2b14e312569324dc42c79f2ba49dab2"},
-		{1232, "4937e0c409a0f0811f85047301d07b5db8eb5601265a49fb45aa570a25e9faeb"},
-		{1227, "a90b61d2541872c90e3f44b6941c1d719509b0d3a661115cdb244ffaa108f839"},
-		{1232, "5ba3c96353176f6e533a8ea6167d31ee50d4eb8b581203407ef8ff32568d0e92"},
-		{1230, "2e7da586f788b28435f575119182c775a4b3e4f88acddd1d30c14483d3134a44"},
-		{1229, "8be0da517c3ecc50e70156b4bdd620d896c168ad13fd6e94d3a8740fc961d97b"},
-		{1229, "e382fc50731f464598e1e8768847a0bd60ce1944bc805cf8452aa870e538edf0"},
-		{1232, "7bc474ae78e6f20776ea1682582c841186495fc58ce346ec4102231c00792100"},
-		{1229, "1798601e97a4909b0f5291e17734de7ba4f23f6d1666e601912e4ab406cfdf9f"},
-	}
+func TestCompressedCodec(t *testing.T) {
+	t.Run("reference raw s2 KATs", func(t *testing.T) {
+		// The expected lengths and digests were derived from the Falcon reference
+		// implementation comp_encode applied to KAT_SIG_1024 s2 values.
+		// Source: https://falcon-sign.info/impl/test_falcon.c.html
+		expected := []struct {
+			length int
+			digest string
+		}{
+			{1231, "d44837d1e8addd9a6ff73afd7ff585dc82d17e07e9167dc6a567633acdc4fd92"},
+			{1234, "9003f73ea73862807846698a9bf2e7bde2b14e312569324dc42c79f2ba49dab2"},
+			{1232, "4937e0c409a0f0811f85047301d07b5db8eb5601265a49fb45aa570a25e9faeb"},
+			{1227, "a90b61d2541872c90e3f44b6941c1d719509b0d3a661115cdb244ffaa108f839"},
+			{1232, "5ba3c96353176f6e533a8ea6167d31ee50d4eb8b581203407ef8ff32568d0e92"},
+			{1230, "2e7da586f788b28435f575119182c775a4b3e4f88acddd1d30c14483d3134a44"},
+			{1229, "8be0da517c3ecc50e70156b4bdd620d896c168ad13fd6e94d3a8740fc961d97b"},
+			{1229, "e382fc50731f464598e1e8768847a0bd60ce1944bc805cf8452aa870e538edf0"},
+			{1232, "7bc474ae78e6f20776ea1682582c841186495fc58ce346ec4102231c00792100"},
+			{1229, "1798601e97a4909b0f5291e17734de7ba4f23f6d1666e601912e4ab406cfdf9f"},
+		}
 
-	for i, tc := range verifyRawKATs {
-		t.Run(tc.message, func(t *testing.T) {
-			s2 := decodeVerifyRawKATSignature(t, mustDecodeHex(t, tc.signatureHex))
-			dst := make([]byte, signatureSize-signaturePrefixSize)
+		for i, tc := range verifyRawKATs {
+			t.Run(tc.message, func(t *testing.T) {
+				s2 := decodeVerifyRawKATSignature(t, mustDecodeHex(t, tc.signatureHex))
+				dst := make([]byte, signatureSize-signaturePrefixSize)
 
-			written, err := compressedEncode(dst, s2)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if written != expected[i].length {
-				t.Fatalf("compressed length = %d, want %d", written, expected[i].length)
-			}
+				written, err := compressedEncode(dst, s2)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if written != expected[i].length {
+					t.Fatalf("compressed length = %d, want %d", written, expected[i].length)
+				}
 
-			digest := sha256.Sum256(dst[:written])
-			if got := hex.EncodeToString(digest[:]); got != expected[i].digest {
-				t.Fatalf("compressed digest = %s, want %s", got, expected[i].digest)
-			}
-		})
-	}
-}
+				digest := sha256.Sum256(dst[:written])
+				if got := hex.EncodeToString(digest[:]); got != expected[i].digest {
+					t.Fatalf("compressed digest = %s, want %s", got, expected[i].digest)
+				}
+			})
+		}
+	})
 
-func TestCompressedEncodeRejectsInvalidInput(t *testing.T) {
-	outOfRange := smallPolynomial{}
-	outOfRange[0] = maxCompressedCoefficient + 1
+	t.Run("rejects invalid encode input", func(t *testing.T) {
+		outOfRange := smallPolynomial{}
+		outOfRange[0] = maxCompressedCoefficient + 1
 
-	testCases := []struct {
-		name string
-		s2   smallPolynomial
-		dst  []byte
-		err  error
-	}{
-		{
-			name: "out of range coefficient",
-			s2:   outOfRange,
-			dst:  make([]byte, signatureSize-signaturePrefixSize),
-			err:  errCompressedCoefficientOutOfRange,
-		},
-		{
-			name: "tiny buffer",
-			s2:   smallPolynomial{},
-			dst:  make([]byte, 1),
-			err:  errCompressedSignatureTooLarge,
-		},
-	}
+		testCases := []struct {
+			name string
+			s2   smallPolynomial
+			dst  []byte
+			err  error
+		}{
+			{
+				name: "out of range coefficient",
+				s2:   outOfRange,
+				dst:  make([]byte, signatureSize-signaturePrefixSize),
+				err:  errCompressedCoefficientOutOfRange,
+			},
+			{
+				name: "tiny buffer",
+				s2:   smallPolynomial{},
+				dst:  make([]byte, 1),
+				err:  errCompressedSignatureTooLarge,
+			},
+		}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			if _, err := compressedEncode(tc.dst, tc.s2); !errors.Is(err, tc.err) {
-				t.Fatalf("compressedEncode error = %v, want %v", err, tc.err)
-			}
-		})
-	}
-}
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				if _, err := compressedEncode(tc.dst, tc.s2); !errors.Is(err, tc.err) {
+					t.Fatalf("compressedEncode error = %v, want %v", err, tc.err)
+				}
+			})
+		}
+	})
 
-func TestCompressedDecodeRejectsNonZeroTrailingBits(t *testing.T) {
-	var s2 smallPolynomial
-	s2[0] = 128
+	t.Run("rejects non-zero trailing bits", func(t *testing.T) {
+		var s2 smallPolynomial
+		s2[0] = 128
 
-	buf := make([]byte, signatureSize-signaturePrefixSize)
-	written, err := compressedEncode(buf, s2)
-	if err != nil {
-		t.Fatal(err)
-	}
+		buf := make([]byte, signatureSize-signaturePrefixSize)
+		written, err := compressedEncode(buf, s2)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	buf[written-1] |= 1
-	if _, _, err := compressedDecode(buf[:written]); !errors.Is(err, errInvalidSignatureEncoding) {
-		t.Fatalf("compressedDecode error = %v, want %v", err, errInvalidSignatureEncoding)
-	}
+		buf[written-1] |= 1
+		if _, _, err := compressedDecode(buf[:written]); !errors.Is(err, errInvalidSignatureEncoding) {
+			t.Fatalf("compressedDecode error = %v, want %v", err, errInvalidSignatureEncoding)
+		}
+	})
 }
 
 func TestTrimI8Encode(t *testing.T) {
