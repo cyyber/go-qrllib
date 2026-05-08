@@ -385,7 +385,8 @@ func sign(random io.Reader, signature []byte, priv *PrivateKey, message []byte) 
 		}
 
 		if err := sigEncode(signature, &nonce, s2); err != nil {
-			if errors.Is(err, errCompressedSignatureTooLarge) {
+			if errors.Is(err, errCompressedSignatureTooLarge) ||
+				errors.Is(err, errCompressedCoefficientOutOfRange) {
 				continue
 			}
 			return nil, err
@@ -425,6 +426,7 @@ func signTreeAttempt(prng *samplerPRNG, priv *PrivateKey, c0 ringElement) (small
 	t0 = fftMul(t0, priv.b11)
 	t0 = fftMulConst(t0, fprInverseOfQ)
 
+	// TODO: does not return error, maybe we can return a bool
 	t0, t1, err := ffSamplingFFT(prng, t0, t1, priv.tree[:], logN)
 	if err != nil {
 		return smallPolynomial{}, err

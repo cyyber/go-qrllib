@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"testing"
 )
 
@@ -207,6 +208,31 @@ func TestSignatureCodecRejectsInvalidInput(t *testing.T) {
 	}
 }
 
+func TestSignatureCodecRejectsInvalidOutputBuffer(t *testing.T) {
+	var nonce [nonceSize]byte
+	var s2 smallPolynomial
+
+	for _, tc := range []struct {
+		name string
+		out  []byte
+	}{
+		{
+			name: "short",
+			out:  make([]byte, signatureSize-1),
+		},
+		{
+			name: "long",
+			out:  make([]byte, signatureSize+1),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := sigEncode(tc.out, &nonce, s2); err == nil {
+				t.Fatal("sigEncode accepted invalid signature buffer")
+			}
+		})
+	}
+}
+
 func TestCompressedEncodeReferenceRawS2KATs(t *testing.T) {
 	// The expected lengths and digests were derived from the Falcon reference
 	// implementation comp_encode applied to KAT_SIG_1024 s2 values.
@@ -245,6 +271,39 @@ func TestCompressedEncodeReferenceRawS2KATs(t *testing.T) {
 				t.Fatalf("compressed digest = %s, want %s", got, expected[i].digest)
 			}
 		})
+	}
+}
+
+func TestCompressedEncodeRejectsOutOfRangeCoefficient(t *testing.T) {
+	var s2 smallPolynomial
+	s2[0] = maxCompressedCoefficient + 1
+
+	if _, err := compressedEncode(make([]byte, signatureSize-signaturePrefixSize), s2); !errors.Is(err, errCompressedCoefficientOutOfRange) {
+		t.Fatalf("compressedEncode error = %v, want %v", err, errCompressedCoefficientOutOfRange)
+	}
+}
+
+func TestCompressedEncodeRejectsTinyBuffer(t *testing.T) {
+	var s2 smallPolynomial
+
+	if _, err := compressedEncode(make([]byte, 1), s2); !errors.Is(err, errCompressedSignatureTooLarge) {
+		t.Fatalf("compressedEncode error = %v, want %v", err, errCompressedSignatureTooLarge)
+	}
+}
+
+func TestCompressedDecodeRejectsNonZeroTrailingBits(t *testing.T) {
+	var s2 smallPolynomial
+	s2[0] = 128
+
+	buf := make([]byte, signatureSize-signaturePrefixSize)
+	written, err := compressedEncode(buf, s2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	buf[written-1] |= 1
+	if _, _, err := compressedDecode(buf[:written]); !errors.Is(err, errInvalidSignatureEncoding) {
+		t.Fatalf("compressedDecode error = %v, want %v", err, errInvalidSignatureEncoding)
 	}
 }
 

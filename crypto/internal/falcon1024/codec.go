@@ -2,12 +2,6 @@ package falcon1024
 
 import "errors"
 
-const (
-	maxCompressedCoefficient = 2047
-	modQBits                 = 14
-	modQEncodedSize          = (n*modQBits + 7) >> 3
-)
-
 type compressedBitReader struct {
 	src     []byte
 	pos     int
@@ -49,9 +43,12 @@ func (r *compressedBitReader) trailingBitsAreZero() bool {
 }
 
 var (
-	errInvalidSignatureEncoding    = errors.New("falcon-1024: invalid signature encoding")
-	errCompressedSignatureTooLarge = errors.New("falcon-1024: compressed signature too large")
+	errInvalidSignatureEncoding        = errors.New("falcon-1024: invalid signature encoding")
+	errCompressedSignatureTooLarge     = errors.New("falcon-1024: compressed signature too large")
+	errCompressedCoefficientOutOfRange = errors.New("falcon-1024: compressed coefficient out of range")
 )
+
+const maxCompressedCoefficient = 2047
 
 func compressedDecode(src []byte) (smallPolynomial, int, error) {
 	var p smallPolynomial
@@ -105,7 +102,7 @@ func compressedEncode(dst []byte, s smallPolynomial) (int, error) {
 
 	for _, x := range s {
 		if x < -maxCompressedCoefficient || x > maxCompressedCoefficient {
-			return 0, errors.New("falcon-1024: compressed coefficient out of range")
+			return 0, errCompressedCoefficientOutOfRange
 		}
 
 		t := x
@@ -245,6 +242,10 @@ func pkDecode(src []byte) (h ringElement, err error) {
 }
 
 func sigEncode(dst []byte, nonce *[nonceSize]byte, s2 smallPolynomial) error {
+	if len(dst) != signatureSize {
+		return errors.New("falcon-1024: invalid signature length")
+	}
+
 	dst[0] = signatureHeader
 	copy(dst[encodedHeaderSize:signaturePrefixSize], nonce[:])
 
