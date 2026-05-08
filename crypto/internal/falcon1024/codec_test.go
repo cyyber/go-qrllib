@@ -369,7 +369,7 @@ func TestSignatureCodecRejectsNonZeroPadding(t *testing.T) {
 
 	sig := make([]byte, signatureSize)
 	sig[0] = signatureHeader
-	copy(sig[encodedHeaderSize:signaturePrefixSize], nonce[:])
+	copy(sig[headerSize:signaturePrefixSize], nonce[:])
 	written, err := compressedEncode(sig[signaturePrefixSize:], s2)
 	if err != nil {
 		t.Fatal(err)

@@ -2,7 +2,10 @@ package falcon1024
 
 import "errors"
 
-const encodedHeaderSize = 1
+const (
+	headerSize          = 1
+	signaturePrefixSize = headerSize + nonceSize
+)
 
 type compressedBitReader struct {
 	src     []byte
@@ -152,7 +155,7 @@ func skEncode(dst []byte, f, g, ntruF smallPolynomial) error {
 	}
 
 	dst[0] = privateKeyHeader
-	offset := encodedHeaderSize
+	offset := headerSize
 
 	written, err := trimI8Encode(dst[offset:], f, fgBits)
 	if err != nil {
@@ -189,7 +192,7 @@ func skDecode(src []byte) (f, g, ntruF smallPolynomial, err error) {
 			errors.New("falcon-1024: invalid private key")
 	}
 
-	offset := encodedHeaderSize
+	offset := headerSize
 	var written int
 
 	f, written, err = trimI8Decode(src[offset:], fgBits)
@@ -224,7 +227,7 @@ func pkEncode(dst []byte, h ringElement) error {
 	}
 
 	dst[0] = publicKeyHeader
-	polyByteEncode(dst[encodedHeaderSize:], h)
+	polyByteEncode(dst[headerSize:], h)
 
 	return nil
 }
@@ -237,7 +240,7 @@ func pkDecode(src []byte) (h ringElement, err error) {
 		return ringElement{}, errors.New("falcon-1024: invalid public key")
 	}
 
-	return polyByteDecode[ringElement](src[encodedHeaderSize:])
+	return polyByteDecode[ringElement](src[headerSize:])
 }
 
 func sigEncode(dst []byte, nonce *[nonceSize]byte, s2 smallPolynomial) error {
@@ -246,7 +249,7 @@ func sigEncode(dst []byte, nonce *[nonceSize]byte, s2 smallPolynomial) error {
 	}
 
 	dst[0] = signatureHeader
-	copy(dst[encodedHeaderSize:signaturePrefixSize], nonce[:])
+	copy(dst[headerSize:signaturePrefixSize], nonce[:])
 
 	written, err := compressedEncode(dst[signaturePrefixSize:], s2)
 	if err != nil {
@@ -257,10 +260,7 @@ func sigEncode(dst []byte, nonce *[nonceSize]byte, s2 smallPolynomial) error {
 	return nil
 }
 
-const (
-	signatureHeader     byte = 0x30 + logN
-	signaturePrefixSize      = encodedHeaderSize + nonceSize
-)
+const signatureHeader byte = 0x30 + logN
 
 func sigDecode(src []byte) (nonce [nonceSize]byte, s2 smallPolynomial, err error) {
 	if len(src) != signatureSize {
@@ -270,7 +270,7 @@ func sigDecode(src []byte) (nonce [nonceSize]byte, s2 smallPolynomial, err error
 		return nonce, smallPolynomial{}, errors.New("falcon-1024: invalid signature")
 	}
 
-	copy(nonce[:], src[encodedHeaderSize:signaturePrefixSize])
+	copy(nonce[:], src[headerSize:signaturePrefixSize])
 
 	s2, consumed, err := compressedDecode(src[signaturePrefixSize:])
 	if err != nil {
