@@ -2,10 +2,7 @@ package falcon1024
 
 import "errors"
 
-const (
-	headerSize          = 1
-	signaturePrefixSize = headerSize + nonceSize
-)
+const headerSize = 1
 
 type compressedBitReader struct {
 	src     []byte
@@ -248,7 +245,10 @@ func pkDecode(src []byte) (h ringElement, err error) {
 	return polyByteDecode[ringElement](src[headerSize:])
 }
 
-const signatureHeader byte = 0x30 + logN
+const (
+	signatureHeader     byte = 0x30 + logN
+	signaturePrefixSize      = headerSize + nonceSize
+)
 
 func sigEncode(dst []byte, nonce [nonceSize]byte, s2 smallPolynomial) error {
 	if len(dst) != signatureSize {
