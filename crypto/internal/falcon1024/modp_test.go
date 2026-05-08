@@ -52,46 +52,77 @@ func TestModPNorm(t *testing.T) {
 	}
 }
 
-func TestModPAddSub(t *testing.T) {
+func TestModPAdd(t *testing.T) {
 	for _, tc := range []struct {
-		name    string
-		p       uint32
-		a       uint32
-		b       uint32
-		wantAdd uint32
-		wantSub uint32
+		name string
+		p    uint32
+		a    uint32
+		b    uint32
+		want uint32
 	}{
 		{
-			name:    "small prime 0",
-			p:       primes[0].p,
-			a:       5,
-			b:       7,
-			wantAdd: 12,
-			wantSub: 2147473407,
+			name: "small prime 0",
+			p:    primes[0].p,
+			a:    5,
+			b:    7,
+			want: 12,
 		},
 		{
-			name:    "wrap prime 0",
-			p:       primes[0].p,
-			a:       2147473407,
-			b:       5,
-			wantAdd: 3,
-			wantSub: 2147473402,
+			name: "wrap prime 0",
+			p:    primes[0].p,
+			a:    2147473407,
+			b:    5,
+			want: 3,
 		},
 		{
-			name:    "max prime 1",
-			p:       primes[1].p,
-			a:       2147389440,
-			b:       2147389440,
-			wantAdd: 2147389439,
-			wantSub: 0,
+			name: "max prime 1",
+			p:    primes[1].p,
+			a:    2147389440,
+			b:    2147389440,
+			want: 2147389439,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := modPAdd(tc.a, tc.b, tc.p); got != tc.wantAdd {
-				t.Fatalf("modPAdd = %d, want %d", got, tc.wantAdd)
+			if got := modPAdd(tc.a, tc.b, tc.p); got != tc.want {
+				t.Fatalf("modPAdd = %d, want %d", got, tc.want)
 			}
-			if got := modPSub(tc.a, tc.b, tc.p); got != tc.wantSub {
-				t.Fatalf("modPSub = %d, want %d", got, tc.wantSub)
+		})
+	}
+}
+
+func TestModPSub(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		p    uint32
+		a    uint32
+		b    uint32
+		want uint32
+	}{
+		{
+			name: "small prime 0",
+			p:    primes[0].p,
+			a:    5,
+			b:    7,
+			want: 2147473407,
+		},
+		{
+			name: "wrap prime 0",
+			p:    primes[0].p,
+			a:    2147473407,
+			b:    5,
+			want: 2147473402,
+		},
+		{
+			name: "max prime 1",
+			p:    primes[1].p,
+			a:    2147389440,
+			b:    2147389440,
+			want: 0,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := modPSub(tc.a, tc.b, tc.p); got != tc.want {
+				t.Fatalf("modPSub = %d, want %d", got, tc.want)
 			}
 		})
 	}
