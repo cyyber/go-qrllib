@@ -8,71 +8,68 @@ import (
 	"testing"
 )
 
-func TestPublicKeyCodecReferenceKAT(t *testing.T) {
-	// Derived from the Falcon reference implementation test_falcon.c
-	// ntru_pkey_1024 array.
-	// Source: https://falcon-sign.info/impl/test_falcon.c.html
-	want := mustDecodeHex(t, verifyRawKATPublicKeyHex)
-	if len(want) != publicKeySize {
-		t.Fatalf("reference public key length = %d, want %d", len(want), publicKeySize)
-	}
-	if want[0] != publicKeyHeader {
-		t.Fatalf("reference public key header = %#x, want %#x", want[0], publicKeyHeader)
-	}
-
-	h, err := pkDecode(want)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	got := make([]byte, publicKeySize)
-	if err := pkEncode(got, h); err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(got, want) {
-		t.Fatal("pkEncode(pkDecode(reference public key)) did not round-trip")
-	}
-}
-
-func TestPublicKeyCodecRejectsInvalidInput(t *testing.T) {
+func TestPublicKeyCodec(t *testing.T) {
 	pub := mustDecodeHex(t, verifyRawKATPublicKeyHex)
 
-	testCases := []struct {
-		name string
-		in   []byte
-	}{
-		{
-			name: "short",
-			in:   pub[:publicKeySize-1],
-		},
-		{
-			name: "long",
-			in:   append(bytes.Clone(pub), 0),
-		},
-		{
-			name: "invalid header",
-			in: func() []byte {
-				in := bytes.Clone(pub)
-				in[0] ^= 0xff
-				return in
-			}(),
-		},
-	}
+	t.Run("reference KAT", func(t *testing.T) {
+		// Derived from the Falcon reference implementation test_falcon.c
+		// ntru_pkey_1024 array.
+		// Source: https://falcon-sign.info/impl/test_falcon.c.html
+		if len(pub) != publicKeySize {
+			t.Fatalf("reference public key length = %d, want %d", len(pub), publicKeySize)
+		}
+		if pub[0] != publicKeyHeader {
+			t.Fatalf("reference public key header = %#x, want %#x", pub[0], publicKeyHeader)
+		}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			if _, err := pkDecode(tc.in); err == nil {
-				t.Fatal("pkDecode accepted invalid public key")
-			}
-		})
-	}
+		h, err := pkDecode(pub)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		got := make([]byte, publicKeySize)
+		if err := pkEncode(got, h); err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(got, pub) {
+			t.Fatal("pkEncode(pkDecode(reference public key)) did not round-trip")
+		}
+	})
+
+	t.Run("rejects invalid input", func(t *testing.T) {
+		testCases := []struct {
+			name string
+			in   []byte
+		}{
+			{
+				name: "short",
+				in:   pub[:publicKeySize-1],
+			},
+			{
+				name: "long",
+				in:   append(bytes.Clone(pub), 0),
+			},
+			{
+				name: "invalid header",
+				in: func() []byte {
+					in := bytes.Clone(pub)
+					in[0] ^= 0xff
+					return in
+				}(),
+			},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				if _, err := pkDecode(tc.in); err == nil {
+					t.Fatal("pkDecode accepted invalid public key")
+				}
+			})
+		}
+	})
 }
 
-func TestPrivateKeyCodecReferencePolynomials(t *testing.T) {
-	// test_falcon.c publishes component private-key polynomials, not a
-	// serialized secret key. Use those reference polynomials to check that our
-	// private-key codec round-trips the reference components.
-	// Source: https://falcon-sign.info/impl/test_falcon.c.html
+func TestPrivateKeyCodec(t *testing.T) {
 	f := mustDecodeSmallPolynomialHex(t, ntru_f_1024Hex)
 	g := mustDecodeSmallPolynomialHex(t, ntru_g_1024Hex)
 	ntruF := mustDecodeSmallPolynomialHex(t, ntru_F_1024Hex)
@@ -82,90 +79,54 @@ func TestPrivateKeyCodecReferencePolynomials(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	gotF, gotG, gotNTRUF, err := skDecode(sk)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if gotF != f || gotG != g || gotNTRUF != ntruF {
-		t.Fatal("skDecode(skEncode(reference polynomials)) did not round-trip")
-	}
+	t.Run("reference polynomials", func(t *testing.T) {
+		// test_falcon.c publishes component private-key polynomials, not a
+		// serialized secret key. Use those reference polynomials to check that our
+		// private-key codec round-trips the reference components.
+		// Source: https://falcon-sign.info/impl/test_falcon.c.html
+		gotF, gotG, gotNTRUF, err := skDecode(sk)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if gotF != f || gotG != g || gotNTRUF != ntruF {
+			t.Fatal("skDecode(skEncode(reference polynomials)) did not round-trip")
+		}
+	})
+
+	t.Run("rejects invalid input", func(t *testing.T) {
+		testCases := []struct {
+			name string
+			in   []byte
+		}{
+			{
+				name: "short",
+				in:   sk[:privateKeySize-1],
+			},
+			{
+				name: "long",
+				in:   append(bytes.Clone(sk), 0),
+			},
+			{
+				name: "invalid header",
+				in: func() []byte {
+					in := bytes.Clone(sk)
+					in[0] ^= 0xff
+					return in
+				}(),
+			},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				if _, _, _, err := skDecode(tc.in); err == nil {
+					t.Fatal("skDecode accepted invalid private key")
+				}
+			})
+		}
+	})
 }
 
-func TestPrivateKeyCodecRejectsInvalidInput(t *testing.T) {
-	f := mustDecodeSmallPolynomialHex(t, ntru_f_1024Hex)
-	g := mustDecodeSmallPolynomialHex(t, ntru_g_1024Hex)
-	ntruF := mustDecodeSmallPolynomialHex(t, ntru_F_1024Hex)
-
-	sk := make([]byte, privateKeySize)
-	if err := skEncode(sk, f, g, ntruF); err != nil {
-		t.Fatal(err)
-	}
-
-	testCases := []struct {
-		name string
-		in   []byte
-	}{
-		{
-			name: "short",
-			in:   sk[:privateKeySize-1],
-		},
-		{
-			name: "long",
-			in:   append(bytes.Clone(sk), 0),
-		},
-		{
-			name: "invalid header",
-			in: func() []byte {
-				in := bytes.Clone(sk)
-				in[0] ^= 0xff
-				return in
-			}(),
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			if _, _, _, err := skDecode(tc.in); err == nil {
-				t.Fatal("skDecode accepted invalid private key")
-			}
-		})
-	}
-}
-
-func TestSignatureCodecReferenceRawS2KATs(t *testing.T) {
-	// The s2 vectors are decoded from the Falcon reference implementation
-	// KAT_SIG_1024 raw verify vectors. Those raw vectors use a 32-byte hash
-	// seed, not the 40-byte nonce carried by padded Falcon signatures, so the
-	// seed is zero-extended only to exercise this package's padded codec.
-	// Source: https://falcon-sign.info/impl/test_falcon.c.html
-	for _, tc := range verifyRawKATs {
-		t.Run(tc.message, func(t *testing.T) {
-			nonceBytes := mustDecodeHex(t, tc.nonceHex)
-			var nonce [nonceSize]byte
-			copy(nonce[:], nonceBytes)
-
-			wantS2 := decodeVerifyRawKATSignature(t, mustDecodeHex(t, tc.signatureHex))
-
-			sig := make([]byte, signatureSize)
-			if err := sigEncode(sig, nonce, wantS2); err != nil {
-				t.Fatal(err)
-			}
-
-			gotNonce, gotS2, err := sigDecode(sig)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if gotNonce != nonce {
-				t.Fatal("sigDecode returned unexpected nonce")
-			}
-			if gotS2 != wantS2 {
-				t.Fatal("sigDecode returned unexpected s2")
-			}
-		})
-	}
-}
-
-func TestSignatureCodecRejectsInvalidInput(t *testing.T) {
+func TestSignatureCodec(t *testing.T) {
 	tc := verifyRawKATs[0]
 	nonceBytes := mustDecodeHex(t, tc.nonceHex)
 	var nonce [nonceSize]byte
@@ -177,63 +138,113 @@ func TestSignatureCodecRejectsInvalidInput(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	testCases := []struct {
-		name string
-		in   []byte
-	}{
-		{
-			name: "short",
-			in:   sig[:signatureSize-1],
-		},
-		{
-			name: "long",
-			in:   append(bytes.Clone(sig), 0),
-		},
-		{
-			name: "invalid header",
-			in: func() []byte {
-				in := bytes.Clone(sig)
-				in[0] ^= 0xff
-				return in
-			}(),
-		},
-	}
+	t.Run("reference raw s2 KATs", func(t *testing.T) {
+		// The s2 vectors are decoded from the Falcon reference implementation
+		// KAT_SIG_1024 raw verify vectors. Those raw vectors use a 32-byte hash
+		// seed, not the 40-byte nonce carried by padded Falcon signatures, so the
+		// seed is zero-extended only to exercise this package's padded codec.
+		// Source: https://falcon-sign.info/impl/test_falcon.c.html
+		for _, tc := range verifyRawKATs {
+			t.Run(tc.message, func(t *testing.T) {
+				nonceBytes := mustDecodeHex(t, tc.nonceHex)
+				var nonce [nonceSize]byte
+				copy(nonce[:], nonceBytes)
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			if _, _, err := sigDecode(tc.in); err == nil {
-				t.Fatal("sigDecode accepted invalid signature")
-			}
-		})
-	}
+				wantS2 := decodeVerifyRawKATSignature(t, mustDecodeHex(t, tc.signatureHex))
+
+				sig := make([]byte, signatureSize)
+				if err := sigEncode(sig, nonce, wantS2); err != nil {
+					t.Fatal(err)
+				}
+
+				gotNonce, gotS2, err := sigDecode(sig)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if gotNonce != nonce {
+					t.Fatal("sigDecode returned unexpected nonce")
+				}
+				if gotS2 != wantS2 {
+					t.Fatal("sigDecode returned unexpected s2")
+				}
+			})
+		}
+	})
+
+	t.Run("rejects invalid input", func(t *testing.T) {
+		testCases := []struct {
+			name string
+			in   []byte
+		}{
+			{
+				name: "short",
+				in:   sig[:signatureSize-1],
+			},
+			{
+				name: "long",
+				in:   append(bytes.Clone(sig), 0),
+			},
+			{
+				name: "invalid header",
+				in: func() []byte {
+					in := bytes.Clone(sig)
+					in[0] ^= 0xff
+					return in
+				}(),
+			},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				if _, _, err := sigDecode(tc.in); err == nil {
+					t.Fatal("sigDecode accepted invalid signature")
+				}
+			})
+		}
+	})
+
+	t.Run("rejects invalid output buffer", func(t *testing.T) {
+		for _, tc := range []struct {
+			name string
+			out  []byte
+		}{
+			{
+				name: "short",
+				out:  make([]byte, signatureSize-1),
+			},
+			{
+				name: "long",
+				out:  make([]byte, signatureSize+1),
+			},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				if err := sigEncode(tc.out, nonce, s2); err == nil {
+					t.Fatal("sigEncode accepted invalid signature buffer")
+				}
+			})
+		}
+	})
+
+	t.Run("rejects non-zero padding", func(t *testing.T) {
+		sig := make([]byte, signatureSize)
+		sig[0] = signatureHeader
+		copy(sig[headerSize:signaturePrefixSize], nonce[:])
+		written, err := compressedEncode(sig[signaturePrefixSize:], s2)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if written >= signatureSize-signaturePrefixSize {
+			t.Fatal("reference signature unexpectedly leaves no padding byte to corrupt")
+		}
+
+		sig[signaturePrefixSize+written] = 1
+		if _, _, err := sigDecode(sig); err == nil {
+			t.Fatal("sigDecode accepted non-zero padded signature bytes")
+		}
+	})
 }
 
-func TestSignatureCodecRejectsInvalidOutputBuffer(t *testing.T) {
-	var nonce [nonceSize]byte
-	var s2 smallPolynomial
-
-	for _, tc := range []struct {
-		name string
-		out  []byte
-	}{
-		{
-			name: "short",
-			out:  make([]byte, signatureSize-1),
-		},
-		{
-			name: "long",
-			out:  make([]byte, signatureSize+1),
-		},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			if err := sigEncode(tc.out, nonce, s2); err == nil {
-				t.Fatal("sigEncode accepted invalid signature buffer")
-			}
-		})
-	}
-}
-
-func TestCompressedEncodeReferenceRawS2KATs(t *testing.T) {
+func TestCompressedEncode(t *testing.T) {
 	// The expected lengths and digests were derived from the Falcon reference
 	// implementation comp_encode applied to KAT_SIG_1024 s2 values.
 	// Source: https://falcon-sign.info/impl/test_falcon.c.html
@@ -274,20 +285,36 @@ func TestCompressedEncodeReferenceRawS2KATs(t *testing.T) {
 	}
 }
 
-func TestCompressedEncodeRejectsOutOfRangeCoefficient(t *testing.T) {
-	var s2 smallPolynomial
-	s2[0] = maxCompressedCoefficient + 1
+func TestCompressedEncodeRejectsInvalidInput(t *testing.T) {
+	outOfRange := smallPolynomial{}
+	outOfRange[0] = maxCompressedCoefficient + 1
 
-	if _, err := compressedEncode(make([]byte, signatureSize-signaturePrefixSize), s2); !errors.Is(err, errCompressedCoefficientOutOfRange) {
-		t.Fatalf("compressedEncode error = %v, want %v", err, errCompressedCoefficientOutOfRange)
+	testCases := []struct {
+		name string
+		s2   smallPolynomial
+		dst  []byte
+		err  error
+	}{
+		{
+			name: "out of range coefficient",
+			s2:   outOfRange,
+			dst:  make([]byte, signatureSize-signaturePrefixSize),
+			err:  errCompressedCoefficientOutOfRange,
+		},
+		{
+			name: "tiny buffer",
+			s2:   smallPolynomial{},
+			dst:  make([]byte, 1),
+			err:  errCompressedSignatureTooLarge,
+		},
 	}
-}
 
-func TestCompressedEncodeRejectsTinyBuffer(t *testing.T) {
-	var s2 smallPolynomial
-
-	if _, err := compressedEncode(make([]byte, 1), s2); !errors.Is(err, errCompressedSignatureTooLarge) {
-		t.Fatalf("compressedEncode error = %v, want %v", err, errCompressedSignatureTooLarge)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := compressedEncode(tc.dst, tc.s2); !errors.Is(err, tc.err) {
+				t.Fatalf("compressedEncode error = %v, want %v", err, tc.err)
+			}
+		})
 	}
 }
 
@@ -307,7 +334,7 @@ func TestCompressedDecodeRejectsNonZeroTrailingBits(t *testing.T) {
 	}
 }
 
-func TestTrimI8EncodeReferenceKATs(t *testing.T) {
+func TestTrimI8Encode(t *testing.T) {
 	// The expected lengths and digests were derived from the Falcon reference
 	// implementation trim_i8_encode applied to test_falcon.c ntru_*_1024 arrays.
 	// Source: https://falcon-sign.info/impl/test_falcon.c.html
@@ -360,26 +387,37 @@ func TestTrimI8EncodeReferenceKATs(t *testing.T) {
 	}
 }
 
-func TestSignatureCodecRejectsNonZeroPadding(t *testing.T) {
-	tc := verifyRawKATs[0]
-	nonceBytes := mustDecodeHex(t, tc.nonceHex)
-	var nonce [nonceSize]byte
-	copy(nonce[:], nonceBytes)
-	s2 := decodeVerifyRawKATSignature(t, mustDecodeHex(t, tc.signatureHex))
-
-	sig := make([]byte, signatureSize)
-	sig[0] = signatureHeader
-	copy(sig[headerSize:signaturePrefixSize], nonce[:])
-	written, err := compressedEncode(sig[signaturePrefixSize:], s2)
-	if err != nil {
-		t.Fatal(err)
+func TestTrimI8DecodeRejectsForbiddenValues(t *testing.T) {
+	testCases := []struct {
+		name string
+		bits int
+		src  []byte
+	}{
+		{
+			name: "fg",
+			bits: fgBits,
+			src: func() []byte {
+				src := make([]byte, (n*fgBits+7)>>3)
+				src[0] = 0x80 // first 5-bit field is 10000, i.e. forbidden -16.
+				return src
+			}(),
+		},
+		{
+			name: "F",
+			bits: ntruFBits,
+			src: func() []byte {
+				src := make([]byte, (n*ntruFBits+7)>>3)
+				src[0] = 0x80 // forbidden -128.
+				return src
+			}(),
+		},
 	}
-	if written >= signatureSize-signaturePrefixSize {
-		t.Fatal("reference signature unexpectedly leaves no padding byte to corrupt")
-	}
 
-	sig[signaturePrefixSize+written] = 1
-	if _, _, err := sigDecode(sig); err == nil {
-		t.Fatal("sigDecode accepted non-zero padded signature bytes")
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, _, err := trimI8Decode(tc.src, tc.bits); err == nil {
+				t.Fatal("trimI8Decode accepted forbidden value")
+			}
+		})
 	}
 }
