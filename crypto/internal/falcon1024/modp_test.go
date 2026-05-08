@@ -376,10 +376,10 @@ func TestModPPolyRecRes(t *testing.T) {
 	})
 }
 
-func TestBitReverse10(t *testing.T) {
+func TestRev10(t *testing.T) {
 	for _, tc := range []struct {
-		x    uint32
-		want uint32
+		x    int
+		want uint16
 	}{
 		{x: 0, want: 0},
 		{x: 1, want: 512},
@@ -389,8 +389,8 @@ func TestBitReverse10(t *testing.T) {
 		{x: 1023, want: 1023},
 	} {
 		t.Run("", func(t *testing.T) {
-			if got := bitReverse10(tc.x); got != tc.want {
-				t.Fatalf("bitReverse10(%d) = %d, want %d", tc.x, got, tc.want)
+			if got := rev10[tc.x]; got != tc.want {
+				t.Fatalf("rev10[%d] = %d, want %d", tc.x, got, tc.want)
 			}
 		})
 	}

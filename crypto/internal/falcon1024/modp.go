@@ -50,7 +50,7 @@ func modPNInv31(p uint32) uint32 {
 }
 
 func modPR(p uint32) uint32 {
-	return ((uint32(1) << 31) - p)
+	return (uint32(1) << 31) - p
 }
 
 func modPR2(p, p0i uint32) uint32 {
@@ -100,8 +100,9 @@ func modPMkgm2(gm, igm []uint32, logn int, primitiveRoot, p, p0i uint32) {
 	ig := modPDiv(r2, g, p, p0i, modPR(p))
 	x1 := modPR(p)
 	x2 := modPR(p)
+	k := 10 - logn
 	for i := range nn {
-		j := bitReverse10(uint32(i)) >> (10 - logn)
+		j := int(rev10[i]) >> k
 		gm[j] = x1
 		igm[j] = x2
 		x1 = modPMontyMul(x1, g, p, p0i)
@@ -180,13 +181,4 @@ func modPPolyRecRes(f []uint32, logn int, p, p0i, r2 uint32) {
 	for i := range hn {
 		f[i] = modPMontyMul(modPMontyMul(f[i<<1], f[(i<<1)+1], p, p0i), r2, p, p0i)
 	}
-}
-
-func bitReverse10(x uint32) uint32 {
-	var r uint32
-	for range 10 {
-		r = (r << 1) | (x & 1)
-		x >>= 1
-	}
-	return r
 }
