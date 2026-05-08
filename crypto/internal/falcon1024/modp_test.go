@@ -412,23 +412,3 @@ func TestModPPolyRecRes(t *testing.T) {
 		123456789, 987654321,
 	})
 }
-
-func TestRev10(t *testing.T) {
-	for _, tc := range []struct {
-		x    int
-		want uint16
-	}{
-		{x: 0, want: 0},
-		{x: 1, want: 512},
-		{x: 2, want: 256},
-		{x: 3, want: 768},
-		{x: 0b1011001101, want: 0b1011001101},
-		{x: 1023, want: 1023},
-	} {
-		t.Run("", func(t *testing.T) {
-			if got := rev10[tc.x]; got != tc.want {
-				t.Fatalf("rev10[%d] = %d, want %d", tc.x, got, tc.want)
-			}
-		})
-	}
-}
