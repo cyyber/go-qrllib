@@ -639,10 +639,3 @@ func zintPrimeParams(primeIndex int) (p, p0i, r2 uint32) {
 	r2 = modPR2(p, p0i)
 	return p, p0i, r2
 }
-
-func requireEqualWords(t *testing.T, name string, got, want []uint32) {
-	t.Helper()
-	if !slices.Equal(got, want) {
-		t.Fatalf("%s = %v, want %v", name, got, want)
-	}
-}

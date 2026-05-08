@@ -749,15 +749,6 @@ func TestNewSignatureReferenceRawS2KATs(t *testing.T) {
 	}
 }
 
-func mustDecodeHex(t *testing.T, s string) []byte {
-	t.Helper()
-	b, err := hex.DecodeString(s)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return b
-}
-
 func decodeVerifyRawKATSignature(t *testing.T, sig []byte) smallPolynomial {
 	t.Helper()
 	if len(sig) != 1+2*n {
