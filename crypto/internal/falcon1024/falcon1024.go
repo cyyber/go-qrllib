@@ -402,15 +402,14 @@ func signTree(rng *sha3.SHAKE, priv *PrivateKey, c0 ringElement) (smallPolynomia
 		if err == nil {
 			return s2, nil
 		}
-		if errors.Is(err, errRetrySigning) {
+		if errors.Is(err, errSignatureNormExceedsBound) {
 			continue
 		}
 		return smallPolynomial{}, err
 	}
 }
 
-// TODO
-var errRetrySigning = errors.New("falcon-1024: retry signing")
+var errSignatureNormExceedsBound = errors.New("falcon-1024: signature norm exceeds bound")
 
 func signTreeAttempt(prng *samplerPRNG, priv *PrivateKey, c0 ringElement) (smallPolynomial, error) {
 	var target fprPolynomial
@@ -466,7 +465,7 @@ func signTreeAttempt(prng *samplerPRNG, priv *PrivateKey, c0 ringElement) (small
 	sqn |= -(ng >> 31)
 
 	if signatureNormExceedsPartialBound(sqn, s2) {
-		return smallPolynomial{}, errRetrySigning
+		return smallPolynomial{}, errSignatureNormExceedsBound
 	}
 
 	return s2, nil

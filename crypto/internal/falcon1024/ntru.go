@@ -3,14 +3,13 @@ package falcon1024
 import "math"
 
 const (
-	ntruCoeffBits  = 8
-	ntruCoeffBound = 1<<(ntruCoeffBits-1) - 1
-	depthIntFG     = 4
-	// TODO
-	ntruScratchWords    = 7 * n
-	makeFGScratchWords  = 6 * n
-	ntruU32ScratchWords = 16 * n
-	ntruFPRScratchWords = 8 * n
+	ntruCoeffBits     = 8
+	ntruCoeffBound    = 1<<(ntruCoeffBits-1) - 1
+	depthIntFG        = 4
+	ntruScratchLen    = 7 * n
+	makeFGScratchLen  = 6 * n
+	ntruU32ScratchLen = 16 * n
+	ntruFPRScratchLen = 8 * n
 )
 
 var (
@@ -605,11 +604,11 @@ type ntruWorkspace struct {
 
 func newNTRUWorkspace() ntruWorkspace {
 	return ntruWorkspace{
-		tmp:       make([]uint32, ntruScratchWords),
-		fgData:    make([]uint32, makeFGScratchWords),
-		scaledNTT: make([]uint32, polySubScaledNTTWorkspaceWords()),
-		u32:       make([]uint32, ntruU32ScratchWords),
-		fpr:       make([]fpr, ntruFPRScratchWords),
+		tmp:       make([]uint32, ntruScratchLen),
+		fgData:    make([]uint32, makeFGScratchLen),
+		scaledNTT: make([]uint32, polySubScaledNTTWorkspaceLen()),
+		u32:       make([]uint32, ntruU32ScratchLen),
+		fpr:       make([]fpr, ntruFPRScratchLen),
 		i32:       make([]int32, n),
 	}
 }
@@ -650,7 +649,7 @@ func (s *fprScratch) take(size int) []fpr {
 	return out
 }
 
-func polySubScaledNTTWorkspaceWords() int {
+func polySubScaledNTTWorkspaceLen() int {
 	maxWords := 0
 	for depth := 2; depth <= depthIntFG; depth++ {
 		logn := logN - depth
