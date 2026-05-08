@@ -63,11 +63,8 @@ func newPrivateKeyFromSeed(priv *PrivateKey, seed []byte) (*PrivateKey, error) {
 }
 
 const (
-	fgBits  = 5
-	fgBound = 1<<(fgBits-1) - 1
-
-	ntruFBits  = 8
-	ntruFBound = 1<<(ntruFBits-1) - 1
+	fgBound    = 15
+	ntruFBound = 127
 
 	keygenSqNormBound = 16823
 	keygenBNormBound  = 16822.4121
