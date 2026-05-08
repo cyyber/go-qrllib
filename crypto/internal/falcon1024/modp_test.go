@@ -342,6 +342,20 @@ func TestModPNTT2Ext(t *testing.T) {
 	})
 }
 
+func TestModPNTT2ExtLogNZero(t *testing.T) {
+	p := primes[0].p
+	p0i := modPNInv31(p)
+
+	a := []uint32{12345, 67890}
+	want := slices.Clone(a)
+
+	modPNTT2Ext(a, 2, 0, nil, p, p0i)
+	requireEqualWords(t, "modPNTT2Ext logn 0", a, want)
+
+	modPINTT2Ext(a, 2, 0, nil, p, p0i)
+	requireEqualWords(t, "modPINTT2Ext logn 0", a, want)
+}
+
 func TestModPPolyRecRes(t *testing.T) {
 	p := primes[0].p
 	p0i := modPNInv31(p)
