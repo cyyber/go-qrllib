@@ -130,11 +130,6 @@ func compressedEncode(dst []byte, s smallPolynomial) (int, error) {
 			}
 			dst[written] = byte(acc >> accBits)
 			written++
-			if accBits == 0 {
-				acc = 0
-			} else {
-				acc &= (1 << accBits) - 1
-			}
 		}
 	}
 
