@@ -52,7 +52,7 @@ func TestModPNorm(t *testing.T) {
 	}
 }
 
-func TestModPAddSubHalf(t *testing.T) {
+func TestModPAddSub(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
 		p       uint32
@@ -95,7 +95,9 @@ func TestModPAddSubHalf(t *testing.T) {
 			}
 		})
 	}
+}
 
+func TestModPHalf(t *testing.T) {
 	p := primes[0].p
 	for _, tc := range []struct {
 		name string
@@ -107,7 +109,7 @@ func TestModPAddSubHalf(t *testing.T) {
 		{name: "two", a: 2, want: 1},
 		{name: "minus one", a: p - 1, want: 1073736704},
 	} {
-		t.Run("half/"+tc.name, func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			if got := modPHalf(tc.a, p); got != tc.want {
 				t.Fatalf("modPHalf = %d, want %d", got, tc.want)
 			}
@@ -321,39 +323,43 @@ func TestModPNTT2Ext(t *testing.T) {
 	igm := make([]uint32, 8)
 	modPMkgm2(gm, igm, 3, primes[0].g, p, p0i)
 
-	const sentinel = uint32(0x5A5A5A5A)
-	a := []uint32{
-		1, sentinel, 2, sentinel, 3, sentinel, 4, sentinel,
-		5, sentinel, 6, sentinel, 7, sentinel, 8,
-	}
+	t.Run("strided", func(t *testing.T) {
+		const sentinel = uint32(0x5A5A5A5A)
+		a := []uint32{
+			1, sentinel, 2, sentinel, 3, sentinel, 4, sentinel,
+			5, sentinel, 6, sentinel, 7, sentinel, 8,
+		}
 
-	modPNTT2Ext(a, 2, 3, gm, p, p0i)
-	requireEqualWords(t, "modPNTT2Ext", a, []uint32{
-		1939742775, sentinel, 1889065586, sentinel,
-		1695103822, sentinel, 327325878, sentinel,
-		2078796089, sentinel, 1251355496, sentinel,
-		1880810079, sentinel, 1822640737,
+		modPNTT2Ext(a, 2, 3, gm, p, p0i)
+		requireEqualWords(t, "modPNTT2Ext", a, []uint32{
+			1939742775, sentinel, 1889065586, sentinel,
+			1695103822, sentinel, 327325878, sentinel,
+			2078796089, sentinel, 1251355496, sentinel,
+			1880810079, sentinel, 1822640737,
+		})
+
+		modPINTT2Ext(a, 2, 3, igm, p, p0i)
+		requireEqualWords(t, "modPINTT2Ext", a, []uint32{
+			1, sentinel, 2, sentinel, 3, sentinel, 4, sentinel,
+			5, sentinel, 6, sentinel, 7, sentinel, 8,
+		})
 	})
 
-	modPINTT2Ext(a, 2, 3, igm, p, p0i)
-	requireEqualWords(t, "modPINTT2Ext", a, []uint32{
-		1, sentinel, 2, sentinel, 3, sentinel, 4, sentinel,
-		5, sentinel, 6, sentinel, 7, sentinel, 8,
+	t.Run("forward logn 0", func(t *testing.T) {
+		a := []uint32{12345, 67890}
+		want := slices.Clone(a)
+
+		modPNTT2Ext(a, 2, 0, nil, p, p0i)
+		requireEqualWords(t, "modPNTT2Ext logn 0", a, want)
 	})
-}
 
-func TestModPNTT2ExtLogNZero(t *testing.T) {
-	p := primes[0].p
-	p0i := modPNInv31(p)
+	t.Run("inverse logn 0", func(t *testing.T) {
+		a := []uint32{12345, 67890}
+		want := slices.Clone(a)
 
-	a := []uint32{12345, 67890}
-	want := slices.Clone(a)
-
-	modPNTT2Ext(a, 2, 0, nil, p, p0i)
-	requireEqualWords(t, "modPNTT2Ext logn 0", a, want)
-
-	modPINTT2Ext(a, 2, 0, nil, p, p0i)
-	requireEqualWords(t, "modPINTT2Ext logn 0", a, want)
+		modPINTT2Ext(a, 2, 0, nil, p, p0i)
+		requireEqualWords(t, "modPINTT2Ext logn 0", a, want)
+	})
 }
 
 func TestModPPolyRecRes(t *testing.T) {
