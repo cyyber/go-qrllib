@@ -725,7 +725,7 @@ func TestNewSignatureReferenceRawS2KATs(t *testing.T) {
 			wantS2 := decodeVerifyRawKATSignature(t, mustDecodeHex(t, tc.signatureHex))
 
 			sigBytes := make([]byte, signatureSize)
-			if err := sigEncode(sigBytes, &nonce, wantS2); err != nil {
+			if err := sigEncode(sigBytes, nonce, wantS2); err != nil {
 				t.Fatal(err)
 			}
 

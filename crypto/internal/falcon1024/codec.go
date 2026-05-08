@@ -248,7 +248,9 @@ func pkDecode(src []byte) (h ringElement, err error) {
 	return polyByteDecode[ringElement](src[headerSize:])
 }
 
-func sigEncode(dst []byte, nonce *[nonceSize]byte, s2 smallPolynomial) error {
+const signatureHeader byte = 0x30 + logN
+
+func sigEncode(dst []byte, nonce [nonceSize]byte, s2 smallPolynomial) error {
 	if len(dst) != signatureSize {
 		return errors.New("falcon-1024: invalid signature length")
 	}
@@ -264,8 +266,6 @@ func sigEncode(dst []byte, nonce *[nonceSize]byte, s2 smallPolynomial) error {
 
 	return nil
 }
-
-const signatureHeader byte = 0x30 + logN
 
 func sigDecode(src []byte) (nonce [nonceSize]byte, s2 smallPolynomial, err error) {
 	if len(src) != signatureSize {
@@ -292,13 +292,8 @@ func sigDecode(src []byte) (nonce [nonceSize]byte, s2 smallPolynomial, err error
 }
 
 func trimI8Encode(dst []byte, p smallPolynomial, bits int) (int, error) {
-	if bits < 2 || bits > 8 {
+	if bits != fgBits && bits != ntruFBits {
 		return 0, errors.New("falcon-1024: invalid trim_i8 bit width")
-	}
-
-	outLen := (n*bits + 7) >> 3
-	if len(dst) < outLen {
-		return 0, errors.New("falcon-1024: short trim_i8 output buffer")
 	}
 
 	bound := int32(1<<(bits-1)) - 1
@@ -306,6 +301,11 @@ func trimI8Encode(dst []byte, p smallPolynomial, bits int) (int, error) {
 		if x < -bound || x > bound {
 			return 0, errors.New("falcon-1024: trim_i8 coefficient out of range")
 		}
+	}
+
+	outLen := (n*bits + 7) >> 3
+	if len(dst) < outLen {
+		return 0, errors.New("falcon-1024: short trim_i8 output buffer")
 	}
 
 	if bits == 8 {
@@ -341,7 +341,7 @@ func trimI8Encode(dst []byte, p smallPolynomial, bits int) (int, error) {
 }
 
 func trimI8Decode(src []byte, bits int) (smallPolynomial, int, error) {
-	if bits < 2 || bits > 8 {
+	if bits != fgBits && bits != ntruFBits {
 		return smallPolynomial{}, 0, errors.New("falcon-1024: invalid trim_i8 bit width")
 	}
 

@@ -371,7 +371,7 @@ func sign(random io.Reader, signature []byte, priv *PrivateKey, message []byte) 
 	for {
 		s2 := signTree(rng, priv, c0)
 
-		if err := sigEncode(signature, &nonce, s2); err != nil {
+		if err := sigEncode(signature, nonce, s2); err != nil {
 			if errors.Is(err, errCompressedSignatureTooLarge) ||
 				errors.Is(err, errCompressedCoefficientOutOfRange) {
 				continue

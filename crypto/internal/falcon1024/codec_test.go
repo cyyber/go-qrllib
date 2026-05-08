@@ -147,7 +147,7 @@ func TestSignatureCodecReferenceRawS2KATs(t *testing.T) {
 			wantS2 := decodeVerifyRawKATSignature(t, mustDecodeHex(t, tc.signatureHex))
 
 			sig := make([]byte, signatureSize)
-			if err := sigEncode(sig, &nonce, wantS2); err != nil {
+			if err := sigEncode(sig, nonce, wantS2); err != nil {
 				t.Fatal(err)
 			}
 
@@ -173,7 +173,7 @@ func TestSignatureCodecRejectsInvalidInput(t *testing.T) {
 	s2 := decodeVerifyRawKATSignature(t, mustDecodeHex(t, tc.signatureHex))
 
 	sig := make([]byte, signatureSize)
-	if err := sigEncode(sig, &nonce, s2); err != nil {
+	if err := sigEncode(sig, nonce, s2); err != nil {
 		t.Fatal(err)
 	}
 
@@ -226,7 +226,7 @@ func TestSignatureCodecRejectsInvalidOutputBuffer(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if err := sigEncode(tc.out, &nonce, s2); err == nil {
+			if err := sigEncode(tc.out, nonce, s2); err == nil {
 				t.Fatal("sigEncode accepted invalid signature buffer")
 			}
 		})
