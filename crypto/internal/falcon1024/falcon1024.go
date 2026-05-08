@@ -457,12 +457,7 @@ func Verify(pub *PublicKey, message []byte, sig *Signature) error {
 	return verify(pub, message, sig)
 }
 
-const (
-	signatureHeader     byte = 0x30 + logN
-	nonceSize                = 40
-	encodedHeaderSize        = 1
-	signaturePrefixSize      = encodedHeaderSize + nonceSize
-)
+const nonceSize = 40
 
 type Signature struct {
 	nonce [nonceSize]byte

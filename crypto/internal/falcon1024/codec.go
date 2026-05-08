@@ -2,6 +2,8 @@ package falcon1024
 
 import "errors"
 
+const encodedHeaderSize = 1
+
 type compressedBitReader struct {
 	src     []byte
 	pos     int
@@ -254,6 +256,11 @@ func sigEncode(dst []byte, nonce *[nonceSize]byte, s2 smallPolynomial) error {
 
 	return nil
 }
+
+const (
+	signatureHeader     byte = 0x30 + logN
+	signaturePrefixSize      = encodedHeaderSize + nonceSize
+)
 
 func sigDecode(src []byte) (nonce [nonceSize]byte, s2 smallPolynomial, err error) {
 	if len(src) != signatureSize {
