@@ -35,11 +35,11 @@ func (r *compressedBitReader) readBits(bitCount int) (uint32, bool) {
 	return v, true
 }
 
-func (r *compressedBitReader) trailingBitsAreZero() bool {
+func (r *compressedBitReader) trailingBits() byte {
 	if r.bits == 0 {
-		return true
+		return 0
 	}
-	return r.current&byte((1<<r.bits)-1) == 0
+	return r.current & byte((1<<r.bits)-1)
 }
 
 var (
@@ -88,7 +88,7 @@ func compressedDecode(src []byte) (smallPolynomial, int, error) {
 		p[i] = magnitude
 	}
 
-	if !r.trailingBitsAreZero() {
+	if r.trailingBits() != 0 {
 		return smallPolynomial{}, 0, errInvalidSignatureEncoding
 	}
 
@@ -104,7 +104,9 @@ func compressedEncode(dst []byte, s smallPolynomial) (int, error) {
 		if x < -maxCompressedCoefficient || x > maxCompressedCoefficient {
 			return 0, errCompressedCoefficientOutOfRange
 		}
+	}
 
+	for _, x := range s {
 		t := x
 		sign := uint32(0)
 		if t < 0 {
