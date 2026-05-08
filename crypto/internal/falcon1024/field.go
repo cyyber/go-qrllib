@@ -98,7 +98,7 @@ type ringElement [n]fieldElement // modulo-q polynomial
 
 func polyByteEncode[T ~[n]fieldElement](dst []byte, p T) {
 	for i := 0; i < n; i += 4 {
-		x := uint64(p[i+0])<<42 |
+		x := uint64(p[i])<<42 |
 			uint64(p[i+1])<<28 |
 			uint64(p[i+2])<<14 |
 			uint64(p[i+3])
@@ -130,12 +130,12 @@ func polyByteDecode[T ~[n]fieldElement](b []byte) (T, error) {
 			uint64(b[5])<<8 |
 			uint64(b[6])
 
-		p[i+0] = fieldElement((x >> 42) & 0x3FFF)
+		p[i] = fieldElement((x >> 42) & 0x3FFF)
 		p[i+1] = fieldElement((x >> 28) & 0x3FFF)
 		p[i+2] = fieldElement((x >> 14) & 0x3FFF)
 		p[i+3] = fieldElement(x & 0x3FFF)
 
-		if p[i+0] >= q || p[i+1] >= q || p[i+2] >= q || p[i+3] >= q {
+		if p[i] >= q || p[i+1] >= q || p[i+2] >= q || p[i+3] >= q {
 			return T{}, errors.New("falcon-1024: invalid polynomial encoding")
 		}
 

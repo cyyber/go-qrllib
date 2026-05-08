@@ -89,19 +89,11 @@ func modPDiv(a, b, p, p0i, r uint32) uint32 {
 	return modPMontyMul(a, z, p, p0i)
 }
 
-func modPMkgm2(gm, igm []uint32, primitiveRoot, p, p0i uint32) {
-	nn := len(gm)
-	if len(igm) < nn {
-		panic("falcon1024: invalid modp root table")
-	}
-	logn := 0
-	for (1 << logn) < nn {
-		logn++
-	}
-
+func modPMkgm2(gm, igm []uint32, logn int, primitiveRoot, p, p0i uint32) {
+	nn := 1 << logn
 	r2 := modPR2(p, p0i)
 	g := modPMontyMul(primitiveRoot, r2, p, p0i)
-	for i := nn; i < 1<<10; i <<= 1 {
+	for k := logn; k < 10; k++ {
 		g = modPMontyMul(g, g, p, p0i)
 	}
 
@@ -117,63 +109,69 @@ func modPMkgm2(gm, igm []uint32, primitiveRoot, p, p0i uint32) {
 	}
 }
 
-func modPNTT2(a, gm []uint32, p, p0i uint32) {
-	modPNTT2Ext(a, 1, gm, p, p0i)
+func modPNTT2(a []uint32, logn int, gm []uint32, p, p0i uint32) {
+	modPNTT2Ext(a, 1, logn, gm, p, p0i)
 }
 
-func modPNTT2Ext(a []uint32, stride int, gm []uint32, p, p0i uint32) {
-	nn := (len(a) + stride - 1) / stride
+func modPNTT2Ext(a []uint32, stride, logn int, gm []uint32, p, p0i uint32) {
+	if logn == 0 {
+		return
+	}
+
+	nn := 1 << logn
 	t := nn
 	for m := 1; m < nn; m <<= 1 {
 		ht := t >> 1
-		for i, j1 := 0, 0; i < m; i, j1 = i+1, j1+t {
+		for i, v1 := 0, 0; i < m; i, v1 = i+1, v1+t {
 			s := gm[m+i]
-			j2 := j1 + ht
-			for j := j1; j < j2; j++ {
-				jx := j * stride
-				jy := (j + ht) * stride
-				u := a[jx]
-				v := modPMontyMul(a[jy], s, p, p0i)
-				a[jx] = modPAdd(u, v, p)
-				a[jy] = modPSub(u, v, p)
+			r1 := v1 * stride
+			r2 := r1 + ht*stride
+			for range ht {
+				x := a[r1]
+				y := modPMontyMul(a[r2], s, p, p0i)
+				a[r1] = modPAdd(x, y, p)
+				a[r2] = modPSub(x, y, p)
+				r1 += stride
+				r2 += stride
 			}
 		}
 		t = ht
 	}
 }
 
-func modPINTT2(a, igm []uint32, p, p0i uint32) {
-	modPINTT2Ext(a, 1, igm, p, p0i)
+func modPINTT2(a []uint32, logn int, igm []uint32, p, p0i uint32) {
+	modPINTT2Ext(a, 1, logn, igm, p, p0i)
 }
 
-func modPINTT2Ext(a []uint32, stride int, igm []uint32, p, p0i uint32) {
-	nn := (len(a) + stride - 1) / stride
+func modPINTT2Ext(a []uint32, stride, logn int, igm []uint32, p, p0i uint32) {
+	if logn == 0 {
+		return
+	}
+
+	nn := 1 << logn
 	t := 1
 	for m := nn; m > 1; m >>= 1 {
 		hm := m >> 1
 		dt := t << 1
-		for i, j1 := 0, 0; i < hm; i, j1 = i+1, j1+dt {
+		for i, v1 := 0, 0; i < hm; i, v1 = i+1, v1+dt {
 			s := igm[hm+i]
-			j2 := j1 + t
-			for j := j1; j < j2; j++ {
-				jx := j * stride
-				jy := (j + t) * stride
-				u := a[jx]
-				v := a[jy]
-				a[jx] = modPAdd(u, v, p)
-				a[jy] = modPMontyMul(modPSub(u, v, p), s, p, p0i)
+			r1 := v1 * stride
+			r2 := r1 + t*stride
+			for range t {
+				x := a[r1]
+				y := a[r2]
+				a[r1] = modPAdd(x, y, p)
+				a[r2] = modPMontyMul(modPSub(x, y, p), s, p, p0i)
+				r1 += stride
+				r2 += stride
 			}
 		}
 		t = dt
 	}
 
-	ni := modPR(p)
-	for m := nn; m > 1; m >>= 1 {
-		ni = modPHalf(ni, p)
-	}
-	for i := range nn {
-		j := i * stride
-		a[j] = modPMontyMul(a[j], ni, p, p0i)
+	ni := uint32(1) << (31 - logn)
+	for k, r := 0, 0; k < nn; k, r = k+1, r+stride {
+		a[r] = modPMontyMul(a[r], ni, p, p0i)
 	}
 }
 

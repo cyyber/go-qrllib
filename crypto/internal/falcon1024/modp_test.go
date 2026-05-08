@@ -268,7 +268,7 @@ func TestModPMkgm2(t *testing.T) {
 
 	gm := make([]uint32, 8)
 	igm := make([]uint32, 8)
-	modPMkgm2(gm, igm, primes[0].g, p, p0i)
+	modPMkgm2(gm, igm, 3, primes[0].g, p, p0i)
 
 	requireEqualWords(t, "modPMkgm2 gm", gm, []uint32{
 		10239, 1211775442, 844192849, 380966363,
@@ -285,7 +285,7 @@ func TestModPNTT2(t *testing.T) {
 	p0i := modPNInv31(p)
 	gm := make([]uint32, 8)
 	igm := make([]uint32, 8)
-	modPMkgm2(gm, igm, primes[0].g, p, p0i)
+	modPMkgm2(gm, igm, 3, primes[0].g, p, p0i)
 
 	for _, tc := range []struct {
 		name    string
@@ -305,10 +305,10 @@ func TestModPNTT2(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			a := slices.Clone(tc.input)
-			modPNTT2(a, gm, p, p0i)
+			modPNTT2(a, 3, gm, p, p0i)
 			requireEqualWords(t, "modPNTT2", a, tc.wantNTT)
 
-			modPINTT2(a, igm, p, p0i)
+			modPINTT2(a, 3, igm, p, p0i)
 			requireEqualWords(t, "modPINTT2", a, tc.input)
 		})
 	}
@@ -319,7 +319,7 @@ func TestModPNTT2Ext(t *testing.T) {
 	p0i := modPNInv31(p)
 	gm := make([]uint32, 8)
 	igm := make([]uint32, 8)
-	modPMkgm2(gm, igm, primes[0].g, p, p0i)
+	modPMkgm2(gm, igm, 3, primes[0].g, p, p0i)
 
 	const sentinel = uint32(0x5A5A5A5A)
 	a := []uint32{
@@ -327,7 +327,7 @@ func TestModPNTT2Ext(t *testing.T) {
 		5, sentinel, 6, sentinel, 7, sentinel, 8,
 	}
 
-	modPNTT2Ext(a, 2, gm, p, p0i)
+	modPNTT2Ext(a, 2, 3, gm, p, p0i)
 	requireEqualWords(t, "modPNTT2Ext", a, []uint32{
 		1939742775, sentinel, 1889065586, sentinel,
 		1695103822, sentinel, 327325878, sentinel,
@@ -335,7 +335,7 @@ func TestModPNTT2Ext(t *testing.T) {
 		1880810079, sentinel, 1822640737,
 	})
 
-	modPINTT2Ext(a, 2, igm, p, p0i)
+	modPINTT2Ext(a, 2, 3, igm, p, p0i)
 	requireEqualWords(t, "modPINTT2Ext", a, []uint32{
 		1, sentinel, 2, sentinel, 3, sentinel, 4, sentinel,
 		5, sentinel, 6, sentinel, 7, sentinel, 8,

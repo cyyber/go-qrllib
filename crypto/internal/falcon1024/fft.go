@@ -34,7 +34,7 @@ func fprFromSmall(src smallPolynomial) fprPolynomial {
 	dst := fprPolynomial{}
 
 	for i := 0; i < n; i += 8 {
-		dst[i+0] = fpr(src[i+0])
+		dst[i] = fpr(src[i])
 		dst[i+1] = fpr(src[i+1])
 		dst[i+2] = fpr(src[i+2])
 		dst[i+3] = fpr(src[i+3])
@@ -107,7 +107,7 @@ var (
 func initFFTGM() ([n]fpr, [n]fpr) {
 	var re, im [n]fpr
 	for j := range n {
-		re[j] = fpr(math.Float64frombits(falconGMTabBits[(j<<1)+0]))
+		re[j] = fpr(math.Float64frombits(falconGMTabBits[j<<1]))
 		im[j] = fpr(math.Float64frombits(falconGMTabBits[(j<<1)+1]))
 	}
 	return re, im
@@ -214,8 +214,8 @@ func ffLDLTreeSize(logn int) int {
 	return (logn + 1) << logn
 }
 
-func mulFFTSlice(a, b []fpr) {
-	hn := len(a) >> 1
+func mulFFTSlice(a, b []fpr, logn int) {
+	hn := 1 << (logn - 1)
 	for u := range hn {
 		aRe := a[u]
 		aIm := a[u+hn]
@@ -234,10 +234,11 @@ func splitFFTSlice(f0, f1, f []fpr, logn int) {
 	f0[0] = f[0]
 	f1[0] = f[hn]
 	for u := range qn {
-		aRe := f[(u<<1)+0]
-		aIm := f[(u<<1)+0+hn]
-		bRe := f[(u<<1)+1]
-		bIm := f[(u<<1)+1+hn]
+		j := u << 1
+		aRe := f[j]
+		aIm := f[j+hn]
+		bRe := f[j+1]
+		bIm := f[j+1+hn]
 
 		tRe := aRe + bRe
 		tIm := aIm + bIm
@@ -270,10 +271,11 @@ func mergeFFTSlice(f, f0, f1 []fpr, logn int) {
 		cRe := bRe*gmRe - bIm*gmIm
 		cIm := bRe*gmIm + bIm*gmRe
 
-		f[(u<<1)+0] = aRe + cRe
-		f[(u<<1)+0+hn] = aIm + cIm
-		f[(u<<1)+1] = aRe - cRe
-		f[(u<<1)+1+hn] = aIm - cIm
+		j := u << 1
+		f[j] = aRe + cRe
+		f[j+hn] = aIm + cIm
+		f[j+1] = aRe - cRe
+		f[j+1+hn] = aIm - cIm
 	}
 }
 
@@ -432,7 +434,7 @@ func ffSamplingFFTRecursive(prng *samplerPRNG, z0, z1, tree, t0, t1, tmp []fpr, 
 	for i := range nn {
 		tmp[i] -= z1[i]
 	}
-	mulFFTSlice(tmp[:nn], tree[:nn])
+	mulFFTSlice(tmp[:nn], tree[:nn], logn)
 	for i := range nn {
 		tmp[i] += t0[i]
 	}
