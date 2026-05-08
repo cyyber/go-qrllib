@@ -149,6 +149,11 @@ func compressedEncode(dst []byte, s smallPolynomial) (int, error) {
 	return written, nil
 }
 
+const (
+	fgBits    = 5
+	ntruFBits = 8
+)
+
 func skEncode(dst []byte, f, g, ntruF smallPolynomial) error {
 	if len(dst) != privateKeySize {
 		return errors.New("falcon-1024: invalid private key length")
@@ -193,25 +198,25 @@ func skDecode(src []byte) (f, g, ntruF smallPolynomial, err error) {
 	}
 
 	offset := headerSize
-	var written int
+	var consumed int
 
-	f, written, err = trimI8Decode(src[offset:], fgBits)
+	f, consumed, err = trimI8Decode(src[offset:], fgBits)
 	if err != nil {
 		return smallPolynomial{}, smallPolynomial{}, smallPolynomial{}, err
 	}
-	offset += written
+	offset += consumed
 
-	g, written, err = trimI8Decode(src[offset:], fgBits)
+	g, consumed, err = trimI8Decode(src[offset:], fgBits)
 	if err != nil {
 		return smallPolynomial{}, smallPolynomial{}, smallPolynomial{}, err
 	}
-	offset += written
+	offset += consumed
 
-	ntruF, written, err = trimI8Decode(src[offset:], ntruFBits)
+	ntruF, consumed, err = trimI8Decode(src[offset:], ntruFBits)
 	if err != nil {
 		return smallPolynomial{}, smallPolynomial{}, smallPolynomial{}, err
 	}
-	offset += written
+	offset += consumed
 
 	if offset != privateKeySize {
 		return smallPolynomial{}, smallPolynomial{}, smallPolynomial{},
