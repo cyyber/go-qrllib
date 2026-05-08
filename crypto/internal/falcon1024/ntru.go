@@ -3,9 +3,10 @@ package falcon1024
 import "math"
 
 const (
-	ntruCoeffBits       = 8
-	ntruCoeffBound      = 1<<(ntruCoeffBits-1) - 1
-	depthIntFG          = 4
+	ntruCoeffBits  = 8
+	ntruCoeffBound = 1<<(ntruCoeffBits-1) - 1
+	depthIntFG     = 4
+	// TODO
 	ntruScratchWords    = 7 * n
 	makeFGScratchWords  = 6 * n
 	ntruU32ScratchWords = 16 * n

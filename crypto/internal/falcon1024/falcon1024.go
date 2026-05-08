@@ -176,37 +176,41 @@ func expandPrivateKey(priv *PrivateKey, f, g, ntruF, ntruG smallPolynomial) erro
 	tmp = fftMulSelfAdj(tmp)
 	g11 = polyAdd(g11, tmp)
 
-	ffLDLFFT(priv.tree[:], g00, g01, g11, logN)
+	var ldlScratch [3 * n]fpr
+	ffLDLFFT(priv.tree[:], g00, g01, g11, logN, ldlScratch[:])
 	ffLDLBinaryNormalize(priv.tree[:], logN, logN)
 
 	return nil
 }
 
-func ffLDLFFT(tree []fpr, g00, g01, g11 fftPolynomial, logn int) {
-	ffLDLFFTSlice(tree, g00[:], g01[:], g11[:], logn)
+func ffLDLFFT(tree []fpr, g00, g01, g11 fftPolynomial, logn int, tmp []fpr) {
+	ffLDLFFTSlice(tree, g00[:], g01[:], g11[:], logn, tmp)
 }
 
-func ffLDLFFTSlice(tree, g00, g01, g11 []fpr, logn int) {
+func ffLDLFFTSlice(tree, g00, g01, g11 []fpr, logn int, tmp []fpr) {
 	nn := 1 << logn
 	if nn == 1 {
 		tree[0] = g00[0]
 		return
 	}
+	if len(tmp) < 3*nn {
+		panic("falcon1024: short ffLDLFFT scratch")
+	}
 
 	hn := nn >> 1
-	d00 := make([]fpr, nn)
-	d11 := make([]fpr, nn)
-	tmp := make([]fpr, nn)
+	d00 := tmp[:nn]
+	d11 := tmp[nn : 2*nn]
+	t := tmp[2*nn : 3*nn]
 
 	copy(d00, g00[:nn])
 	fftLDLMV(d11, tree[:nn], g00[:nn], g01[:nn], g11[:nn], logn)
 
-	splitFFTSlice(tmp[:hn], tmp[hn:nn], d00, logn)
+	splitFFTSlice(t[:hn], t[hn:nn], d00, logn)
 	splitFFTSlice(d00[:hn], d00[hn:nn], d11, logn)
-	copy(d11, tmp)
+	copy(d11, t)
 
-	ffLDLFFTInner(tree[nn:], d11[:hn], d11[hn:nn], logn-1, tmp)
-	ffLDLFFTInner(tree[nn+ffLDLTreeSize(logn-1):], d00[:hn], d00[hn:nn], logn-1, tmp)
+	ffLDLFFTInner(tree[nn:], d11[:hn], d11[hn:nn], logn-1, t)
+	ffLDLFFTInner(tree[nn+ffLDLTreeSize(logn-1):], d00[:hn], d00[hn:nn], logn-1, t)
 }
 
 func ffLDLFFTInner(tree, g0, g1 []fpr, logn int, tmp []fpr) {
@@ -405,7 +409,8 @@ func signTree(rng *sha3.SHAKE, priv *PrivateKey, c0 ringElement) (smallPolynomia
 	}
 }
 
-var errRetrySigning = errors.New("")
+// TODO
+var errRetrySigning = errors.New("falcon-1024: retry signing")
 
 func signTreeAttempt(prng *samplerPRNG, priv *PrivateKey, c0 ringElement) (smallPolynomial, error) {
 	var target fprPolynomial
