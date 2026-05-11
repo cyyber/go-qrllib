@@ -517,53 +517,6 @@ func ffSamplingFFTRecursive(prng *samplerPRNG, z0, z1, tree, t0, t1, tmp []fpr, 
 	mergeFFTSlice(z0[:nn], tmp[:hn], tmp[hn:nn], logn)
 }
 
-func fft(f fprPolynomial) fftPolynomial {
-	var out fftPolynomial
-	copy(out[:], f[:])
-	fftSlice(out[:], logN)
-	return out
-}
-
-func inverseFFT(f fftPolynomial) fprPolynomial {
-	var out fprPolynomial
-	copy(out[:], f[:])
-	inverseFFTSlice(out[:], logN)
-	return out
-}
-
-func fftMul(a, b fftPolynomial) (p fftPolynomial) {
-	for i := range n / 2 {
-		aRe := a[i]
-		aIm := a[i+n/2]
-		bRe := b[i]
-		bIm := b[i+n/2]
-		p[i] = aRe*bRe - aIm*bIm
-		p[i+n/2] = aRe*bIm + aIm*bRe
-	}
-	return p
-}
-
-func fftMulConst(a fftPolynomial, x fpr) (p fftPolynomial) {
-	for i := range p {
-		p[i] = a[i] * x
-	}
-	return p
-}
-
-func fftMulSelfAdj(a fftPolynomial) (p fftPolynomial) {
-	for i := range n / 2 {
-		aRe := a[i]
-		aIm := a[i+n/2]
-		p[i] = aRe*aRe + aIm*aIm
-	}
-	return p
-}
-
-func fftMulAdj(a, b fftPolynomial) (p fftPolynomial) {
-	fftMulAdjSlice(p[:], a[:], b[:], logN)
-	return p
-}
-
 func fftSlice(f []fpr, logn int) {
 	if logn == 0 {
 		return
@@ -661,6 +614,31 @@ func fftMulSlice(a, b []fpr, logn int) {
 	}
 }
 
+func fftMulConstSlice(a []fpr, x fpr, logn int) {
+	for i := range 1 << logn {
+		a[i] *= x
+	}
+}
+
+// fftMulSelfAdjSlice computes a = a * adj(a) in FFT representation. The result
+// is real-valued so the imaginary half is explicitly zeroed; callers (notably
+// expandPrivateKey's fftAdd composition) rely on that.
+func fftMulSelfAdjSlice(a []fpr, logn int) {
+	hn := 1 << (logn - 1)
+	for i := range hn {
+		aRe := a[i]
+		aIm := a[i+hn]
+		a[i] = aRe*aRe + aIm*aIm
+		a[i+hn] = 0
+	}
+}
+
+func polyNegSlice(a []fpr, logn int) {
+	for i := range 1 << logn {
+		a[i] = -a[i]
+	}
+}
+
 func fftMulAdjSlice(dst, a, b []fpr, logn int) {
 	hn := 1 << (logn - 1)
 	for i := range hn {
@@ -727,16 +705,3 @@ func ffSamplingFFT(prng *samplerPRNG, t0, t1 fftPolynomial, tree []fpr, logn int
 	return z0, z1
 }
 
-func polyAdd[T ~[n]fpr](a, b T) (s T) {
-	for i := range s {
-		s[i] = a[i] + b[i]
-	}
-	return s
-}
-
-func polyNeg[T ~[n]fpr](a T) (p T) {
-	for i := range p {
-		p[i] = -a[i]
-	}
-	return p
-}

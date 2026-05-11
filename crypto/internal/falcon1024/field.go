@@ -318,8 +318,9 @@ func squaredNormExceedsBound(f, g smallPolynomial, bound uint32) bool {
 }
 
 func orthogonalizedNormExceedsBound(f, g smallPolynomial, bound float64) bool {
-	rf := fft(fprFromSmall(f))
-	rg := fft(fprFromSmall(g))
+	var rf, rg fftPolynomial
+	fftFromSmall(rf[:], f)
+	fftFromSmall(rg[:], g)
 
 	var invNorm fftPolynomial
 	fftInvNorm2(invNorm[:], rf[:], rg[:], logN)
@@ -335,12 +336,12 @@ func orthogonalizedNormExceedsBound(f, g smallPolynomial, bound float64) bool {
 	fftMulAutoAdj(rf[:], invNorm[:], logN)
 	fftMulAutoAdj(rg[:], invNorm[:], logN)
 
-	fp := inverseFFT(rf)
-	gp := inverseFFT(rg)
+	inverseFFTSlice(rf[:], logN)
+	inverseFFTSlice(rg[:], logN)
 
 	var norm float64
-	for i := range fp {
-		norm += float64(fp[i]*fp[i] + gp[i]*gp[i])
+	for i := range rf {
+		norm += float64(rf[i]*rf[i] + rg[i]*rg[i])
 	}
 
 	return norm >= bound

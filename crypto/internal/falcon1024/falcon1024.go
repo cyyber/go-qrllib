@@ -148,31 +148,44 @@ func initPrivateKey(priv *PrivateKey, f, g, ntruF, ntruG smallPolynomial, h ring
 }
 
 func expandPrivateKey(priv *PrivateKey, f, g, ntruF, ntruG smallPolynomial) {
-	priv.b01 = fft(fprFromSmall(f))
-	priv.b00 = fft(fprFromSmall(g))
-	priv.b11 = fft(fprFromSmall(ntruF))
-	priv.b10 = fft(fprFromSmall(ntruG))
+	fftFromSmall(priv.b01[:], f)
+	fftFromSmall(priv.b00[:], g)
+	fftFromSmall(priv.b11[:], ntruF)
+	fftFromSmall(priv.b10[:], ntruG)
 
-	priv.b01 = polyNeg(priv.b01)
-	priv.b11 = polyNeg(priv.b11)
+	polyNegSlice(priv.b01[:], logN)
+	polyNegSlice(priv.b11[:], logN)
 
 	var g00, g01, g11, tmp fftPolynomial
 
-	g00 = fftMulSelfAdj(priv.b00)
-	tmp = fftMulSelfAdj(priv.b01)
-	g00 = polyAdd(g00, tmp)
+	copy(g00[:], priv.b00[:])
+	fftMulSelfAdjSlice(g00[:], logN)
+	copy(tmp[:], priv.b01[:])
+	fftMulSelfAdjSlice(tmp[:], logN)
+	fftAdd(g00[:], tmp[:], logN)
 
-	g01 = fftMulAdj(priv.b00, priv.b10)
-	tmp = fftMulAdj(priv.b01, priv.b11)
-	g01 = polyAdd(g01, tmp)
+	fftMulAdjSlice(g01[:], priv.b00[:], priv.b10[:], logN)
+	fftMulAdjSlice(tmp[:], priv.b01[:], priv.b11[:], logN)
+	fftAdd(g01[:], tmp[:], logN)
 
-	g11 = fftMulSelfAdj(priv.b10)
-	tmp = fftMulSelfAdj(priv.b11)
-	g11 = polyAdd(g11, tmp)
+	copy(g11[:], priv.b10[:])
+	fftMulSelfAdjSlice(g11[:], logN)
+	copy(tmp[:], priv.b11[:])
+	fftMulSelfAdjSlice(tmp[:], logN)
+	fftAdd(g11[:], tmp[:], logN)
 
 	var ffLDLScratch [3 * n]fpr
 	ffLDLFFT(priv.tree[:], g00, g01, g11, logN, ffLDLScratch[:])
 	ffLDLBinaryNormalize(priv.tree[:], logN, logN)
+}
+
+// fftFromSmall converts a small polynomial to floating-point in place at dst,
+// then runs an in-place forward FFT. dst must hold n elements.
+func fftFromSmall(dst []fpr, src smallPolynomial) {
+	for i := range src {
+		dst[i] = fpr(src[i])
+	}
+	fftSlice(dst, logN)
 }
 
 func NewPrivateKey(priv []byte) (*PrivateKey, error) {
@@ -323,51 +336,49 @@ func signTree(rng *sha3.SHAKE, priv *PrivateKey, c0 ringElement) smallPolynomial
 }
 
 func signTreeAttempt(prng *samplerPRNG, priv *PrivateKey, c0 ringElement) (smallPolynomial, bool) {
-	var target fprPolynomial
-	for i := range target {
-		target[i] = fpr(c0[i])
+	var t0, t1 fftPolynomial
+	for i := range t0 {
+		t0[i] = fpr(c0[i])
 	}
+	fftSlice(t0[:], logN)
 
-	t0 := fft(target)
-	var t1 fftPolynomial
 	copy(t1[:], t0[:])
-	t1 = fftMul(t1, priv.b01)
-	t1 = fftMulConst(t1, -fprInverseOfQ)
-	t0 = fftMul(t0, priv.b11)
-	t0 = fftMulConst(t0, fprInverseOfQ)
+	fftMulSlice(t1[:], priv.b01[:], logN)
+	fftMulConstSlice(t1[:], -fprInverseOfQ, logN)
+	fftMulSlice(t0[:], priv.b11[:], logN)
+	fftMulConstSlice(t0[:], fprInverseOfQ, logN)
 
 	sampleX, sampleY := ffSamplingFFT(prng, t0, t1, priv.tree[:], logN)
 
-	var latticeX fftPolynomial
+	// Reuse latticeX / latticeY as both the FFT-domain working buffers and
+	// the coefficient-domain result of inverseFFTSlice. tmp is the per-half
+	// scratch for the b10 / b11 products that get added in.
+	var latticeX, latticeY, tmp fftPolynomial
 	copy(latticeX[:], sampleX[:])
-	latticeX = fftMul(latticeX, priv.b00)
-
-	var tmp fftPolynomial
+	fftMulSlice(latticeX[:], priv.b00[:], logN)
 	copy(tmp[:], sampleY[:])
-	tmp = fftMul(tmp, priv.b10)
-	latticeX = polyAdd(latticeX, tmp)
+	fftMulSlice(tmp[:], priv.b10[:], logN)
+	fftAdd(latticeX[:], tmp[:], logN)
 
-	var latticeY fftPolynomial
 	copy(latticeY[:], sampleX[:])
-	latticeY = fftMul(latticeY, priv.b01)
-
+	fftMulSlice(latticeY[:], priv.b01[:], logN)
 	copy(tmp[:], sampleY[:])
-	tmp = fftMul(tmp, priv.b11)
-	latticeY = polyAdd(latticeY, tmp)
+	fftMulSlice(tmp[:], priv.b11[:], logN)
+	fftAdd(latticeY[:], tmp[:], logN)
 
-	x := inverseFFT(latticeX)
-	y := inverseFFT(latticeY)
+	inverseFFTSlice(latticeX[:], logN)
+	inverseFFTSlice(latticeY[:], logN)
 
 	var s2 smallPolynomial
 	var sqn uint32
 	var ng uint32
 
 	for i := range s2 {
-		s1 := int32(c0[i]) - int32(fprRint(x[i]))
+		s1 := int32(c0[i]) - int32(fprRint(latticeX[i]))
 		sqn += uint32(s1 * s1)
 		ng |= sqn
 
-		s2[i] = -int32(fprRint(y[i]))
+		s2[i] = -int32(fprRint(latticeY[i]))
 	}
 
 	sqn |= -(ng >> 31)
