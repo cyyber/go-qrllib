@@ -23,9 +23,8 @@ type PrivateKey struct {
 }
 
 func (priv *PrivateKey) Bytes() []byte {
-	k := make([]byte, privateKeySize)
-	copy(k, priv.raw[:])
-	return k
+	k := priv.raw
+	return k[:]
 }
 
 func (priv *PrivateKey) PublicKey() []byte {
@@ -39,9 +38,8 @@ type PublicKey struct {
 }
 
 func (pub *PublicKey) Bytes() []byte {
-	k := make([]byte, publicKeySize)
-	copy(k, pub.raw[:])
-	return k
+	pk := pub.raw
+	return pk[:]
 }
 
 const privateKeyHeader byte = 0x50 + logN
@@ -86,12 +84,12 @@ func keygen(priv *PrivateKey, rng *sha3.SHAKE) (*PrivateKey, error) {
 			continue
 		}
 
-		h, ok := computePublic(f, g)
+		ntruF, ntruG, ok := solveNTRU(f, g)
 		if !ok {
 			continue
 		}
 
-		ntruF, ntruG, ok := solveNTRU(f, g)
+		h, ok := computePublic(f, g)
 		if !ok {
 			continue
 		}

@@ -529,7 +529,7 @@ var verifyRawKATs = []struct {
 	},
 }
 
-func TestVerifyRawReferenceKAT(t *testing.T) {
+func TestVerifyRaw(t *testing.T) {
 	pubBytes := mustDecodeHex(t, verifyRawKATPublicKeyHex)
 	pub, err := NewPublicKey(pubBytes)
 	if err != nil {
@@ -557,7 +557,7 @@ func TestVerifyRawReferenceKAT(t *testing.T) {
 	}
 }
 
-func TestNewPublicKeyReferenceKAT(t *testing.T) {
+func TestNewPublicKey(t *testing.T) {
 	// Derived from the Falcon reference implementation test_falcon.c
 	// ntru_pkey_1024 array.
 	// Source: https://falcon-sign.info/impl/test_falcon.c.html
@@ -576,7 +576,7 @@ func TestNewPublicKeyReferenceKAT(t *testing.T) {
 	}
 }
 
-func TestComputePublicReferenceKAT(t *testing.T) {
+func TestComputePublic(t *testing.T) {
 	// Derived from the Falcon reference implementation test_falcon.c
 	// ntru_f_1024, ntru_g_1024, and ntru_pkey_1024 arrays.
 	// Source: https://falcon-sign.info/impl/test_falcon.c.html
@@ -606,7 +606,7 @@ func TestComputePublicReferenceKAT(t *testing.T) {
 	}
 }
 
-func TestCompletePrivateReferenceKAT(t *testing.T) {
+func TestCompletePrivate(t *testing.T) {
 	// Derived from the Falcon reference implementation test_falcon.c
 	// ntru_f_1024, ntru_g_1024, ntru_F_1024, and ntru_G_1024 arrays.
 	// Source: https://falcon-sign.info/impl/test_falcon.c.html
@@ -624,7 +624,7 @@ func TestCompletePrivateReferenceKAT(t *testing.T) {
 	}
 }
 
-func TestNewPrivateKeyReferencePolynomials(t *testing.T) {
+func TestNewPrivateKey(t *testing.T) {
 	// test_falcon.c publishes component private-key polynomials, not a
 	// serialized secret key. Use those reference polynomials to check that
 	// private-key reconstruction produces the reference public key.
@@ -647,7 +647,7 @@ func TestNewPrivateKeyReferencePolynomials(t *testing.T) {
 	}
 }
 
-func TestSignTreeReferenceKeySelf(t *testing.T) {
+func TestSignTree(t *testing.T) {
 	// Derived from the Falcon reference implementation test_falcon.c
 	// ntru_f_1024, ntru_g_1024, ntru_F_1024, ntru_G_1024, and
 	// ntru_pkey_1024 arrays. The reference publishes the key components, not
@@ -711,7 +711,7 @@ func TestSignTreeReferenceKeySelf(t *testing.T) {
 	}
 }
 
-func TestNewSignatureReferenceRawS2KATs(t *testing.T) {
+func TestNewSignature(t *testing.T) {
 	// The s2 vectors are decoded from the Falcon reference implementation
 	// KAT_SIG_1024 raw verify vectors. Those raw vectors use a 32-byte hash
 	// seed, not the 40-byte nonce carried by padded Falcon signatures, so the
