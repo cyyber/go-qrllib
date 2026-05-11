@@ -144,25 +144,20 @@ func expandPrivateKey(priv *PrivateKey, f, g, ntruF, ntruG smallPolynomial) {
 
 	var g00, g01, g11, tmp fftPolynomial
 
-	copy(g00[:], priv.b00[:])
-	g00 = fftMulSelfAdj(g00)
-	copy(tmp[:], priv.b01[:])
-	tmp = fftMulSelfAdj(tmp)
+	g00 = fftMulSelfAdj(priv.b00)
+	tmp = fftMulSelfAdj(priv.b01)
 	g00 = polyAdd(g00, tmp)
 
-	copy(g01[:], priv.b00[:])
-	fftMulAdj(g01[:], g01[:], priv.b10[:], logN)
-	fftMulAdj(tmp[:], priv.b01[:], priv.b11[:], logN)
+	g01 = fftMulAdj(priv.b00, priv.b10)
+	tmp = fftMulAdj(priv.b01, priv.b11)
 	g01 = polyAdd(g01, tmp)
 
-	copy(g11[:], priv.b10[:])
-	g11 = fftMulSelfAdj(g11)
-	copy(tmp[:], priv.b11[:])
-	tmp = fftMulSelfAdj(tmp)
+	g11 = fftMulSelfAdj(priv.b10)
+	tmp = fftMulSelfAdj(priv.b11)
 	g11 = polyAdd(g11, tmp)
 
-	var ldlScratch [3 * n]fpr
-	ffLDLFFT(priv.tree[:], g00, g01, g11, logN, ldlScratch[:])
+	var ffLDLScratch [3 * n]fpr
+	ffLDLFFT(priv.tree[:], g00, g01, g11, logN, ffLDLScratch[:])
 	ffLDLBinaryNormalize(priv.tree[:], logN, logN)
 }
 

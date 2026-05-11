@@ -568,6 +568,11 @@ func fftMulSelfAdj(a fftPolynomial) (p fftPolynomial) {
 	return p
 }
 
+func fftMulAdj(a, b fftPolynomial) (p fftPolynomial) {
+	fftMulAdjSlice(p[:], a[:], b[:], logN)
+	return p
+}
+
 func fftSlice(f []fpr, logn int) {
 	if logn == 0 {
 		return
@@ -665,7 +670,7 @@ func fftMulSlice(a, b []fpr, logn int) {
 	}
 }
 
-func fftMulAdj(dst, a, b []fpr, logn int) {
+func fftMulAdjSlice(dst, a, b []fpr, logn int) {
 	hn := 1 << (logn - 1)
 	for i := range hn {
 		aRe := a[i]
