@@ -10,9 +10,9 @@ const (
 	n                  = 1024
 	logN               = 10
 	q                  = 12289
-	qNegInv            = 12287 // -q^-1 mod 2^16
-	r2                 = 10952 // 2^32 mod q
-	nInverseMontgomery = 64    // n^-1 * 2^16 mod q
+	qNegInv            = 12287
+	r2                 = 10952
+	nInverseMontgomery = 64
 )
 
 // encodingSize14 is the byte size of a ringElement encoded with 14-bit coefficients.

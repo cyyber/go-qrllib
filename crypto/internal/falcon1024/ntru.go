@@ -11,17 +11,16 @@ func solveNTRU(f, g smallPolynomial) (ntruF, ntruG smallPolynomial, ok bool) {
 		return smallPolynomial{}, smallPolynomial{}, false
 	}
 
-	depth := logN
-	for depth > 2 {
+	for depth := logN; depth > 2; {
 		depth--
-		if !solveNTRUIntermediate(f, g, depth, &wk) {
+		if !solveNTRUIntermediate(f, g, depth, wk) {
 			return smallPolynomial{}, smallPolynomial{}, false
 		}
 	}
-	if !solveNTRUBinaryDepth1(f, g, &wk) {
+	if !solveNTRUBinaryDepth1(f, g, wk) {
 		return smallPolynomial{}, smallPolynomial{}, false
 	}
-	if !solveNTRUBinaryDepth0(f, g, &wk) {
+	if !solveNTRUBinaryDepth0(f, g, wk) {
 		return smallPolynomial{}, smallPolynomial{}, false
 	}
 
@@ -39,11 +38,15 @@ func solveNTRU(f, g smallPolynomial) (ntruF, ntruG smallPolynomial, ok bool) {
 	return ntruF, ntruG, true
 }
 
+// Scratch lengths are implementation workspace capacities derived from the Go
+// NTRU scratch slicing below, not Falcon parameters. Revalidate them if any
+// NTRU stage changes its scratch layout.
 const (
-	ntruScratchLen    = 7 * n
-	makeFGScratchLen  = 6 * n
-	ntruU32ScratchLen = 16 * n
-	ntruFPRScratchLen = 8 * n
+	ntruScratchLen             = 7 * n
+	makeFGScratchLen           = 6 * n
+	polySubScaledNTTScratchLen = 1536
+	ntruU32ScratchLen          = 16 * n
+	ntruFPRScratchLen          = 8 * n
 )
 
 // ntruWorkspace mirrors the Falcon reference tmp scratch model, but keeps
@@ -57,11 +60,11 @@ type ntruWorkspace struct {
 	i32       []int32
 }
 
-func newNTRUWorkspace() ntruWorkspace {
-	return ntruWorkspace{
+func newNTRUWorkspace() *ntruWorkspace {
+	return &ntruWorkspace{
 		tmp:       make([]uint32, ntruScratchLen),
 		fgData:    make([]uint32, makeFGScratchLen),
-		scaledNTT: make([]uint32, polySubScaledNTTWorkspaceLen()),
+		scaledNTT: make([]uint32, polySubScaledNTTScratchLen),
 		u32:       make([]uint32, ntruU32ScratchLen),
 		fpr:       make([]fpr, ntruFPRScratchLen),
 		i32:       make([]int32, n),
@@ -102,22 +105,6 @@ func (s *fprScratch) take(size int) []fpr {
 	out := s.buf[s.off : s.off+size]
 	s.off += size
 	return out
-}
-
-const depthIntFG = 4
-
-func polySubScaledNTTWorkspaceLen() int {
-	maxWords := 0
-	for depth := 2; depth <= depthIntFG; depth++ {
-		logn := logN - depth
-		nn := 1 << logn
-		tlen := maxBlSmall[depth] + 1
-		words := nn * (tlen + 3)
-		if words > maxWords {
-			maxWords = words
-		}
-	}
-	return maxWords
 }
 
 func checkNTRUEquation(f, g, ntruF, ntruG smallPolynomial, scratch []uint32) bool {
@@ -389,6 +376,8 @@ func polySubScaledNTT(F []uint32, Flen, Fstride int, f []uint32, flen, fstride i
 		zintSubScaled(F[u*Fstride:u*Fstride+Flen], fk[u*tlen:u*tlen+tlen], sch, scl)
 	}
 }
+
+const depthIntFG = 4
 
 func solveNTRUIntermediate(f, g smallPolynomial, depth int, wk *ntruWorkspace) bool {
 	logn := logN - depth
