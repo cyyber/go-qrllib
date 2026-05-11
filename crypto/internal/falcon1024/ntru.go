@@ -382,8 +382,8 @@ func polySubScaledNTT(F []uint32, Flen, Fstride int, f []uint32, flen, fstride i
 
 func solveNTRUIntermediate(f, g smallPolynomial, depth int, wk *ntruWorkspace) bool {
 	logn := logN - depth
-	nn := 1 << logn
-	hn := nn >> 1
+	n := 1 << logn
+	hn := n >> 1
 
 	slen := maxBlSmall[depth]
 	dlen := maxBlSmall[depth+1]
@@ -394,8 +394,8 @@ func solveNTRUIntermediate(f, g smallPolynomial, depth int, wk *ntruWorkspace) b
 
 	ft, gt := makeFGPair(f, g, depth, true)
 
-	Ft := make([]uint32, nn*llen)
-	Gt := make([]uint32, nn*llen)
+	Ft := make([]uint32, n*llen)
+	Gt := make([]uint32, n*llen)
 
 	if !liftNTRUSolution(Ft, Gt, Fd, Gd, ft, gt, logn, slen, dlen, llen) {
 		return false
@@ -404,29 +404,29 @@ func solveNTRUIntermediate(f, g smallPolynomial, depth int, wk *ntruWorkspace) b
 	if !reduceNTRUSolution(Ft, Gt, ft, gt, depth, logn, slen, llen) {
 		return false
 	}
-	writeReducedNTRUSolution(wk.state, Ft, Gt, nn, slen, llen)
+	writeReducedNTRUSolution(wk.state, Ft, Gt, n, slen, llen)
 	return true
 }
 
 func makeFGPair(f, g smallPolynomial, depth int, outNTT bool) (ft, gt []uint32) {
 	logn := logN - depth
-	nn := 1 << logn
+	n := 1 << logn
 	slen := maxBlSmall[depth]
 
 	data := make([]uint32, makeFGScratchLen)
 	makeFG(data, f, g, depth, outNTT)
 
-	return slices.Clone(data[:nn*slen]), slices.Clone(data[nn*slen : 2*nn*slen])
+	return slices.Clone(data[:n*slen]), slices.Clone(data[n*slen : 2*n*slen])
 }
 
 func liftNTRUSolution(Ft, Gt, Fd, Gd, ft, gt []uint32, logn, slen, dlen, llen int) bool {
-	nn := 1 << logn
-	hn := nn >> 1
+	n := 1 << logn
+	hn := n >> 1
 
-	gm := make([]uint32, nn)
-	igm := make([]uint32, nn)
-	fx := make([]uint32, nn)
-	gx := make([]uint32, nn)
+	gm := make([]uint32, n)
+	igm := make([]uint32, n)
+	fx := make([]uint32, n)
+	gx := make([]uint32, n)
 	Fp := make([]uint32, hn)
 	Gp := make([]uint32, hn)
 	crtScratch := make([]uint32, max(llen, slen))
@@ -449,12 +449,12 @@ func liftNTRUSolution(Ft, Gt, Fd, Gd, ft, gt []uint32, logn, slen, dlen, llen in
 		modPMkgm2(gm, igm, logn, primes[u].g, p, p0i)
 
 		if u == slen {
-			zintRebuildCRT(ft, slen, slen, nn, primes[:], true, crtScratch[:slen])
-			zintRebuildCRT(gt, slen, slen, nn, primes[:], true, crtScratch[:slen])
+			zintRebuildCRT(ft, slen, slen, n, primes[:], true, crtScratch[:slen])
+			zintRebuildCRT(gt, slen, slen, n, primes[:], true, crtScratch[:slen])
 		}
 
 		if u < slen {
-			for v := range nn {
+			for v := range n {
 				fx[v] = ft[v*slen+u]
 				gx[v] = gt[v*slen+u]
 			}
@@ -462,7 +462,7 @@ func liftNTRUSolution(Ft, Gt, Fd, Gd, ft, gt []uint32, logn, slen, dlen, llen in
 			modPINTT2Ext(gt[u:], slen, logn, igm, p, p0i)
 		} else {
 			rx := modPRx(slen, p, p0i, r2)
-			for v := range nn {
+			for v := range n {
 				fx[v] = zintModSmallSigned(ft[v*slen:v*slen+slen], p, p0i, r2, rx)
 				gx[v] = zintModSmallSigned(gt[v*slen:v*slen+slen], p, p0i, r2, rx)
 			}
@@ -492,22 +492,22 @@ func liftNTRUSolution(Ft, Gt, Fd, Gd, ft, gt []uint32, logn, slen, dlen, llen in
 		modPINTT2Ext(Gt[u:], llen, logn, igm, p, p0i)
 	}
 
-	zintRebuildCRT(Ft, llen, llen, nn, primes[:], true, crtScratch[:llen])
-	zintRebuildCRT(Gt, llen, llen, nn, primes[:], true, crtScratch[:llen])
+	zintRebuildCRT(Ft, llen, llen, n, primes[:], true, crtScratch[:llen])
+	zintRebuildCRT(Gt, llen, llen, n, primes[:], true, crtScratch[:llen])
 	return true
 }
 
 const depthIntFG = 4
 
 func reduceNTRUSolution(Ft, Gt, ft, gt []uint32, depth, logn, slen, llen int) bool {
-	nn := 1 << logn
+	n := 1 << logn
 
-	rt1 := make([]fpr, nn)
-	rt2 := make([]fpr, nn)
-	rt3 := make([]fpr, nn)
-	rt4 := make([]fpr, nn)
-	rt5 := make([]fpr, nn>>1)
-	k := make([]int32, nn)
+	rt1 := make([]fpr, n)
+	rt2 := make([]fpr, n)
+	rt3 := make([]fpr, n)
+	rt4 := make([]fpr, n)
+	rt5 := make([]fpr, n>>1)
+	k := make([]int32, n)
 	scaledNTT := make([]uint32, polySubScaledNTTScratchLen)
 
 	rlen := min(slen, 10)
@@ -544,7 +544,7 @@ func reduceNTRUSolution(Ft, Gt, ft, gt []uint32, depth, logn, slen, llen int) bo
 
 		scaleCorrection := scaleK - scaleFGSolution + scaleFGBase
 		pdc := fpr(math.Ldexp(1, -scaleCorrection))
-		for i := range nn {
+		for i := range n {
 			x := rt2[i] * pdc
 			if !(-2147483647.0 < x) || !(x < 2147483647.0) {
 				return false
@@ -580,7 +580,7 @@ func reduceNTRUSolution(Ft, Gt, ft, gt []uint32, depth, logn, slen, llen int) bo
 	}
 
 	if FGlen < slen {
-		for i := range nn {
+		for i := range n {
 			Fw := -(Ft[i*llen+FGlen-1] >> 30) >> 1
 			Gw := -(Gt[i*llen+FGlen-1] >> 30) >> 1
 			for j := FGlen; j < slen; j++ {
@@ -592,10 +592,10 @@ func reduceNTRUSolution(Ft, Gt, ft, gt []uint32, depth, logn, slen, llen int) bo
 	return true
 }
 
-func writeReducedNTRUSolution(tmp, Ft, Gt []uint32, nn, slen, llen int) {
-	for i := range nn {
+func writeReducedNTRUSolution(tmp, Ft, Gt []uint32, n, slen, llen int) {
+	for i := range n {
 		copy(tmp[i*slen:(i+1)*slen], Ft[i*llen:i*llen+slen])
-		copy(tmp[(nn+i)*slen:(nn+i+1)*slen], Gt[i*llen:i*llen+slen])
+		copy(tmp[(n+i)*slen:(n+i+1)*slen], Gt[i*llen:i*llen+slen])
 	}
 }
 
