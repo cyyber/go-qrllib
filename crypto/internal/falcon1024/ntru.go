@@ -1,9 +1,6 @@
 package falcon1024
 
-import (
-	"math"
-	"slices"
-)
+import "math"
 
 const ntruCoeffBound = 127
 
@@ -50,21 +47,46 @@ const (
 	polySubScaledNTTScratchLen = 1536
 	ntruU32ScratchLen          = 16 * n
 	ntruFPRScratchLen          = 8 * n
+
+	// Sizes below are the maximum buffers solveNTRUIntermediate / its lift &
+	// reduce helpers need across the depths they actually run at (2..logN-1).
+	// Each comment annotates which depth saturates the maximum.
+	ntruInterFdGdMax = 256  // max(dlen*hn) at depth 2 and 3 (tied)
+	ntruInterFtGtMax = 1280 // max(n*llen)  at depth 2
+	ntruInterNMax    = 256  // max n         at depth 2
 )
 
 // ntruWorkspace mirrors the Falcon reference tmp scratch model, but keeps
-// uint32 and fpr scratch storage separate for Go type safety.
+// uint32 and fpr scratch storage separate for Go type safety. All buffers are
+// owned by the workspace so per-keygen helpers can borrow slices without
+// allocating.
 type ntruWorkspace struct {
 	state   []uint32 // persistent NTRU solution/state across stages
-	scratch []uint32 // temporary uint32 workspace
-	fpr     []fpr
+	scratch []uint32 // generic uint32 scratch (newUint32Scratch consumers)
+	fpr     []fpr    // generic fpr scratch    (newFPRScratch consumers)
+
+	// makeFGPair scratch + result region.
+	makeFGScratch []uint32 // 6*N, used by makeFG and the ft/gt slices it leaves behind
+
+	// solveNTRUIntermediate persistent buffers (must outlive lift+reduce calls).
+	Fd, Gd []uint32 // dlen*hn snapshot of wk.state from the previous depth
+	Ft, Gt []uint32 // n*llen lifted solution
+
+	// reduceNTRUSolution k buffer (int32, separate from wk.scratch).
+	k []int32
 }
 
 func newNTRUWorkspace() *ntruWorkspace {
 	return &ntruWorkspace{
-		state:   make([]uint32, ntruScratchLen),
-		scratch: make([]uint32, ntruU32ScratchLen),
-		fpr:     make([]fpr, ntruFPRScratchLen),
+		state:         make([]uint32, ntruScratchLen),
+		scratch:       make([]uint32, ntruU32ScratchLen),
+		fpr:           make([]fpr, ntruFPRScratchLen),
+		makeFGScratch: make([]uint32, makeFGScratchLen),
+		Fd:            make([]uint32, ntruInterFdGdMax),
+		Gd:            make([]uint32, ntruInterFdGdMax),
+		Ft:            make([]uint32, ntruInterFtGtMax),
+		Gt:            make([]uint32, ntruInterFtGtMax),
+		k:             make([]int32, ntruInterNMax),
 	}
 }
 
@@ -389,47 +411,55 @@ func solveNTRUIntermediate(f, g smallPolynomial, depth int, wk *ntruWorkspace) b
 	dlen := maxBlSmall[depth+1]
 	llen := maxBlLarge[depth]
 
-	Fd := slices.Clone(wk.state[:dlen*hn])
-	Gd := slices.Clone(wk.state[dlen*hn : 2*dlen*hn])
+	// Snapshot the previous depth's solution out of wk.state before lift /
+	// reduce overwrites it.
+	Fd := wk.Fd[:dlen*hn]
+	Gd := wk.Gd[:dlen*hn]
+	copy(Fd, wk.state[:dlen*hn])
+	copy(Gd, wk.state[dlen*hn:2*dlen*hn])
 
-	ft, gt := makeFGPair(f, g, depth, true)
+	ft, gt := makeFGPair(wk, f, g, depth)
 
-	Ft := make([]uint32, n*llen)
-	Gt := make([]uint32, n*llen)
+	Ft := wk.Ft[:n*llen]
+	Gt := wk.Gt[:n*llen]
 
-	if !liftNTRUSolution(Ft, Gt, Fd, Gd, ft, gt, logn, slen, dlen, llen) {
+	if !liftNTRUSolution(wk, Ft, Gt, Fd, Gd, ft, gt, logn, slen, dlen, llen) {
 		return false
 	}
 
-	if !reduceNTRUSolution(Ft, Gt, ft, gt, depth, logn, slen, llen) {
+	if !reduceNTRUSolution(wk, Ft, Gt, ft, gt, depth, logn, slen, llen) {
 		return false
 	}
 	writeReducedNTRUSolution(wk.state, Ft, Gt, n, slen, llen)
 	return true
 }
 
-func makeFGPair(f, g smallPolynomial, depth int, outNTT bool) (ft, gt []uint32) {
+// makeFGPair returns ft / gt slices into wk.makeFGScratch. The slices are
+// valid until wk.makeFGScratch is reused (i.e. until the next makeFGPair call
+// inside this solveNTRU pass), which the caller controls.
+func makeFGPair(wk *ntruWorkspace, f, g smallPolynomial, depth int) (ft, gt []uint32) {
 	logn := logN - depth
 	n := 1 << logn
 	slen := maxBlSmall[depth]
 
-	data := make([]uint32, makeFGScratchLen)
-	makeFG(data, f, g, depth, outNTT)
+	data := wk.makeFGScratch[:makeFGScratchLen]
+	makeFG(data, f, g, depth, true)
 
-	return slices.Clone(data[:n*slen]), slices.Clone(data[n*slen : 2*n*slen])
+	return data[:n*slen], data[n*slen : 2*n*slen]
 }
 
-func liftNTRUSolution(Ft, Gt, Fd, Gd, ft, gt []uint32, logn, slen, dlen, llen int) bool {
+func liftNTRUSolution(wk *ntruWorkspace, Ft, Gt, Fd, Gd, ft, gt []uint32, logn, slen, dlen, llen int) bool {
 	n := 1 << logn
 	hn := n >> 1
 
-	gm := make([]uint32, n)
-	igm := make([]uint32, n)
-	fx := make([]uint32, n)
-	gx := make([]uint32, n)
-	Fp := make([]uint32, hn)
-	Gp := make([]uint32, hn)
-	crtScratch := make([]uint32, max(llen, slen))
+	u32s := newUint32Scratch(wk.scratch)
+	gm := u32s.take(n)
+	igm := u32s.take(n)
+	fx := u32s.take(n)
+	gx := u32s.take(n)
+	Fp := u32s.take(hn)
+	Gp := u32s.take(hn)
+	crtScratch := u32s.take(max(llen, slen))
 
 	for u := range llen {
 		p := primes[u].p
@@ -499,16 +529,20 @@ func liftNTRUSolution(Ft, Gt, Fd, Gd, ft, gt []uint32, logn, slen, dlen, llen in
 
 const depthIntFG = 4
 
-func reduceNTRUSolution(Ft, Gt, ft, gt []uint32, depth, logn, slen, llen int) bool {
+func reduceNTRUSolution(wk *ntruWorkspace, Ft, Gt, ft, gt []uint32, depth, logn, slen, llen int) bool {
 	n := 1 << logn
 
-	rt1 := make([]fpr, n)
-	rt2 := make([]fpr, n)
-	rt3 := make([]fpr, n)
-	rt4 := make([]fpr, n)
-	rt5 := make([]fpr, n>>1)
-	k := make([]int32, n)
-	scaledNTT := make([]uint32, polySubScaledNTTScratchLen)
+	fprs := newFPRScratch(wk.fpr)
+	rt1 := fprs.take(n)
+	rt2 := fprs.take(n)
+	rt3 := fprs.take(n)
+	rt4 := fprs.take(n)
+	rt5 := fprs.take(n >> 1)
+
+	u32s := newUint32Scratch(wk.scratch)
+	scaledNTT := u32s.take(polySubScaledNTTScratchLen)
+
+	k := wk.k[:n]
 
 	rlen := min(slen, 10)
 	polyBigToFP(rt3, ft[slen-rlen:], rlen, slen, logn)
