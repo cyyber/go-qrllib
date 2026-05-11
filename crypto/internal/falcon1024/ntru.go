@@ -1,13 +1,16 @@
 package falcon1024
 
-import "math"
+import (
+	"math"
+	"slices"
+)
 
 const ntruCoeffBound = 127
 
 func solveNTRU(f, g smallPolynomial) (ntruF, ntruG smallPolynomial, ok bool) {
 	wk := newNTRUWorkspace()
 
-	if !solveNTRUDeepest(f, g, wk.tmp) {
+	if !solveNTRUDeepest(f, g, wk.state) {
 		return smallPolynomial{}, smallPolynomial{}, false
 	}
 
@@ -24,15 +27,15 @@ func solveNTRU(f, g smallPolynomial) (ntruF, ntruG smallPolynomial, ok bool) {
 		return smallPolynomial{}, smallPolynomial{}, false
 	}
 
-	ntruF, ok = polyBigToSmall(wk.tmp[:n], ntruCoeffBound)
+	ntruF, ok = polyBigToSmall(wk.state[:n], ntruCoeffBound)
 	if !ok {
 		return smallPolynomial{}, smallPolynomial{}, false
 	}
-	ntruG, ok = polyBigToSmall(wk.tmp[n:2*n], ntruCoeffBound)
+	ntruG, ok = polyBigToSmall(wk.state[n:2*n], ntruCoeffBound)
 	if !ok {
 		return smallPolynomial{}, smallPolynomial{}, false
 	}
-	if !checkNTRUEquation(f, g, ntruF, ntruG, wk.u32) {
+	if !checkNTRUEquation(f, g, ntruF, ntruG, wk.scratch) {
 		return smallPolynomial{}, smallPolynomial{}, false
 	}
 	return ntruF, ntruG, true
@@ -50,24 +53,18 @@ const (
 )
 
 // ntruWorkspace mirrors the Falcon reference tmp scratch model, but keeps
-// uint32, fpr, and int32 scratch storage separate for Go type safety.
+// uint32 and fpr scratch storage separate for Go type safety.
 type ntruWorkspace struct {
-	tmp       []uint32
-	fgData    []uint32
-	scaledNTT []uint32
-	u32       []uint32
-	fpr       []fpr
-	i32       []int32
+	state   []uint32 // persistent NTRU solution/state across stages
+	scratch []uint32 // temporary uint32 workspace
+	fpr     []fpr
 }
 
 func newNTRUWorkspace() *ntruWorkspace {
 	return &ntruWorkspace{
-		tmp:       make([]uint32, ntruScratchLen),
-		fgData:    make([]uint32, makeFGScratchLen),
-		scaledNTT: make([]uint32, polySubScaledNTTScratchLen),
-		u32:       make([]uint32, ntruU32ScratchLen),
-		fpr:       make([]fpr, ntruFPRScratchLen),
-		i32:       make([]int32, n),
+		state:   make([]uint32, ntruScratchLen),
+		scratch: make([]uint32, ntruU32ScratchLen),
+		fpr:     make([]fpr, ntruFPRScratchLen),
 	}
 }
 
@@ -272,22 +269,22 @@ func makeFGStep(data []uint32, logn, depth int, inNTT, outNTT bool) {
 func solveNTRUDeepest(f, g smallPolynomial, tmp []uint32) bool {
 	wordLen := maxBlSmall[logN]
 
-	ntruF := tmp[:wordLen]
-	ntruG := tmp[wordLen : 2*wordLen]
+	Fp := tmp[:wordLen]
+	Gp := tmp[wordLen : 2*wordLen]
 
 	resultants := tmp[2*wordLen:]
-	resultantF := resultants[:wordLen]
-	resultantG := resultants[wordLen : 2*wordLen]
+	fp := resultants[:wordLen]
+	gp := resultants[wordLen : 2*wordLen]
 	scratch := tmp[4*wordLen:]
 
 	makeFG(resultants, f, g, logN, false)
 	zintRebuildCRT(resultants, wordLen, wordLen, 2, primes[:], false, scratch)
 
-	if !zintBezout(ntruG, ntruF, resultantF, resultantG, scratch) {
+	if !zintBezout(Gp, Fp, fp, gp, scratch) {
 		return false
 	}
 
-	if zintMulSmall(ntruF, q) != 0 || zintMulSmall(ntruG, q) != 0 {
+	if zintMulSmall(Fp, q) != 0 || zintMulSmall(Gp, q) != 0 {
 		return false
 	}
 
@@ -383,36 +380,57 @@ func polySubScaledNTT(F []uint32, Flen, Fstride int, f []uint32, flen, fstride i
 	}
 }
 
-const depthIntFG = 4
-
 func solveNTRUIntermediate(f, g smallPolynomial, depth int, wk *ntruWorkspace) bool {
 	logn := logN - depth
 	nn := 1 << logn
 	hn := nn >> 1
+
 	slen := maxBlSmall[depth]
 	dlen := maxBlSmall[depth+1]
 	llen := maxBlLarge[depth]
 
-	tmp := wk.tmp
-	u32s := newUint32Scratch(wk.u32)
-	fprs := newFPRScratch(wk.fpr)
+	Fd := slices.Clone(wk.state[:dlen*hn])
+	Gd := slices.Clone(wk.state[dlen*hn : 2*dlen*hn])
 
-	Fd := u32s.takeCopy(tmp[:dlen*hn])
-	Gd := u32s.takeCopy(tmp[dlen*hn : 2*dlen*hn])
+	ft, gt := makeFGPair(f, g, depth, true)
 
-	makeFG(wk.fgData, f, g, depth, true)
-	ft := u32s.takeCopy(wk.fgData[:nn*slen])
-	gt := u32s.takeCopy(wk.fgData[nn*slen : 2*nn*slen])
+	Ft := make([]uint32, nn*llen)
+	Gt := make([]uint32, nn*llen)
 
-	Ft := u32s.take(nn * llen)
-	Gt := u32s.take(nn * llen)
-	gm := u32s.take(nn)
-	igm := u32s.take(nn)
-	fx := u32s.take(nn)
-	gx := u32s.take(nn)
-	Fp := u32s.take(hn)
-	Gp := u32s.take(hn)
-	crtScratch := u32s.take(max(llen, slen))
+	if !liftNTRUSolution(Ft, Gt, Fd, Gd, ft, gt, logn, slen, dlen, llen) {
+		return false
+	}
+
+	if !reduceNTRUSolution(Ft, Gt, ft, gt, depth, logn, slen, llen) {
+		return false
+	}
+	writeReducedNTRUSolution(wk.state, Ft, Gt, nn, slen, llen)
+	return true
+}
+
+func makeFGPair(f, g smallPolynomial, depth int, outNTT bool) (ft, gt []uint32) {
+	logn := logN - depth
+	nn := 1 << logn
+	slen := maxBlSmall[depth]
+
+	data := make([]uint32, makeFGScratchLen)
+	makeFG(data, f, g, depth, outNTT)
+
+	return slices.Clone(data[:nn*slen]), slices.Clone(data[nn*slen : 2*nn*slen])
+}
+
+func liftNTRUSolution(Ft, Gt, Fd, Gd, ft, gt []uint32, logn, slen, dlen, llen int) bool {
+	nn := 1 << logn
+	hn := nn >> 1
+
+	gm := make([]uint32, nn)
+	igm := make([]uint32, nn)
+	fx := make([]uint32, nn)
+	gx := make([]uint32, nn)
+	Fp := make([]uint32, hn)
+	Gp := make([]uint32, hn)
+	crtScratch := make([]uint32, max(llen, slen))
+
 	for u := range llen {
 		p := primes[u].p
 		p0i := modPNInv31(p)
@@ -423,6 +441,7 @@ func solveNTRUIntermediate(f, g smallPolynomial, depth int, wk *ntruWorkspace) b
 			Gt[v*llen+u] = zintModSmallSigned(Gd[v*dlen:v*dlen+dlen], p, p0i, r2, rx)
 		}
 	}
+
 	for u := range llen {
 		p := primes[u].p
 		p0i := modPNInv31(p)
@@ -475,16 +494,23 @@ func solveNTRUIntermediate(f, g smallPolynomial, depth int, wk *ntruWorkspace) b
 
 	zintRebuildCRT(Ft, llen, llen, nn, primes[:], true, crtScratch[:llen])
 	zintRebuildCRT(Gt, llen, llen, nn, primes[:], true, crtScratch[:llen])
+	return true
+}
 
-	rlen := slen
-	if rlen > 10 {
-		rlen = 10
-	}
-	rt1 := fprs.take(nn)
-	rt2 := fprs.take(nn)
-	rt3 := fprs.take(nn)
-	rt4 := fprs.take(nn)
-	rt5 := fprs.take(nn >> 1)
+const depthIntFG = 4
+
+func reduceNTRUSolution(Ft, Gt, ft, gt []uint32, depth, logn, slen, llen int) bool {
+	nn := 1 << logn
+
+	rt1 := make([]fpr, nn)
+	rt2 := make([]fpr, nn)
+	rt3 := make([]fpr, nn)
+	rt4 := make([]fpr, nn)
+	rt5 := make([]fpr, nn>>1)
+	k := make([]int32, nn)
+	scaledNTT := make([]uint32, polySubScaledNTTScratchLen)
+
+	rlen := min(slen, 10)
 	polyBigToFP(rt3, ft[slen-rlen:], rlen, slen, logn)
 	polyBigToFP(rt4, gt[slen-rlen:], rlen, slen, logn)
 	scaleFGBase := 31 * (slen - rlen)
@@ -501,13 +527,9 @@ func solveNTRUIntermediate(f, g smallPolynomial, depth int, wk *ntruWorkspace) b
 	FGlen := llen
 	maxBitsFGSolution := 31 * llen
 	scaleK := maxBitsFGSolution - minBitsFG
-	k := wk.i32[:nn]
 
 	for {
-		rlen = FGlen
-		if rlen > 10 {
-			rlen = 10
-		}
+		rlen = min(FGlen, 10)
 		scaleFGSolution := 31 * (FGlen - rlen)
 		polyBigToFP(rt1, Ft[FGlen-rlen:], rlen, llen, logn)
 		polyBigToFP(rt2, Gt[FGlen-rlen:], rlen, llen, logn)
@@ -533,8 +555,8 @@ func solveNTRUIntermediate(f, g smallPolynomial, depth int, wk *ntruWorkspace) b
 		sch := uint32(scaleK / 31)
 		scl := uint32(scaleK % 31)
 		if depth <= depthIntFG {
-			polySubScaledNTT(Ft, FGlen, llen, ft, slen, slen, k, sch, scl, logn, wk.scaledNTT)
-			polySubScaledNTT(Gt, FGlen, llen, gt, slen, slen, k, sch, scl, logn, wk.scaledNTT)
+			polySubScaledNTT(Ft, FGlen, llen, ft, slen, slen, k, sch, scl, logn, scaledNTT)
+			polySubScaledNTT(Gt, FGlen, llen, gt, slen, slen, k, sch, scl, logn, scaledNTT)
 		} else {
 			polySubScaled(Ft, FGlen, llen, ft, slen, slen, k, sch, scl, logn)
 			polySubScaled(Gt, FGlen, llen, gt, slen, slen, k, sch, scl, logn)
@@ -567,11 +589,14 @@ func solveNTRUIntermediate(f, g smallPolynomial, depth int, wk *ntruWorkspace) b
 			}
 		}
 	}
+	return true
+}
+
+func writeReducedNTRUSolution(tmp, Ft, Gt []uint32, nn, slen, llen int) {
 	for i := range nn {
 		copy(tmp[i*slen:(i+1)*slen], Ft[i*llen:i*llen+slen])
 		copy(tmp[(nn+i)*slen:(nn+i+1)*slen], Gt[i*llen:i*llen+slen])
 	}
-	return true
 }
 
 func solveNTRUBinaryDepth0(f, g smallPolynomial, wk *ntruWorkspace) bool {
@@ -581,8 +606,8 @@ func solveNTRUBinaryDepth0(f, g smallPolynomial, wk *ntruWorkspace) bool {
 	p0i := modPNInv31(p)
 	r2 := modPR2(p, p0i)
 
-	tmp := wk.tmp
-	u32s := newUint32Scratch(wk.u32)
+	tmp := wk.state
+	u32s := newUint32Scratch(wk.scratch)
 	fprs := newFPRScratch(wk.fpr)
 
 	prevF := u32s.takeCopy(tmp[:hn])
@@ -709,8 +734,8 @@ func solveNTRUBinaryDepth1(f, g smallPolynomial, wk *ntruWorkspace) bool {
 	dlen := maxBlSmall[depth+1]
 	llen := maxBlLarge[depth]
 
-	tmp := wk.tmp
-	u32s := newUint32Scratch(wk.u32)
+	tmp := wk.state
+	u32s := newUint32Scratch(wk.scratch)
 	fprs := newFPRScratch(wk.fpr)
 
 	Fd := u32s.takeCopy(tmp[:dlen*hn])
