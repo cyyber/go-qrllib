@@ -214,6 +214,88 @@ func ffLDLTreeSize(logn int) int {
 	return (logn + 1) << logn
 }
 
+func ffLDLFFT(tree []fpr, g00, g01, g11 fftPolynomial, logn int, tmp []fpr) {
+	ffLDLFFTSlice(tree, g00[:], g01[:], g11[:], logn, tmp)
+}
+
+func ffLDLFFTSlice(tree, g00, g01, g11 []fpr, logn int, tmp []fpr) {
+	nn := 1 << logn
+	if nn == 1 {
+		tree[0] = g00[0]
+		return
+	}
+	if len(tmp) < 3*nn {
+		panic("falcon1024: short ffLDLFFT scratch")
+	}
+
+	hn := nn >> 1
+	d00 := tmp[:nn]
+	d11 := tmp[nn : 2*nn]
+	t := tmp[2*nn : 3*nn]
+
+	copy(d00, g00[:nn])
+	fftLDLMV(d11, tree[:nn], g00[:nn], g01[:nn], g11[:nn], logn)
+
+	splitFFTSlice(t[:hn], t[hn:nn], d00, logn)
+	splitFFTSlice(d00[:hn], d00[hn:nn], d11, logn)
+	copy(d11, t)
+
+	ffLDLFFTInner(tree[nn:], d11[:hn], d11[hn:nn], logn-1, t)
+	ffLDLFFTInner(tree[nn+ffLDLTreeSize(logn-1):], d00[:hn], d00[hn:nn], logn-1, t)
+}
+
+func ffLDLFFTInner(tree, g0, g1 []fpr, logn int, tmp []fpr) {
+	nn := 1 << logn
+	if nn == 1 {
+		tree[0] = g0[0]
+		return
+	}
+
+	hn := nn >> 1
+	fftLDLMV(tmp[:nn], tree[:nn], g0[:nn], g1[:nn], g0[:nn], logn)
+
+	splitFFTSlice(g1[:hn], g1[hn:nn], g0[:nn], logn)
+	splitFFTSlice(g0[:hn], g0[hn:nn], tmp[:nn], logn)
+
+	ffLDLFFTInner(tree[nn:], g1[:hn], g1[hn:nn], logn-1, tmp)
+	ffLDLFFTInner(tree[nn+ffLDLTreeSize(logn-1):], g0[:hn], g0[hn:nn], logn-1, tmp)
+}
+
+func fftLDLMV(d11, l10, g00, g01, g11 []fpr, logn int) {
+	hn := 1 << (logn - 1)
+	for i := range hn {
+		g00Re := g00[i]
+		g00Im := g00[i+hn]
+		g01Re := g01[i]
+		g01Im := g01[i+hn]
+		g11Re := g11[i]
+		g11Im := g11[i+hn]
+
+		den := g00Re*g00Re + g00Im*g00Im
+		muRe := (g01Re*g00Re + g01Im*g00Im) / den
+		muIm := (g01Im*g00Re - g01Re*g00Im) / den
+
+		xiRe := muRe*g01Re + muIm*g01Im
+		xiIm := muIm*g01Re - muRe*g01Im
+
+		d11[i] = g11Re - xiRe
+		d11[i+hn] = g11Im - xiIm
+		l10[i] = muRe
+		l10[i+hn] = -muIm
+	}
+}
+
+func ffLDLBinaryNormalize(tree []fpr, origLogn, logn int) {
+	nn := 1 << logn
+	if nn == 1 {
+		tree[0] = fpr(math.Sqrt(float64(tree[0]))) * falconInvSigma[origLogn]
+		return
+	}
+
+	ffLDLBinaryNormalize(tree[nn:], origLogn, logn-1)
+	ffLDLBinaryNormalize(tree[nn+ffLDLTreeSize(logn-1):], origLogn, logn-1)
+}
+
 func mulFFTSlice(a, b []fpr, logn int) {
 	hn := 1 << (logn - 1)
 	for u := range hn {
