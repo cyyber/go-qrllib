@@ -271,21 +271,27 @@ func makeFGStep(data []uint32, logn, depth int, inNTT, outNTT bool) {
 
 func solveNTRUDeepest(f, g smallPolynomial, tmp []uint32) bool {
 	wordLen := maxBlSmall[logN]
-	bigF := tmp[:wordLen]
-	bigG := tmp[wordLen : 2*wordLen]
-	fg := tmp[2*wordLen : 4*wordLen]
-	ff := fg[:wordLen]
-	gg := fg[wordLen : 2*wordLen]
+
+	ntruF := tmp[:wordLen]
+	ntruG := tmp[wordLen : 2*wordLen]
+
+	resultants := tmp[2*wordLen:]
+	resultantF := resultants[:wordLen]
+	resultantG := resultants[wordLen : 2*wordLen]
 	scratch := tmp[4*wordLen:]
 
-	makeFG(tmp[2*wordLen:], f, g, logN, false)
-	zintRebuildCRT(fg, wordLen, wordLen, 2, primes[:], false, scratch)
+	makeFG(resultants, f, g, logN, false)
+	zintRebuildCRT(resultants, wordLen, wordLen, 2, primes[:], false, scratch)
 
-	if !zintBezout(bigG, bigF, ff, gg, scratch) {
+	if !zintBezout(ntruG, ntruF, resultantF, resultantG, scratch) {
 		return false
 	}
 
-	return zintMulSmall(bigF, q) == 0 && zintMulSmall(bigG, q) == 0
+	if zintMulSmall(ntruF, q) != 0 || zintMulSmall(ntruG, q) != 0 {
+		return false
+	}
+
+	return true
 }
 
 func polyBigToFP(dst []fpr, src []uint32, wordLen, stride, logn int) {

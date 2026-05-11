@@ -7,8 +7,11 @@ import (
 )
 
 const (
+	// n is the Falcon-1024 polynomial degree.
 	n                  = 1024
+	// logN is log2(n), the Falcon degree parameter.
 	logN               = 10
+	// q is the Falcon field modulus.
 	q                  = 12289
 	qNegInv            = 12287
 	r2                 = 10952
