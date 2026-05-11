@@ -96,9 +96,7 @@ func keygen(priv *PrivateKey, rng *sha3.SHAKE) (*PrivateKey, error) {
 }
 
 func computePublic(f, g smallPolynomial) (ringElement, bool) {
-	var fModQ ringElement
-	var gModQ ringElement
-
+	var fModQ, gModQ ringElement
 	for i := range fModQ {
 		fModQ[i] = fieldFromSmall(f[i])
 		gModQ[i] = fieldFromSmall(g[i])
@@ -107,12 +105,30 @@ func computePublic(f, g smallPolynomial) (ringElement, bool) {
 	fNTT := ntt(fModQ)
 	hNTT := ntt(gModQ)
 
-	for i := range hNTT {
+	// Batch-invert fNTT with Montgomery's trick
+	var fMont, pMont [n]fieldElement
+	for i := range fNTT {
 		if fNTT[i] == 0 {
 			return ringElement{}, false
 		}
-		hNTT[i] = fieldDiv(hNTT[i], fNTT[i])
+		fMont[i] = fieldMontgomeryMul(fNTT[i], r2)
 	}
+	pMont[0] = fMont[0]
+	for i := 1; i < n; i++ {
+		pMont[i] = fieldMontgomeryMul(pMont[i-1], fMont[i])
+	}
+
+	// pMont[n-1] = Q*R. fieldInvMontgomery returns (1/input)*R, so this yields
+	// 1/Q in plain form; one more MontMul lifts it back into Montgomery form
+	// for the back-substitution.
+	invRunMont := fieldMontgomeryMul(fieldInvMontgomery(pMont[n-1]), r2)
+
+	for i := n - 1; i >= 1; i-- {
+		invMont := fieldMontgomeryMul(invRunMont, pMont[i-1]) // 1/fNTT[i] in Mont form
+		hNTT[i] = fieldMontgomeryMul(hNTT[i], invMont)        // h/f, back in plain form
+		invRunMont = fieldMontgomeryMul(invRunMont, fMont[i]) // shift to next prefix
+	}
+	hNTT[0] = fieldMontgomeryMul(hNTT[0], invRunMont)
 
 	return inverseNTT(hNTT), true
 }
@@ -207,12 +223,27 @@ func completePrivate(f, g, ntruF smallPolynomial) (smallPolynomial, bool) {
 
 	fNTT := ntt(fModQ)
 
-	for i := range gNTT {
+	// Batch-invert fNTT with Montgomery's trick
+	var fMont, pMont [n]fieldElement
+	for i := range fNTT {
 		if fNTT[i] == 0 {
 			return smallPolynomial{}, false
 		}
-		gNTT[i] = fieldDiv(gNTT[i], fNTT[i])
+		fMont[i] = fieldMontgomeryMul(fNTT[i], r2)
 	}
+	pMont[0] = fMont[0]
+	for i := 1; i < n; i++ {
+		pMont[i] = fieldMontgomeryMul(pMont[i-1], fMont[i])
+	}
+
+	invRunMont := fieldMontgomeryMul(fieldInvMontgomery(pMont[n-1]), r2)
+
+	for i := n - 1; i >= 1; i-- {
+		invMont := fieldMontgomeryMul(invRunMont, pMont[i-1]) // 1/fNTT[i] in Mont form
+		gNTT[i] = fieldMontgomeryMul(gNTT[i], invMont)        // (g·F)/f, back in plain form
+		invRunMont = fieldMontgomeryMul(invRunMont, fMont[i]) // shift to next prefix
+	}
+	gNTT[0] = fieldMontgomeryMul(gNTT[0], invRunMont)
 
 	ntruGModQ := inverseNTT(gNTT)
 
@@ -305,22 +336,22 @@ func signTreeAttempt(prng *samplerPRNG, priv *PrivateKey, c0 ringElement) (small
 	t0 = fftMul(t0, priv.b11)
 	t0 = fftMulConst(t0, fprInverseOfQ)
 
-	t0, t1 = ffSamplingFFT(prng, t0, t1, priv.tree[:], logN)
+	sampleX, sampleY := ffSamplingFFT(prng, t0, t1, priv.tree[:], logN)
 
 	var latticeX fftPolynomial
-	copy(latticeX[:], t0[:])
+	copy(latticeX[:], sampleX[:])
 	latticeX = fftMul(latticeX, priv.b00)
 
 	var tmp fftPolynomial
-	copy(tmp[:], t1[:])
+	copy(tmp[:], sampleY[:])
 	tmp = fftMul(tmp, priv.b10)
 	latticeX = polyAdd(latticeX, tmp)
 
 	var latticeY fftPolynomial
-	copy(latticeY[:], t0[:])
+	copy(latticeY[:], sampleX[:])
 	latticeY = fftMul(latticeY, priv.b01)
 
-	copy(tmp[:], t1[:])
+	copy(tmp[:], sampleY[:])
 	tmp = fftMul(tmp, priv.b11)
 	latticeY = polyAdd(latticeY, tmp)
 
@@ -348,10 +379,6 @@ func signTreeAttempt(prng *samplerPRNG, priv *PrivateKey, c0 ringElement) (small
 	return s2, true
 }
 
-func Verify(pub *PublicKey, message []byte, sig *Signature) error {
-	return verify(pub, message, sig)
-}
-
 const nonceSize = 40
 
 type Signature struct {
@@ -373,6 +400,10 @@ func newSignature(sig *Signature, sigBytes []byte) (*Signature, error) {
 	sig.s2 = s2
 
 	return sig, nil
+}
+
+func Verify(pub *PublicKey, message []byte, sig *Signature) error {
+	return verify(pub, message, sig)
 }
 
 func verify(pub *PublicKey, message []byte, sig *Signature) error {

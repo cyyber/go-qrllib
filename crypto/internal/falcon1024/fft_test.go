@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestSampleFFTPointReferenceKATs(t *testing.T) {
+func TestSampleFFTPoint(t *testing.T) {
 	// Derived from Supporting_Documentation/additional/
 	// test-vector-sampler-falcon1024.txt in the Falcon submission package.
 	// Source archive: https://falcon-sign.info/falcon-round3.zip

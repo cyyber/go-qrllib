@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/aes"
 	"crypto/sha1"
+	"crypto/sha256"
 	"crypto/sha3"
 	"encoding/hex"
 	"hash"
@@ -709,6 +710,123 @@ func TestSignTree(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSignTreeNISTKATVectors(t *testing.T) {
+	// These vectors are derived from the Falcon-1024 NIST KAT signing flow.
+	// TestGolden checks the full 100-case transcript against the Falcon
+	// reference digest; this test pins the internal signTree output for the
+	// first few cases.
+	// Source: https://falcon-sign.info/falcon-round3.zip
+	testCases := []struct {
+		name             string
+		count            int
+		compressedLength int
+		compressedSHA256 string
+	}{
+		{
+			name:             "count-0",
+			count:            0,
+			compressedLength: 1229,
+			compressedSHA256: "e944ab75f51ed934e189cd1042aa883dc480eb608a365f4a6aadbae03dbc819b",
+		},
+		{
+			name:             "count-1",
+			count:            1,
+			compressedLength: 1231,
+			compressedSHA256: "1a67ab5a86f7b59df1f866a1fed6ef608e24d62814aaf8ad71074ab559109586",
+		},
+		{
+			name:             "count-2",
+			count:            2,
+			compressedLength: 1231,
+			compressedSHA256: "af36b003fcb95100edb31e7e97858ac293e9340e712c22ba64675a7bd1c44c00",
+		},
+		{
+			name:             "count-3",
+			count:            3,
+			compressedLength: 1224,
+			compressedSHA256: "f508da9c7f05bb7dbc6f54cc05676876abf94dfd8b4d06e6020eaabd41f0284f",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			priv, c0, rng := nistKATSignTreeInput(t, tc.count)
+			s2 := signTree(rng, priv, c0)
+
+			pub, err := NewPublicKey(priv.PublicKey())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !verifyRaw(c0, s2, pub.h) {
+				t.Fatal("signTree output failed verifyRaw")
+			}
+
+			comp := make([]byte, nistKATOverheadSize-43)
+			written, err := compressedEncode(comp, s2)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if written != tc.compressedLength {
+				t.Fatalf("compressed length = %d, want %d", written, tc.compressedLength)
+			}
+			got := sha256.Sum256(comp[:written])
+			if got := hex.EncodeToString(got[:]); got != tc.compressedSHA256 {
+				t.Fatalf("compressed SHA-256 = %s, want %s", got, tc.compressedSHA256)
+			}
+		})
+	}
+}
+
+func nistKATSignTreeInput(t *testing.T, count int) (*PrivateKey, ringElement, *sha3.SHAKE) {
+	t.Helper()
+
+	var entropy [seedSize]byte
+	for i := range entropy {
+		entropy[i] = byte(i)
+	}
+
+	drbg := newNISTDRBG(entropy[:])
+	for i := range count + 1 {
+		var seed [seedSize]byte
+		drbg.read(seed[:])
+
+		msg := make([]byte, 33*(i+1))
+		drbg.read(msg)
+
+		state := drbg.save()
+		drbg = newNISTDRBG(seed[:])
+
+		var keySeed [seedSize]byte
+		drbg.read(keySeed[:])
+
+		priv, err := NewPrivateKeyFromSeed(keySeed[:])
+		if err != nil {
+			t.Fatalf("NewPrivateKeyFromSeed: %v", err)
+		}
+
+		var nonce [nonceSize]byte
+		drbg.read(nonce[:])
+
+		hashData := sha3.NewSHAKE256()
+		hashData.Write(nonce[:])
+		hashData.Write(msg)
+
+		c0 := hashToPoint(hashData)
+
+		var signSeed [seedSize]byte
+		drbg.read(signSeed[:])
+		rng := sha3.NewSHAKE256()
+		rng.Write(signSeed[:])
+
+		if i == count {
+			return priv, c0, rng
+		}
+		drbg.restore(state)
+	}
+
+	panic("unreachable")
 }
 
 func TestNewSignature(t *testing.T) {

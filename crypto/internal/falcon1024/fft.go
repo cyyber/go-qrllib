@@ -1,6 +1,9 @@
 package falcon1024
 
-import "math"
+import (
+	"math"
+	"math/bits"
+)
 
 const fprInverseOfQ fpr = 1.0 / q
 
@@ -170,25 +173,13 @@ func fprExpmP63(x, ccs fpr) uint64 {
 	y := c[0]
 	z := uint64(fprTrunc(x*falconPtwo63)) << 1
 	for _, ci := range c[1:] {
-		y = ci - mul64High(z, y)
+		hi, _ := bits.Mul64(z, y)
+		y = ci - hi
 	}
 
 	z = uint64(fprTrunc(ccs*falconPtwo63)) << 1
-	return mul64High(z, y)
-}
-
-func mul64High(x, y uint64) uint64 {
-	x0 := uint32(x)
-	x1 := uint32(x >> 32)
-	y0 := uint32(y)
-	y1 := uint32(y >> 32)
-
-	a := uint64(x0)*uint64(y1) + ((uint64(x0) * uint64(y0)) >> 32)
-	b := uint64(x1) * uint64(y0)
-	z := (a >> 32) + (b >> 32)
-	z += (uint64(uint32(a)) + uint64(uint32(b))) >> 32
-	z += uint64(x1) * uint64(y1)
-	return z
+	hi, _ := bits.Mul64(z, y)
+	return hi
 }
 
 func sampleFFTPoint(prng *samplerPRNG, mu, isigma fpr) fpr {
