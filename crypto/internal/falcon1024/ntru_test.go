@@ -43,7 +43,8 @@ func TestSolveNTRU(t *testing.T) {
 			if gotG != wantG {
 				t.Fatal("solveNTRU returned unexpected G")
 			}
-			if !checkNTRUEquation(f, g, gotF, gotG) {
+			scratch := make([]uint32, 6*n)
+			if !checkNTRUEquation(f, g, gotF, gotG, scratch) {
 				t.Fatal("solveNTRU returned polynomials that fail the NTRU equation")
 			}
 
@@ -82,7 +83,7 @@ func TestSolveNTRU(t *testing.T) {
 					f, g, F, G := f, g, gotF, gotG
 					tc.mutate(&f, &g, &F, &G)
 
-					if checkNTRUEquation(f, g, F, G) {
+					if checkNTRUEquation(f, g, F, G, scratch) {
 						t.Fatal("invalid NTRU equation accepted")
 					}
 				})

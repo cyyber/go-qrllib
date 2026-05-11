@@ -512,13 +512,13 @@ var gauss1024_12289 = [...]uint64{
 	94, 4, 0,
 }
 
-func sampleSmallPolynomial(rng *sha3.SHAKE) smallPolynomial {
+func sampleGaussianPolynomial(rng *sha3.SHAKE) smallPolynomial {
 	var p smallPolynomial
 	var parity int32
 
 	for i := 0; i < n; {
 		x := sampleKeygenGaussian(rng)
-		if x < -ntruFBound || x > ntruFBound {
+		if x < -ntruCoeffBound || x > ntruCoeffBound {
 			continue
 		}
 

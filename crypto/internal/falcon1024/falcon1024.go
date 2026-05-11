@@ -63,17 +63,15 @@ func newPrivateKeyFromSeed(priv *PrivateKey, seed []byte) (*PrivateKey, error) {
 }
 
 const (
-	fgBound    = 15
-	ntruFBound = 127
-
+	fgBound           = 15
 	keygenSqNormBound = 16823
 	keygenBNormBound  = 16822.4121
 )
 
 func keygen(priv *PrivateKey, rng *sha3.SHAKE) (*PrivateKey, error) {
 	for {
-		f := sampleSmallPolynomial(rng)
-		g := sampleSmallPolynomial(rng)
+		f := sampleGaussianPolynomial(rng)
+		g := sampleGaussianPolynomial(rng)
 
 		if coefficientsExceedBound(f, fgBound) ||
 			coefficientsExceedBound(g, fgBound) {
@@ -95,11 +93,6 @@ func keygen(priv *PrivateKey, rng *sha3.SHAKE) (*PrivateKey, error) {
 
 		ntruF, ntruG, ok := solveNTRU(f, g)
 		if !ok {
-			continue
-		}
-
-		if coefficientsExceedBound(ntruF, ntruFBound) ||
-			coefficientsExceedBound(ntruG, ntruFBound) {
 			continue
 		}
 
@@ -318,7 +311,7 @@ func completePrivate(f, g, ntruF smallPolynomial) (smallPolynomial, bool) {
 	var ntruG smallPolynomial
 	for i := range ntruG {
 		gi := fieldCenteredMod(ntruGModQ[i])
-		if gi < -ntruFBound || gi > ntruFBound {
+		if gi < -ntruCoeffBound || gi > ntruCoeffBound {
 			return smallPolynomial{}, false
 		}
 		ntruG[i] = gi

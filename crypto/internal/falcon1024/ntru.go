@@ -2,15 +2,7 @@ package falcon1024
 
 import "math"
 
-const (
-	ntruCoeffBits     = 8
-	ntruCoeffBound    = 1<<(ntruCoeffBits-1) - 1
-	depthIntFG        = 4
-	ntruScratchLen    = 7 * n
-	makeFGScratchLen  = 6 * n
-	ntruU32ScratchLen = 16 * n
-	ntruFPRScratchLen = 8 * n
-)
+const ntruCoeffBound = 127
 
 func solveNTRU(f, g smallPolynomial) (ntruF, ntruG smallPolynomial, ok bool) {
 	wk := newNTRUWorkspace()
@@ -18,7 +10,10 @@ func solveNTRU(f, g smallPolynomial) (ntruF, ntruG smallPolynomial, ok bool) {
 	if !solveNTRUDeepest(f, g, wk.tmp) {
 		return smallPolynomial{}, smallPolynomial{}, false
 	}
-	for depth := logN - 1; depth >= 2; depth-- {
+
+	depth := logN
+	for depth > 2 {
+		depth--
 		if !solveNTRUIntermediate(f, g, depth, &wk) {
 			return smallPolynomial{}, smallPolynomial{}, false
 		}
@@ -38,11 +33,18 @@ func solveNTRU(f, g smallPolynomial) (ntruF, ntruG smallPolynomial, ok bool) {
 	if !ok {
 		return smallPolynomial{}, smallPolynomial{}, false
 	}
-	if !checkNTRUEquationWithScratch(f, g, ntruF, ntruG, wk.u32) {
+	if !checkNTRUEquation(f, g, ntruF, ntruG, wk.u32) {
 		return smallPolynomial{}, smallPolynomial{}, false
 	}
 	return ntruF, ntruG, true
 }
+
+const (
+	ntruScratchLen    = 7 * n
+	makeFGScratchLen  = 6 * n
+	ntruU32ScratchLen = 16 * n
+	ntruFPRScratchLen = 8 * n
+)
 
 // ntruWorkspace mirrors the Falcon reference tmp scratch model, but keeps
 // uint32, fpr, and int32 scratch storage separate for Go type safety.
@@ -102,6 +104,8 @@ func (s *fprScratch) take(size int) []fpr {
 	return out
 }
 
+const depthIntFG = 4
+
 func polySubScaledNTTWorkspaceLen() int {
 	maxWords := 0
 	for depth := 2; depth <= depthIntFG; depth++ {
@@ -116,11 +120,7 @@ func polySubScaledNTTWorkspaceLen() int {
 	return maxWords
 }
 
-func checkNTRUEquation(f, g, ntruF, ntruG smallPolynomial) bool {
-	return checkNTRUEquationWithScratch(f, g, ntruF, ntruG, make([]uint32, 6*n))
-}
-
-func checkNTRUEquationWithScratch(f, g, ntruF, ntruG smallPolynomial, scratch []uint32) bool {
+func checkNTRUEquation(f, g, ntruF, ntruG smallPolynomial, scratch []uint32) bool {
 	p := primes[0].p
 	p0i := modPNInv31(p)
 	gm := scratch[:n]
