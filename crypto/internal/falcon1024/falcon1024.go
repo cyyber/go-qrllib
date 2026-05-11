@@ -41,8 +41,6 @@ func (pub *PublicKey) Bytes() []byte {
 	return pk[:]
 }
 
-const privateKeyHeader byte = 0x50 + logN
-
 func NewPrivateKeyFromSeed(seed []byte) (*PrivateKey, error) {
 	priv := &PrivateKey{}
 	return newPrivateKeyFromSeed(priv, seed)
@@ -230,8 +228,6 @@ func completePrivate(f, g, ntruF smallPolynomial) (smallPolynomial, bool) {
 	return ntruG, true
 }
 
-const publicKeyHeader byte = 0x00 + logN
-
 func NewPublicKey(pub []byte) (*PublicKey, error) {
 	p := &PublicKey{}
 	return newPublicKey(p, pub)
@@ -242,9 +238,8 @@ func newPublicKey(pub *PublicKey, pubBytes []byte) (*PublicKey, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	copy(pub.raw[:], pubBytes)
 	pub.h = h
+	copy(pub.raw[:], pubBytes)
 	return pub, nil
 }
 

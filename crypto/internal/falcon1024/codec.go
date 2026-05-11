@@ -147,8 +147,9 @@ func compressedEncode(dst []byte, s smallPolynomial) (int, error) {
 }
 
 const (
-	fgBits    = 5
-	ntruFBits = 8
+	privateKeyHeader byte = 0x50 + logN
+	fgBits                = 5
+	ntruFBits             = 8
 )
 
 func skEncode(dst []byte, f, g, ntruF smallPolynomial) error {
@@ -222,6 +223,8 @@ func skDecode(src []byte) (f, g, ntruF smallPolynomial, err error) {
 
 	return f, g, ntruF, nil
 }
+
+const publicKeyHeader byte = 0x00 + logN
 
 func pkEncode(dst []byte, h ringElement) error {
 	if len(dst) != publicKeySize {
