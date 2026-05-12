@@ -277,18 +277,6 @@ func ffLDLBinaryNormalize(tree []fpr, origLogn, logn int) {
 	ffLDLBinaryNormalize(tree[nn+ffLDLTreeSize(logn-1):], origLogn, logn-1)
 }
 
-func mulFFT(a, b []fpr, logn int) {
-	hn := 1 << (logn - 1)
-	for u := range hn {
-		aRe := a[u]
-		aIm := a[u+hn]
-		bRe := b[u]
-		bIm := b[u+hn]
-		a[u] = aRe*bRe - aIm*bIm
-		a[u+hn] = aRe*bIm + aIm*bRe
-	}
-}
-
 func splitFFT(f0, f1, f []fpr, logn int) {
 	nn := 1 << logn
 	hn := nn >> 1
@@ -497,7 +485,7 @@ func ffSamplingFFTRecursive(prng *samplerPRNG, z0, z1, tree, t0, t1, tmp []fpr, 
 	for i := range nn {
 		tmp[i] -= z1[i]
 	}
-	mulFFT(tmp[:nn], tree[:nn], logn)
+	fftMul(tmp[:nn], tree[:nn], logn)
 	for i := range nn {
 		tmp[i] += t0[i]
 	}
