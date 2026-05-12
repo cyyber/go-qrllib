@@ -26,6 +26,10 @@ func TestHashToPointReferenceKATs(t *testing.T) {
 		"bbeca2dd0710cdcaad7d573f4a137d93a30ee81f47f8287aa9ff4f7f84d6d039",
 	}
 
+	if len(expected) != len(verifyRawKATs) {
+		t.Fatalf("expected digests = %d, verifyRawKATs = %d", len(expected), len(verifyRawKATs))
+	}
+
 	for i, tc := range verifyRawKATs {
 		t.Run(tc.message, func(t *testing.T) {
 			h := sha3.NewSHAKE256()
