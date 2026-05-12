@@ -24,15 +24,10 @@ func mustDecodeHex(t *testing.T, s string) []byte {
 
 func mustDecodeSmallPolynomialHex(t *testing.T, s string) smallPolynomial {
 	t.Helper()
-
-	b, err := hex.DecodeString(s)
-	if err != nil {
-		t.Fatal(err)
-	}
+	b := mustDecodeHex(t, s)
 	if len(b) != n {
 		t.Fatalf("decoded polynomial length = %d, want %d", len(b), n)
 	}
-
 	var p smallPolynomial
 	for i, v := range b {
 		p[i] = int32(int8(v))
