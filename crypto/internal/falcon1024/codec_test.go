@@ -265,6 +265,10 @@ func TestCompressedCodec(t *testing.T) {
 			{1229, "1798601e97a4909b0f5291e17734de7ba4f23f6d1666e601912e4ab406cfdf9f"},
 		}
 
+		if len(expected) != len(verifyRawKATs) {
+			t.Fatalf("expected = %d, verifyRawKATs = %d", len(expected), len(verifyRawKATs))
+		}
+
 		for i, tc := range verifyRawKATs {
 			t.Run(tc.message, func(t *testing.T) {
 				s2 := decodeVerifyRawKATSignature(t, mustDecodeHex(t, tc.signatureHex))
@@ -399,7 +403,7 @@ func TestTrimI8DecodeRejectsForbiddenValues(t *testing.T) {
 			name: "fg",
 			bits: fgBits,
 			src: func() []byte {
-				src := make([]byte, (n*fgBits+7)>>3)
+				src := make([]byte, trimI8Len(fgBits))
 				src[0] = 0x80 // first 5-bit field is 10000, i.e. forbidden -16.
 				return src
 			}(),
@@ -408,7 +412,7 @@ func TestTrimI8DecodeRejectsForbiddenValues(t *testing.T) {
 			name: "F",
 			bits: ntruFBits,
 			src: func() []byte {
-				src := make([]byte, (n*ntruFBits+7)>>3)
+				src := make([]byte, trimI8Len(ntruFBits))
 				src[0] = 0x80 // forbidden -128.
 				return src
 			}(),
