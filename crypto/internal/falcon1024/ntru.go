@@ -4,6 +4,24 @@ import "math"
 
 const ntruCoeffBound = 127
 
+var (
+	maxBlSmall = [...]int{1, 1, 2, 2, 4, 7, 14, 27, 53, 106, 209}
+	maxBlLarge = [...]int{2, 2, 5, 7, 12, 21, 40, 78, 157, 308}
+	bitLength  = [...]struct{ avg, std int }{
+		{4, 0},
+		{11, 1},
+		{24, 1},
+		{50, 1},
+		{102, 1},
+		{202, 2},
+		{401, 4},
+		{794, 5},
+		{1577, 8},
+		{3138, 13},
+		{6308, 25},
+	}
+)
+
 func solveNTRU(f, g smallPolynomial) (ntruF, ntruG smallPolynomial, ok bool) {
 	wk := newNTRUWorkspace()
 
