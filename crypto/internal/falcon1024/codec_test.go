@@ -338,6 +338,30 @@ func TestCompressedCodec(t *testing.T) {
 			t.Fatalf("compressedDecode error = %v, want %v", err, errInvalidSignatureEncoding)
 		}
 	})
+
+	t.Run("rejects invalid decode input", func(t *testing.T) {
+		testCases := []struct {
+			name string
+			src  []byte
+		}{
+			{
+				name: "truncated",
+				src:  nil,
+			},
+			{
+				name: "negative zero",
+				src:  []byte{0x80, 0x80},
+			},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				if _, _, err := compressedDecode(tc.src); !errors.Is(err, errInvalidSignatureEncoding) {
+					t.Fatalf("compressedDecode error = %v, want %v", err, errInvalidSignatureEncoding)
+				}
+			})
+		}
+	})
 }
 
 func TestTrimI8Encode(t *testing.T) {
@@ -388,6 +412,70 @@ func TestTrimI8Encode(t *testing.T) {
 			digest := sha256.Sum256(dst[:written])
 			if got := hex.EncodeToString(digest[:]); got != tc.digest {
 				t.Fatalf("trim_i8 digest = %s, want %s", got, tc.digest)
+			}
+		})
+	}
+}
+
+func TestTrimI8EncodeRejectsInvalidInputs(t *testing.T) {
+	outOfRange := smallPolynomial{}
+	outOfRange[0] = int32(1 << (fgBits - 1))
+
+	testCases := []struct {
+		name string
+		p    smallPolynomial
+		bits int
+		dst  []byte
+	}{
+		{
+			name: "invalid bit width",
+			bits: 7,
+			dst:  make([]byte, trimI8Len(fgBits)),
+		},
+		{
+			name: "short output buffer",
+			bits: fgBits,
+			dst:  make([]byte, trimI8Len(fgBits)-1),
+		},
+		{
+			name: "out of range coefficient",
+			p:    outOfRange,
+			bits: fgBits,
+			dst:  make([]byte, trimI8Len(fgBits)),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := trimI8Encode(tc.dst, tc.p, tc.bits); err == nil {
+				t.Fatal("trimI8Encode accepted invalid input")
+			}
+		})
+	}
+}
+
+func TestTrimI8DecodeRejectsInvalidInputs(t *testing.T) {
+	testCases := []struct {
+		name string
+		src  []byte
+		bits int
+	}{
+		{
+			name: "invalid bit width",
+			src:  make([]byte, trimI8Len(fgBits)),
+			bits: 7,
+		},
+		{
+			name: "short input",
+			src:  make([]byte, trimI8Len(fgBits)-1),
+			bits: fgBits,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, _, err := trimI8Decode(tc.src, tc.bits); err == nil {
+				t.Fatal("trimI8Decode accepted invalid input")
 			}
 		})
 	}
