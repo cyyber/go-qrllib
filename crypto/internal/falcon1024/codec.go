@@ -335,7 +335,6 @@ func trimI8Encode(dst []byte, p smallPolynomial, bits int) (int, error) {
 			accBits -= 8
 			dst[written] = byte(acc >> accBits)
 			written++
-			acc &= (1 << accBits) - 1
 		}
 	}
 
@@ -376,12 +375,12 @@ func trimI8Decode(src []byte, bits int) (smallPolynomial, int, error) {
 
 	var acc uint32
 	accBits := 0
-	read := 0
+	consumed := 0
 
 	for i := range p {
 		for accBits < bits {
-			acc = (acc << 8) | uint32(src[read])
-			read++
+			acc = (acc << 8) | uint32(src[consumed])
+			consumed++
 			accBits += 8
 		}
 
