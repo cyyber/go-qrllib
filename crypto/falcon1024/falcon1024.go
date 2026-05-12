@@ -81,6 +81,7 @@ func (priv PrivateKey) Sign(random io.Reader, message []byte) (signature []byte,
 }
 
 // GenerateKey generates a public/private key pair using entropy from random.
+// If random is nil, GenerateKey uses crypto/rand.Reader.
 func GenerateKey(random io.Reader) (PublicKey, PrivateKey, error) {
 	if random == nil {
 		random = rand.Reader
@@ -94,7 +95,7 @@ func GenerateKey(random io.Reader) (PublicKey, PrivateKey, error) {
 	return NewKeyFromSeed(seed)
 }
 
-// NewKeyFromSeed generates a public/private key pair from a seed.
+// NewKeyFromSeed generates a public/private key pair from a SeedSize-byte seed.
 func NewKeyFromSeed(seed []byte) (PublicKey, PrivateKey, error) {
 	privateKey := make([]byte, PrivateKeySize)
 	publicKey := make([]byte, PublicKeySize)
@@ -115,6 +116,7 @@ func newKeyFromSeed(publicKey, privateKey, seed []byte) error {
 }
 
 // Sign signs the message with privateKey and returns a signature.
+// If random is nil, Sign uses crypto/rand.Reader.
 //
 // It returns an error if privateKey is invalid or random fails.
 func Sign(random io.Reader, privateKey PrivateKey, message []byte) ([]byte, error) {
