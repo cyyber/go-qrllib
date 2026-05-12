@@ -21,3 +21,21 @@ func mustDecodeHex(t *testing.T, s string) []byte {
 	}
 	return b
 }
+
+func mustDecodeSmallPolynomialHex(t *testing.T, s string) smallPolynomial {
+	t.Helper()
+
+	b, err := hex.DecodeString(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(b) != n {
+		t.Fatalf("decoded polynomial length = %d, want %d", len(b), n)
+	}
+
+	var p smallPolynomial
+	for i, v := range b {
+		p[i] = int32(int8(v))
+	}
+	return p
+}

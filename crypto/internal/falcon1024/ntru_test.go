@@ -1,9 +1,6 @@
 package falcon1024
 
-import (
-	"encoding/hex"
-	"testing"
-)
+import "testing"
 
 // These vectors are derived from the Falcon reference implementation
 // test_falcon.c ntru_f_1024, ntru_g_1024, ntru_F_1024, and ntru_G_1024
@@ -90,24 +87,6 @@ func TestSolveNTRU(t *testing.T) {
 			}
 		})
 	}
-}
-
-func mustDecodeSmallPolynomialHex(t *testing.T, s string) smallPolynomial {
-	t.Helper()
-
-	b, err := hex.DecodeString(s)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(b) != n {
-		t.Fatalf("decoded polynomial length = %d, want %d", len(b), n)
-	}
-
-	var p smallPolynomial
-	for i, v := range b {
-		p[i] = int32(int8(v))
-	}
-	return p
 }
 
 const ntru_f_1024Hex = "0302fcfd00fb04fdff01fe020300ff0000000000fefefd03fcffff0002fc00f7fd0503ff01fb01fffa00ffff05ff04ff" +
