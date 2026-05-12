@@ -543,12 +543,8 @@ func TestVerifyRaw(t *testing.T) {
 			s2 := decodeVerifyRawKATSignature(t, mustDecodeHex(t, tc.signatureHex))
 
 			h := sha3.NewSHAKE256()
-			if _, err := h.Write(nonce); err != nil {
-				t.Fatal(err)
-			}
-			if _, err := h.Write([]byte(tc.message)); err != nil {
-				t.Fatal(err)
-			}
+			_, _ = h.Write(nonce)
+			_, _ = h.Write([]byte(tc.message))
 
 			c0 := hashToPoint(h)
 			if !verifyRaw(c0, s2, pub.h) {
@@ -695,15 +691,11 @@ func TestSignTree(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			hashData := sha3.NewSHAKE256()
-			if _, err := hashData.Write([]byte(tc.message)); err != nil {
-				t.Fatal(err)
-			}
+			_, _ = hashData.Write([]byte(tc.message))
 			c0 := hashToPoint(hashData)
 
 			rng := sha3.NewSHAKE256()
-			if _, err := rng.Write([]byte(tc.seed)); err != nil {
-				t.Fatal(err)
-			}
+			_, _ = rng.Write([]byte(tc.seed))
 			s2 := signTree(rng, priv, c0)
 			if !verifyRaw(c0, s2, pub.h) {
 				t.Fatal("signTree output failed verifyRaw")
