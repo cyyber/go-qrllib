@@ -240,6 +240,33 @@ func toNTTMonty(f []fieldElement) {
 	}
 }
 
+// divideNTTByBatchedInverse computes hNTT[i] /= fNTT[i] for each i via a
+// single Fermat inversion of the prefix product (Montgomery's trick) followed
+// by back-substitution. Returns false if any fNTT[i] is zero.
+func divideNTTByBatchedInverse(hNTT, fNTT []fieldElement) bool {
+	var fMont, pMont [n]fieldElement
+	for i := range fNTT {
+		if fNTT[i] == 0 {
+			return false
+		}
+		fMont[i] = fieldMontgomeryMul(fNTT[i], r2)
+	}
+	pMont[0] = fMont[0]
+	for i := 1; i < n; i++ {
+		pMont[i] = fieldMontgomeryMul(pMont[i-1], fMont[i])
+	}
+
+	invRunMont := fieldMontgomeryMul(fieldInvMontgomery(pMont[n-1]), r2)
+
+	for i := n - 1; i >= 1; i-- {
+		invMont := fieldMontgomeryMul(invRunMont, pMont[i-1])
+		hNTT[i] = fieldMontgomeryMul(hNTT[i], invMont)
+		invRunMont = fieldMontgomeryMul(invRunMont, fMont[i])
+	}
+	hNTT[0] = fieldMontgomeryMul(hNTT[0], invRunMont)
+	return true
+}
+
 const signatureNormBound uint64 = 70_265_242
 
 type smallPolynomial [n]int32

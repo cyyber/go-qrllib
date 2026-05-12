@@ -31,16 +31,6 @@ func (priv *PrivateKey) PublicKey() []byte {
 	return pub[:]
 }
 
-// PublicKey is the parsed Falcon-1024 public key.
-//
-// Performance note: verifyRaw recomputes toNTTMonty(h) on every Verify call.
-// Caching it in a hMontNTT field here (precomputed in newPublicKey) would
-// save ~30% on Verify wall time when the same *PublicKey is reused across
-// many Verify calls. We deliberately don't cache: in one-shot patterns
-// (parse fresh bytes, verify once, discard) the work is identical, just
-// shifted from Verify into NewPublicKey, while every PublicKey pays the
-// extra ~4 KB. Add a Precompute() method or a CachedPublicKey wrapper if a
-// measured workload makes the reuse pattern dominant.
 type PublicKey struct {
 	raw [publicKeySize]byte
 	h   ringElement
@@ -115,26 +105,9 @@ func computePublic(f, g smallPolynomial) (ringElement, bool) {
 	ntt(fNTT[:])
 	ntt(hNTT[:])
 
-	var fMont, pMont [n]fieldElement
-	for i := range fNTT {
-		if fNTT[i] == 0 {
-			return ringElement{}, false
-		}
-		fMont[i] = fieldMontgomeryMul(fNTT[i], r2)
+	if !divideNTTByBatchedInverse(hNTT[:], fNTT[:]) {
+		return ringElement{}, false
 	}
-	pMont[0] = fMont[0]
-	for i := 1; i < n; i++ {
-		pMont[i] = fieldMontgomeryMul(pMont[i-1], fMont[i])
-	}
-
-	invRunMont := fieldMontgomeryMul(fieldInvMontgomery(pMont[n-1]), r2)
-
-	for i := n - 1; i >= 1; i-- {
-		invMont := fieldMontgomeryMul(invRunMont, pMont[i-1])
-		hNTT[i] = fieldMontgomeryMul(hNTT[i], invMont)
-		invRunMont = fieldMontgomeryMul(invRunMont, fMont[i])
-	}
-	hNTT[0] = fieldMontgomeryMul(hNTT[0], invRunMont)
 
 	inverseNTT(hNTT[:])
 	return hNTT, true
@@ -223,26 +196,9 @@ func completePrivate(f, g, ntruF smallPolynomial) (smallPolynomial, bool) {
 	}
 	nttMul(gNTT[:], ntruFNTT[:])
 
-	var fMont, pMont [n]fieldElement
-	for i := range fNTT {
-		if fNTT[i] == 0 {
-			return smallPolynomial{}, false
-		}
-		fMont[i] = fieldMontgomeryMul(fNTT[i], r2)
+	if !divideNTTByBatchedInverse(gNTT[:], fNTT[:]) {
+		return smallPolynomial{}, false
 	}
-	pMont[0] = fMont[0]
-	for i := 1; i < n; i++ {
-		pMont[i] = fieldMontgomeryMul(pMont[i-1], fMont[i])
-	}
-
-	invRunMont := fieldMontgomeryMul(fieldInvMontgomery(pMont[n-1]), r2)
-
-	for i := n - 1; i >= 1; i-- {
-		invMont := fieldMontgomeryMul(invRunMont, pMont[i-1])
-		gNTT[i] = fieldMontgomeryMul(gNTT[i], invMont)
-		invRunMont = fieldMontgomeryMul(invRunMont, fMont[i])
-	}
-	gNTT[0] = fieldMontgomeryMul(gNTT[0], invRunMont)
 
 	inverseNTT(gNTT[:])
 
