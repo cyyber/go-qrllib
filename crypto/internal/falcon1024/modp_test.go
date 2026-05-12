@@ -155,8 +155,11 @@ func TestModPMontgomeryHelpers(t *testing.T) {
 		wantP0i    uint32
 		wantR      uint32
 		wantR2     uint32
-		wantRx     map[int]uint32
-		mul        []struct {
+		wantRx     []struct {
+			x    int
+			want uint32
+		}
+		mul []struct {
 			a, b uint32
 			want uint32
 		}
@@ -171,12 +174,15 @@ func TestModPMontgomeryHelpers(t *testing.T) {
 			wantP0i:    2042615807,
 			wantR:      10239,
 			wantR2:     104837121,
-			wantRx: map[int]uint32{
-				1:    10239,
-				2:    104837121,
-				5:    546337913,
-				209:  1926030416,
-				1024: 1858646498,
+			wantRx: []struct {
+				x    int
+				want uint32
+			}{
+				{x: 1, want: 10239},
+				{x: 2, want: 104837121},
+				{x: 5, want: 546337913},
+				{x: 209, want: 1926030416},
+				{x: 1024, want: 1858646498},
 			},
 			mul: []struct {
 				a, b uint32
@@ -203,12 +209,15 @@ func TestModPMontgomeryHelpers(t *testing.T) {
 			wantP0i:    1862176767,
 			wantR:      94207,
 			wantR2:     285401085,
-			wantRx: map[int]uint32{
-				1:    94207,
-				2:    285401085,
-				5:    1467853668,
-				209:  1394546252,
-				1024: 877988126,
+			wantRx: []struct {
+				x    int
+				want uint32
+			}{
+				{x: 1, want: 94207},
+				{x: 2, want: 285401085},
+				{x: 5, want: 1467853668},
+				{x: 209, want: 1394546252},
+				{x: 1024, want: 877988126},
 			},
 			mul: []struct {
 				a, b uint32
@@ -235,12 +244,15 @@ func TestModPMontgomeryHelpers(t *testing.T) {
 			wantP0i:    2098206719,
 			wantR:      11528191,
 			wantR2:     39197941,
-			wantRx: map[int]uint32{
-				1:    11528191,
-				2:    39197941,
-				5:    1185998780,
-				209:  1404733308,
-				1024: 42721858,
+			wantRx: []struct {
+				x    int
+				want uint32
+			}{
+				{x: 1, want: 11528191},
+				{x: 2, want: 39197941},
+				{x: 5, want: 1185998780},
+				{x: 209, want: 1404733308},
+				{x: 1024, want: 42721858},
 			},
 			mul: []struct {
 				a, b uint32
@@ -275,9 +287,9 @@ func TestModPMontgomeryHelpers(t *testing.T) {
 			if r2 != tc.wantR2 {
 				t.Fatalf("modPR2 = %d, want %d", r2, tc.wantR2)
 			}
-			for x, want := range tc.wantRx {
-				if got := modPRx(x, p, p0i, r2); got != want {
-					t.Fatalf("modPRx(%d) = %d, want %d", x, got, want)
+			for _, wantRx := range tc.wantRx {
+				if got := modPRx(wantRx.x, p, p0i, r2); got != wantRx.want {
+					t.Fatalf("modPRx(%d) = %d, want %d", wantRx.x, got, wantRx.want)
 				}
 			}
 			for _, mul := range tc.mul {
