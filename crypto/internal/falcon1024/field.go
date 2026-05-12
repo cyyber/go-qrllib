@@ -18,9 +18,6 @@ const (
 	nInverseMontgomery = 64
 )
 
-// encodingSize14 is the byte size of a ringElement encoded with 14-bit coefficients.
-const encodingSize14 = 1792
-
 type fieldElement uint32
 
 func fieldFromSmall(x int32) fieldElement {
@@ -115,6 +112,9 @@ func polyByteEncode[T ~[n]fieldElement](dst []byte, p T) {
 		dst = dst[7:]
 	}
 }
+
+// encodingSize14 is the byte size of a ringElement encoded with 14-bit coefficients.
+const encodingSize14 = 1792
 
 func polyByteDecode[T ~[n]fieldElement](b []byte) (T, error) {
 	if len(b) != encodingSize14 {
