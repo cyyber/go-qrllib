@@ -33,7 +33,7 @@ func modPHalf(a, p uint32) uint32 {
 
 func modPMontyMul(a, b, p, p0i uint32) uint32 {
 	z := uint64(a) * uint64(b)
-	w := (uint32(z) * p0i) & 0x7FFFFFFF
+	w := (uint32(z) * p0i) & mask31
 	z = (z + uint64(w)*uint64(p)) >> 31
 	d := uint32(z) - p
 	d += p & -(d >> 31)
@@ -46,7 +46,7 @@ func modPNInv31(p uint32) uint32 {
 	y *= 2 - p*y
 	y *= 2 - p*y
 	y *= 2 - p*y
-	return 0x7FFFFFFF & -y
+	return mask31 & -y
 }
 
 func modPR(p uint32) uint32 {

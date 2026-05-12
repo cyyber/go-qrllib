@@ -2,8 +2,8 @@ package falcon1024
 
 // zint values are little-endian arrays of 31-bit limbs. Callers own scratch
 // allocation and length invariants; these helpers assume correctly sized
-// buffers and keep limbs reduced under zintWordMask.
-const zintWordMask = 0x7FFFFFFF
+// buffers and keep limbs reduced under mask31.
+const mask31 = 0x7FFFFFFF
 
 func zintSub(a, b []uint32, ctl uint32) uint32 {
 	var cc uint32
@@ -12,7 +12,7 @@ func zintSub(a, b []uint32, ctl uint32) uint32 {
 		aw := a[i]
 		w := aw - b[i] - cc
 		cc = w >> 31
-		a[i] = aw ^ (((w & zintWordMask) ^ aw) & m)
+		a[i] = aw ^ (((w & mask31) ^ aw) & m)
 	}
 	return cc
 }
@@ -21,7 +21,7 @@ func zintMulSmall(m []uint32, x uint32) uint32 {
 	var cc uint32
 	for i := range m {
 		z := uint64(m[i])*uint64(x) + uint64(cc)
-		m[i] = uint32(z) & zintWordMask
+		m[i] = uint32(z) & mask31
 		cc = uint32(z >> 31)
 	}
 	return cc
@@ -51,7 +51,7 @@ func zintAddMulSmall(x, y []uint32, s uint32) {
 	var cc uint32
 	for i := range y {
 		z := uint64(y[i])*uint64(s) + uint64(x[i]) + uint64(cc)
-		x[i] = uint32(z) & zintWordMask
+		x[i] = uint32(z) & mask31
 		cc = uint32(z >> 31)
 	}
 	x[len(y)] = cc
@@ -104,7 +104,7 @@ func zintNegate(a []uint32, ctl uint32) {
 	m := -ctl >> 1
 	for i := range a {
 		aw := (a[i] ^ m) + cc
-		a[i] = aw & zintWordMask
+		a[i] = aw & mask31
 		cc = aw >> 31
 	}
 }
@@ -117,8 +117,8 @@ func zintCoReduce(a, b []uint32, xa, xb, ya, yb int64) uint32 {
 		za := uint64(wa)*uint64(xa) + uint64(wb)*uint64(xb) + uint64(cca)
 		zb := uint64(wa)*uint64(ya) + uint64(wb)*uint64(yb) + uint64(ccb)
 		if i > 0 {
-			a[i-1] = uint32(za) & zintWordMask
-			b[i-1] = uint32(zb) & zintWordMask
+			a[i-1] = uint32(za) & mask31
+			b[i-1] = uint32(zb) & mask31
 		}
 		cca = int64(za) >> 31
 		ccb = int64(zb) >> 31
@@ -145,23 +145,23 @@ func zintFinishMod(a, m []uint32, neg uint32) {
 	for i := range a {
 		mw := (m[i] ^ xm) & ym
 		aw := a[i] - mw - cc
-		a[i] = aw & zintWordMask
+		a[i] = aw & mask31
 		cc = aw >> 31
 	}
 }
 
 func zintCoReduceMod(a, b, m []uint32, m0i uint32, xa, xb, ya, yb int64) {
 	var cca, ccb int64
-	fa := ((a[0]*uint32(xa) + b[0]*uint32(xb)) * m0i) & zintWordMask
-	fb := ((a[0]*uint32(ya) + b[0]*uint32(yb)) * m0i) & zintWordMask
+	fa := ((a[0]*uint32(xa) + b[0]*uint32(xb)) * m0i) & mask31
+	fb := ((a[0]*uint32(ya) + b[0]*uint32(yb)) * m0i) & mask31
 	for i := range a {
 		wa := a[i]
 		wb := b[i]
 		za := uint64(wa)*uint64(xa) + uint64(wb)*uint64(xb) + uint64(m[i])*uint64(fa) + uint64(cca)
 		zb := uint64(wa)*uint64(ya) + uint64(wb)*uint64(yb) + uint64(m[i])*uint64(fb) + uint64(ccb)
 		if i > 0 {
-			a[i-1] = uint32(za) & zintWordMask
-			b[i-1] = uint32(zb) & zintWordMask
+			a[i-1] = uint32(za) & mask31
+			b[i-1] = uint32(zb) & mask31
 		}
 		cca = int64(za) >> 31
 		ccb = int64(zb) >> 31
@@ -211,7 +211,7 @@ func zintBezout(u, v, x, y []uint32, tmp []uint32) bool {
 			b0 ^= (b0 ^ bw) & c0
 			b1 ^= (b1 ^ bw) & c1
 			c1 = c0
-			c0 &= (((aw | bw) + zintWordMask) >> 31) - 1
+			c0 &= (((aw | bw) + mask31) >> 31) - 1
 		}
 
 		a1 |= a0 & c1
@@ -283,11 +283,11 @@ func zintAddScaledMulSmall(x, y []uint32, k int32, sch, scl uint32) {
 		if v < len(y) {
 			wy = y[v]
 		}
-		wys := ((wy << scl) & zintWordMask) | tw
+		wys := ((wy << scl) & mask31) | tw
 		tw = wy >> (31 - scl)
 
 		z := uint64(int64(wys)*int64(k) + int64(x[u]) + int64(cc))
-		x[u] = uint32(z) & zintWordMask
+		x[u] = uint32(z) & mask31
 		cc = int32(uint32(z >> 31))
 	}
 }
@@ -305,11 +305,11 @@ func zintSubScaled(x, y []uint32, sch, scl uint32) {
 		if v < len(y) {
 			wy = y[v]
 		}
-		wys := ((wy << scl) & zintWordMask) | tw
+		wys := ((wy << scl) & mask31) | tw
 		tw = wy >> (31 - scl)
 
 		w := x[u] - wys - cc
-		x[u] = w & zintWordMask
+		x[u] = w & mask31
 		cc = w >> 31
 	}
 }
