@@ -165,20 +165,16 @@ func expandPrivateKey(priv *PrivateKey, f, g, ntruF, ntruG smallPolynomial) {
 
 	var g00, g01, g11, tmp fftPolynomial
 
-	copy(g00[:], priv.b00[:])
-	fftMulSelfAdjSlice(g00[:], logN)
-	copy(tmp[:], priv.b01[:])
-	fftMulSelfAdjSlice(tmp[:], logN)
+	fftSelfAdjSlice(g00[:], priv.b00[:], logN)
+	fftSelfAdjSlice(tmp[:], priv.b01[:], logN)
 	fftAdd(g00[:], tmp[:], logN)
 
 	fftMulAdjSlice(g01[:], priv.b00[:], priv.b10[:], logN)
 	fftMulAdjSlice(tmp[:], priv.b01[:], priv.b11[:], logN)
 	fftAdd(g01[:], tmp[:], logN)
 
-	copy(g11[:], priv.b10[:])
-	fftMulSelfAdjSlice(g11[:], logN)
-	copy(tmp[:], priv.b11[:])
-	fftMulSelfAdjSlice(tmp[:], logN)
+	fftSelfAdjSlice(g11[:], priv.b10[:], logN)
+	fftSelfAdjSlice(tmp[:], priv.b11[:], logN)
 	fftAdd(g11[:], tmp[:], logN)
 
 	var ffLDLScratch [3 * n]fpr

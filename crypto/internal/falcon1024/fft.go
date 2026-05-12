@@ -603,16 +603,16 @@ func fftMulConstSlice(a []fpr, x fpr, logn int) {
 	}
 }
 
-// fftMulSelfAdjSlice computes a = a * adj(a) in FFT representation. The result
-// is real-valued so the imaginary half is explicitly zeroed; callers (notably
-// expandPrivateKey's fftAdd composition) rely on that.
-func fftMulSelfAdjSlice(a []fpr, logn int) {
+// fftSelfAdjSlice writes dst = src * adj(src) in FFT representation. The
+// result is real-valued so the imaginary half is explicitly zeroed; callers
+// (notably expandPrivateKey's fftAdd composition) rely on that.
+func fftSelfAdjSlice(dst, src []fpr, logn int) {
 	hn := 1 << (logn - 1)
 	for i := range hn {
-		aRe := a[i]
-		aIm := a[i+hn]
-		a[i] = aRe*aRe + aIm*aIm
-		a[i+hn] = 0
+		aRe := src[i]
+		aIm := src[i+hn]
+		dst[i] = aRe*aRe + aIm*aIm
+		dst[i+hn] = 0
 	}
 }
 
