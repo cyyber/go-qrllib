@@ -31,6 +31,16 @@ func (priv *PrivateKey) PublicKey() []byte {
 	return pub[:]
 }
 
+// PublicKey is the parsed Falcon-1024 public key.
+//
+// Performance note: verifyRaw recomputes toNTTMonty(h) on every Verify call.
+// Caching it in a hMontNTT field here (precomputed in newPublicKey) would
+// save ~30% on Verify wall time when the same *PublicKey is reused across
+// many Verify calls. We deliberately don't cache: in one-shot patterns
+// (parse fresh bytes, verify once, discard) the work is identical, just
+// shifted from Verify into NewPublicKey, while every PublicKey pays the
+// extra ~4 KB. Add a Precompute() method or a CachedPublicKey wrapper if a
+// measured workload makes the reuse pattern dominant.
 type PublicKey struct {
 	raw [publicKeySize]byte
 	h   ringElement
@@ -96,16 +106,15 @@ func keygen(priv *PrivateKey, rng *sha3.SHAKE) (*PrivateKey, error) {
 }
 
 func computePublic(f, g smallPolynomial) (ringElement, bool) {
-	var fModQ, gModQ ringElement
-	for i := range fModQ {
-		fModQ[i] = fieldFromSmall(f[i])
-		gModQ[i] = fieldFromSmall(g[i])
+	var fNTT, hNTT ringElement
+	for i := range fNTT {
+		fNTT[i] = fieldFromSmall(f[i])
+		hNTT[i] = fieldFromSmall(g[i])
 	}
 
-	fNTT := ntt(fModQ)
-	hNTT := ntt(gModQ)
+	ntt(fNTT[:])
+	ntt(hNTT[:])
 
-	// Batch-invert fNTT with Montgomery's trick
 	var fMont, pMont [n]fieldElement
 	for i := range fNTT {
 		if fNTT[i] == 0 {
@@ -118,19 +127,17 @@ func computePublic(f, g smallPolynomial) (ringElement, bool) {
 		pMont[i] = fieldMontgomeryMul(pMont[i-1], fMont[i])
 	}
 
-	// pMont[n-1] = Q*R. fieldInvMontgomery returns (1/input)*R, so this yields
-	// 1/Q in plain form; one more MontMul lifts it back into Montgomery form
-	// for the back-substitution.
 	invRunMont := fieldMontgomeryMul(fieldInvMontgomery(pMont[n-1]), r2)
 
 	for i := n - 1; i >= 1; i-- {
-		invMont := fieldMontgomeryMul(invRunMont, pMont[i-1]) // 1/fNTT[i] in Mont form
-		hNTT[i] = fieldMontgomeryMul(hNTT[i], invMont)        // h/f, back in plain form
-		invRunMont = fieldMontgomeryMul(invRunMont, fMont[i]) // shift to next prefix
+		invMont := fieldMontgomeryMul(invRunMont, pMont[i-1])
+		hNTT[i] = fieldMontgomeryMul(hNTT[i], invMont)
+		invRunMont = fieldMontgomeryMul(invRunMont, fMont[i])
 	}
 	hNTT[0] = fieldMontgomeryMul(hNTT[0], invRunMont)
 
-	return inverseNTT(hNTT), true
+	inverseNTT(hNTT[:])
+	return hNTT, true
 }
 
 func initPrivateKey(priv *PrivateKey, f, g, ntruF, ntruG smallPolynomial, h ringElement) (*PrivateKey, error) {
@@ -175,7 +182,7 @@ func expandPrivateKey(priv *PrivateKey, f, g, ntruF, ntruG smallPolynomial) {
 	fftAdd(g11[:], tmp[:], logN)
 
 	var ffLDLScratch [3 * n]fpr
-	ffLDLFFT(priv.tree[:], g00, g01, g11, logN, ffLDLScratch[:])
+	ffLDLFFTSlice(priv.tree[:], g00[:], g01[:], g11[:], logN, ffLDLScratch[:])
 	ffLDLBinaryNormalize(priv.tree[:], logN, logN)
 }
 
@@ -213,30 +220,22 @@ func newPrivateKey(priv *PrivateKey, privBytes []byte) (*PrivateKey, error) {
 }
 
 func completePrivate(f, g, ntruF smallPolynomial) (smallPolynomial, bool) {
-	var gModQ ringElement
-	var ntruFModQ ringElement
-
-	for i := range gModQ {
-		gModQ[i] = fieldFromSmall(g[i])
-		ntruFModQ[i] = fieldFromSmall(ntruF[i])
+	var gNTT, ntruFNTT, fNTT ringElement
+	for i := range gNTT {
+		gNTT[i] = fieldFromSmall(g[i])
+		ntruFNTT[i] = fieldFromSmall(ntruF[i])
+		fNTT[i] = fieldFromSmall(f[i])
 	}
 
-	gNTT := ntt(gModQ)
-	ntruFNTT := ntt(ntruFModQ)
+	ntt(gNTT[:])
+	ntt(ntruFNTT[:])
+	ntt(fNTT[:])
 
 	for i := range gNTT {
 		gNTT[i] = fieldMontgomeryMul(gNTT[i], r2)
 	}
-	gNTT = nttMul(gNTT, ntruFNTT)
+	nttMul(gNTT[:], ntruFNTT[:])
 
-	var fModQ ringElement
-	for i := range fModQ {
-		fModQ[i] = fieldFromSmall(f[i])
-	}
-
-	fNTT := ntt(fModQ)
-
-	// Batch-invert fNTT with Montgomery's trick
 	var fMont, pMont [n]fieldElement
 	for i := range fNTT {
 		if fNTT[i] == 0 {
@@ -252,17 +251,17 @@ func completePrivate(f, g, ntruF smallPolynomial) (smallPolynomial, bool) {
 	invRunMont := fieldMontgomeryMul(fieldInvMontgomery(pMont[n-1]), r2)
 
 	for i := n - 1; i >= 1; i-- {
-		invMont := fieldMontgomeryMul(invRunMont, pMont[i-1]) // 1/fNTT[i] in Mont form
-		gNTT[i] = fieldMontgomeryMul(gNTT[i], invMont)        // (g·F)/f, back in plain form
-		invRunMont = fieldMontgomeryMul(invRunMont, fMont[i]) // shift to next prefix
+		invMont := fieldMontgomeryMul(invRunMont, pMont[i-1])
+		gNTT[i] = fieldMontgomeryMul(gNTT[i], invMont)
+		invRunMont = fieldMontgomeryMul(invRunMont, fMont[i])
 	}
 	gNTT[0] = fieldMontgomeryMul(gNTT[0], invRunMont)
 
-	ntruGModQ := inverseNTT(gNTT)
+	inverseNTT(gNTT[:])
 
 	var ntruG smallPolynomial
 	for i := range ntruG {
-		gi := fieldCenteredMod(ntruGModQ[i])
+		gi := fieldCenteredMod(gNTT[i])
 		if gi < -ntruCoeffBound || gi > ntruCoeffBound {
 			return smallPolynomial{}, false
 		}
@@ -348,11 +347,9 @@ func signTreeAttempt(prng *samplerPRNG, priv *PrivateKey, c0 ringElement) (small
 	fftMulSlice(t0[:], priv.b11[:], logN)
 	fftMulConstSlice(t0[:], fprInverseOfQ, logN)
 
-	sampleX, sampleY := ffSamplingFFT(prng, t0, t1, priv.tree[:], logN)
+	var sampleX, sampleY fftPolynomial
+	ffSamplingFFT(prng, sampleX[:], sampleY[:], t0[:], t1[:], priv.tree[:], logN)
 
-	// Reuse latticeX / latticeY as both the FFT-domain working buffers and
-	// the coefficient-domain result of inverseFFTSlice. tmp is the per-half
-	// scratch for the b10 / b11 products that get added in.
 	var latticeX, latticeY, tmp fftPolynomial
 	copy(latticeX[:], sampleX[:])
 	fftMulSlice(latticeX[:], priv.b00[:], logN)
@@ -437,9 +434,12 @@ func verifyRaw(c0 ringElement, s2 smallPolynomial, h ringElement) bool {
 		t[i] = fieldFromSmall(s2[i])
 	}
 
-	tNTT := ntt(t)
-	tNTT = nttMul(tNTT, toNTTMonty(h))
-	t = inverseNTT(tNTT)
+	hMontNTT := h
+	toNTTMonty(hMontNTT[:])
+
+	ntt(t[:])
+	nttMul(t[:], hMontNTT[:])
+	inverseNTT(t[:])
 
 	var s1 smallPolynomial
 	for i := range s1 {

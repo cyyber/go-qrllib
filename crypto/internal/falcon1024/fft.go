@@ -33,23 +33,6 @@ func fprRint(x fpr) int64 {
 
 type fprPolynomial [n]fpr
 
-func fprFromSmall(src smallPolynomial) fprPolynomial {
-	dst := fprPolynomial{}
-
-	for i := 0; i < n; i += 8 {
-		dst[i] = fpr(src[i])
-		dst[i+1] = fpr(src[i+1])
-		dst[i+2] = fpr(src[i+2])
-		dst[i+3] = fpr(src[i+3])
-		dst[i+4] = fpr(src[i+4])
-		dst[i+5] = fpr(src[i+5])
-		dst[i+6] = fpr(src[i+6])
-		dst[i+7] = fpr(src[i+7])
-	}
-
-	return dst
-}
-
 type fprTree [(logN + 1) * n]fpr
 
 type fftPolynomial [n]fpr
@@ -118,13 +101,17 @@ func initFFTGM() ([n]fpr, [n]fpr) {
 
 func gaussian0Sample(prng *samplerPRNG) int {
 	lo := prng.readUint64()
-	hi := prng.readByte()
-	for i, bound := range gaussian0CDF {
-		if hi < bound.hi || (hi == bound.hi && lo <= bound.lo) {
-			return 18 - i
-		}
+	hi := uint64(prng.readByte())
+
+	var z int
+	for _, bound := range gaussian0CDF {
+		// bound - sample borrows iff bound < sample. We want the count of
+		// entries where bound >= sample, i.e. where there is no borrow.
+		_, borrow := bits.Sub64(bound.lo, lo, 0)
+		_, borrow = bits.Sub64(uint64(bound.hi), hi, borrow)
+		z += int(1 - borrow)
 	}
-	return 0
+	return z - 1
 }
 
 func berExp(prng *samplerPRNG, x, ccs fpr) bool {
@@ -203,10 +190,6 @@ func sampleFFTPoint(prng *samplerPRNG, mu, isigma fpr) fpr {
 
 func ffLDLTreeSize(logn int) int {
 	return (logn + 1) << logn
-}
-
-func ffLDLFFT(tree []fpr, g00, g01, g11 fftPolynomial, logn int, tmp []fpr) {
-	ffLDLFFTSlice(tree, g00[:], g01[:], g11[:], logn, tmp)
 }
 
 func ffLDLFFTSlice(tree, g00, g01, g11 []fpr, logn int, tmp []fpr) {
@@ -695,13 +678,8 @@ func fftDivAutoAdj(a, b []fpr, logn int) {
 	}
 }
 
-func ffSamplingFFT(prng *samplerPRNG, t0, t1 fftPolynomial, tree []fpr, logn int) (fftPolynomial, fftPolynomial) {
-	var z0, z1 fftPolynomial
+func ffSamplingFFT(prng *samplerPRNG, z0, z1, t0, t1, tree []fpr, logn int) {
 	var tmp [2 * n]fpr
-
 	nn := 1 << logn
 	ffSamplingFFTRecursive(prng, z0[:nn], z1[:nn], tree, t0[:nn], t1[:nn], tmp[:nn<<1], logn)
-
-	return z0, z1
 }
-

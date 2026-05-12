@@ -188,7 +188,7 @@ func hashToPoint(h *sha3.SHAKE) ringElement {
 
 type nttElement [n]fieldElement // NTT-domain modulo-q polynomial
 
-func ntt(f ringElement) nttElement {
+func ntt(f []fieldElement) {
 	t := n
 	for m := 1; m < n; m <<= 1 {
 		ht := t >> 1
@@ -204,10 +204,9 @@ func ntt(f ringElement) nttElement {
 		}
 		t = ht
 	}
-	return nttElement(f)
 }
 
-func inverseNTT(f nttElement) ringElement {
+func inverseNTT(f []fieldElement) {
 	t := 1
 	m := n
 	for m > 1 {
@@ -231,22 +230,19 @@ func inverseNTT(f nttElement) ringElement {
 	for i := range f {
 		f[i] = fieldMontgomeryMul(f[i], nInverseMontgomery)
 	}
-	return ringElement(f)
 }
 
-func nttMul(a, b nttElement) (p nttElement) {
-	for i := range p {
-		p[i] = fieldMontgomeryMul(a[i], b[i])
+func nttMul(a, b []fieldElement) {
+	for i := range a {
+		a[i] = fieldMontgomeryMul(a[i], b[i])
 	}
-	return p
 }
 
-func toNTTMonty(h ringElement) nttElement {
-	hm := ntt(h)
-	for i := range hm {
-		hm[i] = fieldMontgomeryMul(hm[i], r2)
+func toNTTMonty(f []fieldElement) {
+	ntt(f)
+	for i := range f {
+		f[i] = fieldMontgomeryMul(f[i], r2)
 	}
-	return hm
 }
 
 const signatureNormBound uint64 = 70_265_242
