@@ -294,6 +294,10 @@ func sigDecode(src []byte) (nonce [nonceSize]byte, s2 smallPolynomial, err error
 	return nonce, s2, nil
 }
 
+// trimI8Len returns the number of bytes a trim_i8 encoding of n bits-wide
+// coefficients occupies.
+func trimI8Len(bits int) int { return (n*bits + 7) >> 3 }
+
 func trimI8Encode(dst []byte, p smallPolynomial, bits int) (int, error) {
 	if bits != fgBits && bits != ntruFBits {
 		return 0, errors.New("falcon-1024: invalid trim_i8 bit width")
@@ -306,7 +310,7 @@ func trimI8Encode(dst []byte, p smallPolynomial, bits int) (int, error) {
 		}
 	}
 
-	outLen := (n*bits + 7) >> 3
+	outLen := trimI8Len(bits)
 	if len(dst) < outLen {
 		return 0, errors.New("falcon-1024: short trim_i8 output buffer")
 	}
@@ -348,7 +352,7 @@ func trimI8Decode(src []byte, bits int) (smallPolynomial, int, error) {
 		return smallPolynomial{}, 0, errors.New("falcon-1024: invalid trim_i8 bit width")
 	}
 
-	inLen := (n*bits + 7) >> 3
+	inLen := trimI8Len(bits)
 	if len(src) < inLen {
 		return smallPolynomial{}, 0, errors.New("falcon-1024: short trim_i8 input")
 	}
