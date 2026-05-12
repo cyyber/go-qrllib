@@ -49,3 +49,61 @@ func TestHashToPointReferenceKATs(t *testing.T) {
 		})
 	}
 }
+
+func TestPolyByteEncodeDecode(t *testing.T) {
+	var p ringElement
+	for i := range p {
+		p[i] = fieldElement((i*i + 17*i + 3) % q)
+	}
+
+	var enc [encodingSize14]byte
+	polyByteEncode(enc[:], p)
+
+	got, err := polyByteDecode[ringElement](enc[:])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != p {
+		t.Fatal("polyByteDecode(polyByteEncode(p)) did not round-trip")
+	}
+
+	enc[0] = 0xFF
+	enc[1] = 0xFC // first 14-bit coefficient is 0x3FFF, which is >= q.
+	if _, err := polyByteDecode[ringElement](enc[:]); err == nil {
+		t.Fatal("polyByteDecode accepted coefficient greater than q")
+	}
+
+	if _, err := polyByteDecode[ringElement](enc[:len(enc)-1]); err == nil {
+		t.Fatal("polyByteDecode accepted short input")
+	}
+}
+
+func TestFieldArithmetic(t *testing.T) {
+	if got := fieldAdd(q-2, 5); got != 3 {
+		t.Fatalf("fieldAdd = %d, want 3", got)
+	}
+	if got := fieldSub(3, 5); got != q-2 {
+		t.Fatalf("fieldSub = %d, want %d", got, q-2)
+	}
+	if got := fieldMontgomeryMul(1234, 5678); got != 4248 {
+		t.Fatalf("fieldMontgomeryMul = %d, want 4248", got)
+	}
+	if got := fieldCenteredMod(q/2 + 1); got != -6144 {
+		t.Fatalf("fieldCenteredMod = %d, want -6144", got)
+	}
+}
+
+func TestNTTRoundTrip(t *testing.T) {
+	var p ringElement
+	for i := range p {
+		p[i] = fieldElement((3*i + 11) % q)
+	}
+	want := p
+
+	ntt(p[:])
+	inverseNTT(p[:])
+
+	if p != want {
+		t.Fatal("inverseNTT(ntt(p)) did not round-trip")
+	}
+}
