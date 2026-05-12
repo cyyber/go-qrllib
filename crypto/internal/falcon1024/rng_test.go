@@ -13,7 +13,7 @@ func TestSamplerPRNG(t *testing.T) {
 	// reference implementation's test_falcon.c.
 	// Source: https://falcon-sign.info/impl/test_falcon.c.html
 	rng := sha3.NewSHAKE256()
-	rng.Write([]byte("rng"))
+	_, _ = rng.Write([]byte("rng"))
 	prng := newSamplerPRNG(rng)
 
 	var rng1 [128 * 8]byte

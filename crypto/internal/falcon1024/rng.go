@@ -15,7 +15,7 @@ type samplerPRNG struct {
 
 func newSamplerPRNG(rng *sha3.SHAKE) *samplerPRNG {
 	var seed [56]byte
-	rng.Read(seed[:])
+	_, _ = rng.Read(seed[:])
 
 	p := &samplerPRNG{}
 	for i := range p.state {

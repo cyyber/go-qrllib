@@ -29,8 +29,8 @@ func TestHashToPointReferenceKATs(t *testing.T) {
 	for i, tc := range verifyRawKATs {
 		t.Run(tc.message, func(t *testing.T) {
 			h := sha3.NewSHAKE256()
-			h.Write(mustDecodeHex(t, tc.nonceHex))
-			h.Write([]byte(tc.message))
+			_, _ = h.Write(mustDecodeHex(t, tc.nonceHex))
+			_, _ = h.Write([]byte(tc.message))
 
 			p := hashToPoint(h)
 

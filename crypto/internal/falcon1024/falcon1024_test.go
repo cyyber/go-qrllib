@@ -810,15 +810,15 @@ func nistKATSignTreeInput(t *testing.T, count int) (*PrivateKey, ringElement, *s
 		drbg.read(nonce[:])
 
 		hashData := sha3.NewSHAKE256()
-		hashData.Write(nonce[:])
-		hashData.Write(msg)
+		_, _ = hashData.Write(nonce[:])
+		_, _ = hashData.Write(msg)
 
 		c0 := hashToPoint(hashData)
 
 		var signSeed [seedSize]byte
 		drbg.read(signSeed[:])
 		rng := sha3.NewSHAKE256()
-		rng.Write(signSeed[:])
+		_, _ = rng.Write(signSeed[:])
 
 		if i == count {
 			return priv, c0, rng
@@ -994,15 +994,15 @@ func testNISTKATDigest(t *testing.T) {
 		drbg.read(nonce[:])
 
 		hashData := sha3.NewSHAKE256()
-		hashData.Write(nonce[:])
-		hashData.Write(msg)
+		_, _ = hashData.Write(nonce[:])
+		_, _ = hashData.Write(msg)
 
 		c0 := hashToPoint(hashData)
 
 		var signSeed [seedSize]byte
 		drbg.read(signSeed[:])
 		signRNG := sha3.NewSHAKE256()
-		signRNG.Write(signSeed[:])
+		_, _ = signRNG.Write(signSeed[:])
 
 		s2 := signTree(signRNG, priv, c0)
 

@@ -62,7 +62,7 @@ func newPrivateKeyFromSeed(priv *PrivateKey, seed []byte) (*PrivateKey, error) {
 	}
 
 	rng := sha3.NewSHAKE256()
-	rng.Write(seed)
+	_, _ = rng.Write(seed)
 
 	return keygen(priv, rng)
 }
@@ -285,14 +285,14 @@ func sign(random io.Reader, signature []byte, priv *PrivateKey, message []byte) 
 	}
 
 	rng := sha3.NewSHAKE256()
-	rng.Write(seed[:])
+	_, _ = rng.Write(seed[:])
 
 	var nonce [nonceSize]byte
-	rng.Read(nonce[:])
+	_, _ = rng.Read(nonce[:])
 
 	hashData := sha3.NewSHAKE256()
-	hashData.Write(nonce[:])
-	hashData.Write(message)
+	_, _ = hashData.Write(nonce[:])
+	_, _ = hashData.Write(message)
 
 	c0 := hashToPoint(hashData)
 
@@ -403,8 +403,8 @@ func Verify(pub *PublicKey, message []byte, sig *Signature) error {
 
 func verify(pub *PublicKey, message []byte, sig *Signature) error {
 	h := sha3.NewSHAKE256()
-	h.Write(sig.nonce[:])
-	h.Write(message)
+	_, _ = h.Write(sig.nonce[:])
+	_, _ = h.Write(message)
 
 	c0 := hashToPoint(h)
 

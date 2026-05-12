@@ -301,7 +301,7 @@ func sampleKeygenGaussian(rng *sha3.SHAKE) int32 {
 
 func readShakeUint64(rng *sha3.SHAKE) uint64 {
 	var buf [8]byte
-	rng.Read(buf[:])
+	_, _ = rng.Read(buf[:])
 	return binary.LittleEndian.Uint64(buf[:])
 }
 

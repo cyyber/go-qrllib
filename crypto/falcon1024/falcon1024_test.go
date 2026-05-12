@@ -86,7 +86,9 @@ func TestGenerateKey(t *testing.T) {
 
 	// GenerateKey is documented to be the same as NewKeyFromSeed.
 	seed = make([]byte, SeedSize)
-	rand.Read(seed)
+	if _, err := rand.Read(seed); err != nil {
+		t.Fatal(err)
+	}
 	_, k4, err := GenerateKey(bytes.NewReader(seed))
 	if err != nil {
 		t.Fatal(err)
