@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"io"
+	"math"
 	"math/big"
 	"strconv"
 	"testing"
@@ -17,6 +18,47 @@ func newSamplerPRNGFromReader(r io.Reader) *samplerPRNG {
 	var p samplerPRNG
 	copy(p.buf[:], b)
 	return &p
+}
+
+func TestFFTRoundTrip(t *testing.T) {
+	var p fftPolynomial
+	for i := range p {
+		p[i] = fpr((i % 31) - 15)
+	}
+	want := p
+
+	fft(p[:], logN)
+	inverseFFT(p[:], logN)
+
+	for i := range p {
+		if !fprAlmostEqual(p[i], want[i]) {
+			t.Fatalf("FFT round trip mismatch at %d: got %v, want %v", i, p[i], want[i])
+		}
+	}
+}
+
+func TestSplitMergeFFTRoundTrip(t *testing.T) {
+	var p fftPolynomial
+	for i := range p {
+		p[i] = fpr((i % 17) - 8)
+	}
+	fft(p[:], logN)
+	want := p
+
+	var even, odd [n / 2]fpr
+	splitFFT(even[:], odd[:], p[:], logN)
+	mergeFFT(p[:], even[:], odd[:], logN)
+
+	for i := range p {
+		if !fprAlmostEqual(p[i], want[i]) {
+			t.Fatalf("split/merge FFT mismatch at %d: got %v, want %v", i, p[i], want[i])
+		}
+	}
+}
+
+func fprAlmostEqual(a, b fpr) bool {
+	const tolerance = 1e-9
+	return math.Abs(float64(a-b)) <= tolerance
 }
 
 func TestSampleFFTPoint(t *testing.T) {
