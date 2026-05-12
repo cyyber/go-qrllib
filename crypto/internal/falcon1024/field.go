@@ -45,11 +45,6 @@ func fieldSub(a, b fieldElement) fieldElement {
 	return fieldReduceOnce(x)
 }
 
-// fieldDiv returns x/y mod q. y must be non-zero.
-func fieldDiv(x, y fieldElement) fieldElement {
-	return fieldMontgomeryMul(x, fieldInvMontgomery(y))
-}
-
 // fieldInvMontgomery returns 1/x in Montgomery representation.
 func fieldInvMontgomery(x fieldElement) fieldElement {
 	y0 := fieldMontgomeryMul(x, r2)
@@ -185,8 +180,6 @@ func hashToPoint(h *sha3.SHAKE) ringElement {
 
 	return p
 }
-
-type nttElement [n]fieldElement // NTT-domain modulo-q polynomial
 
 func ntt(f []fieldElement) {
 	t := n
