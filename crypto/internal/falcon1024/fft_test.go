@@ -3,10 +3,21 @@ package falcon1024
 import (
 	"bytes"
 	"encoding/hex"
+	"io"
 	"math/big"
 	"strconv"
 	"testing"
 )
+
+func newSamplerPRNGFromReader(r io.Reader) *samplerPRNG {
+	b, err := io.ReadAll(r)
+	if err != nil {
+		panic(err)
+	}
+	var p samplerPRNG
+	copy(p.buf[:], b)
+	return &p
+}
 
 func TestSampleFFTPoint(t *testing.T) {
 	// Derived from Supporting_Documentation/additional/

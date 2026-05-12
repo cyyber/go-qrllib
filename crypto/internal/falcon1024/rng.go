@@ -3,12 +3,10 @@ package falcon1024
 import (
 	"crypto/sha3"
 	"encoding/binary"
-	"io"
 	"math/bits"
 )
 
 type samplerPRNG struct {
-	reader  io.Reader
 	buf     [512]byte
 	ptr     int
 	state   [12]uint32
@@ -29,17 +27,7 @@ func newSamplerPRNG(rng *sha3.SHAKE) *samplerPRNG {
 	return p
 }
 
-func newSamplerPRNGFromReader(r io.Reader) *samplerPRNG {
-	return &samplerPRNG{reader: r}
-}
-
 func (p *samplerPRNG) readByte() byte {
-	if p.reader != nil {
-		var buf [1]byte
-		p.read(buf[:])
-		return buf[0]
-	}
-
 	v := p.buf[p.ptr]
 	p.ptr++
 	if p.ptr == len(p.buf) {
@@ -49,24 +37,12 @@ func (p *samplerPRNG) readByte() byte {
 }
 
 func (p *samplerPRNG) readUint64() uint64 {
-	if p.reader != nil {
-		var buf [8]byte
-		p.read(buf[:])
-		return binary.LittleEndian.Uint64(buf[:])
-	}
-
 	if p.ptr >= len(p.buf)-9 {
 		p.refill()
 	}
 	v := binary.LittleEndian.Uint64(p.buf[p.ptr:])
 	p.ptr += 8
 	return v
-}
-
-func (p *samplerPRNG) read(buf []byte) {
-	if _, err := io.ReadFull(p.reader, buf); err != nil {
-		panic("falcon1024: short sampler PRNG reader")
-	}
 }
 
 const (
