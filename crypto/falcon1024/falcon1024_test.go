@@ -176,8 +176,75 @@ func TestInvalidPrivateKeyReturnsErrors(t *testing.T) {
 }
 
 func TestVerifyInvalidInputs(t *testing.T) {
-	if Verify(PublicKey{}, nil, nil) {
-		t.Fatal("Verify accepted invalid public key")
+	var zero zeroReader
+	public, private, err := GenerateKey(zero)
+	if err != nil {
+		t.Fatal(err)
+	}
+	message := []byte("test message")
+	signature, err := Sign(zero, private, message)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	badHeaderPublic := bytes.Clone(public)
+	badHeaderPublic[0] ^= 0xFF
+
+	for _, tc := range []struct {
+		name      string
+		publicKey PublicKey
+		signature []byte
+	}{
+		{
+			name:      "nil public key",
+			publicKey: nil,
+			signature: signature,
+		},
+		{
+			name:      "short public key",
+			publicKey: make(PublicKey, PublicKeySize-1),
+			signature: signature,
+		},
+		{
+			name:      "long public key",
+			publicKey: make(PublicKey, PublicKeySize+1),
+			signature: signature,
+		},
+		{
+			name:      "wrong public key header",
+			publicKey: badHeaderPublic,
+			signature: signature,
+		},
+		{
+			name:      "nil signature",
+			publicKey: public,
+			signature: nil,
+		},
+		{
+			name:      "short signature",
+			publicKey: public,
+			signature: make([]byte, SignatureSize-1),
+		},
+		{
+			name:      "long signature",
+			publicKey: public,
+			signature: make([]byte, SignatureSize+1),
+		},
+		{
+			name:      "wrong signature header",
+			publicKey: public,
+			signature: append([]byte{signature[0] ^ 0xFF}, signature[1:]...),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if Verify(tc.publicKey, message, tc.signature) {
+				t.Fatal("Verify accepted invalid input")
+			}
+		})
+	}
+
+	if !Verify(public, message, signature) {
+		t.Fatal("Verify rejected valid input")
 	}
 }
 
@@ -292,6 +359,8 @@ func BenchmarkVerification(b *testing.B) {
 		b.Fatal(err)
 	}
 	for b.Loop() {
-		Verify(pub, message, signature)
+		if !Verify(pub, message, signature) {
+			b.Fatal("signature rejected")
+		}
 	}
 }
