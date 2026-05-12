@@ -16,6 +16,8 @@ const (
 	qNegInv            = 12287
 	r2                 = 10952
 	nInverseMontgomery = 64
+	// mask16 is the low-16-bit mask used by the Montgomery reduction (R = 2^16).
+	mask16 = 0xFFFF
 )
 
 type fieldElement uint32
@@ -75,7 +77,7 @@ func fieldMontgomeryMul(a, b fieldElement) fieldElement {
 }
 
 func fieldMontgomeryReduce(x uint32) fieldElement {
-	w := ((x * qNegInv) & 0xFFFF) * q
+	w := ((x * qNegInv) & mask16) * q
 	x = (x + w) >> 16
 	x -= q
 	x += q & -(x >> 31)
@@ -267,7 +269,7 @@ func sampleGaussianPolynomial(rng *sha3.SHAKE) smallPolynomial {
 	return p
 }
 
-var gauss1024_12289 = [...]uint64{
+var gauss1024Q12289 = [...]uint64{
 	1283868770400643928, 6416574995475331444, 4078260278032692663,
 	2353523259288686585, 1227179971273316331, 575931623374121527,
 	242543240509105209, 91437049221049666, 30799446349977173,
@@ -283,14 +285,14 @@ func sampleKeygenGaussian(rng *sha3.SHAKE) int32 {
 	r := readShakeUint64(rng)
 	neg := uint32(r >> 63)
 	r &^= uint64(1) << 63
-	f := uint32((r - gauss1024_12289[0]) >> 63)
+	f := uint32((r - gauss1024Q12289[0]) >> 63)
 
 	r = readShakeUint64(rng)
 	r &^= uint64(1) << 63
 
 	var v uint32
-	for k := uint32(1); k < uint32(len(gauss1024_12289)); k++ {
-		t := uint32(((r - gauss1024_12289[k]) >> 63) ^ 1)
+	for k := uint32(1); k < uint32(len(gauss1024Q12289)); k++ {
+		t := uint32(((r - gauss1024Q12289[k]) >> 63) ^ 1)
 		v |= k & -(t & (f ^ 1))
 		f |= t
 	}
@@ -366,11 +368,11 @@ func signatureNormExceedsPartialBound(sqn uint32, s2 smallPolynomial) bool {
 }
 
 func (p smallPolynomial) squaredNorm() uint32 {
-	var n uint32
+	var sum uint32
 	for _, x := range p {
-		n += uint32(x * x)
+		sum += uint32(x * x)
 	}
-	return n
+	return sum
 }
 
 func signatureNormWithinBound(s1, s2 smallPolynomial) bool {
