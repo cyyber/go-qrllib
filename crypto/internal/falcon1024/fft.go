@@ -31,11 +31,18 @@ func fprRint(x fpr) int64 {
 	return tx | rn | rp
 }
 
-type fprPolynomial [n]fpr
-
 type fprTree [(logN + 1) * n]fpr
 
 type fftPolynomial [n]fpr
+
+// fftFromSmall converts a small polynomial to floating-point in place at dst,
+// then runs an in-place forward FFT. dst must hold n elements.
+func fftFromSmall(dst []fpr, src smallPolynomial) {
+	for i := range src {
+		dst[i] = fpr(src[i])
+	}
+	fft(dst, logN)
+}
 
 const (
 	falconSigmaMin1024  fpr = 1.2982803343442918539708792538826807
@@ -192,7 +199,7 @@ func ffLDLTreeSize(logn int) int {
 	return (logn + 1) << logn
 }
 
-func ffLDLFFTSlice(tree, g00, g01, g11 []fpr, logn int, tmp []fpr) {
+func ffLDLFFT(tree, g00, g01, g11 []fpr, logn int, tmp []fpr) {
 	nn := 1 << logn
 	if nn == 1 {
 		tree[0] = g00[0]
@@ -210,8 +217,8 @@ func ffLDLFFTSlice(tree, g00, g01, g11 []fpr, logn int, tmp []fpr) {
 	copy(d00, g00[:nn])
 	fftLDLMV(d11, tree[:nn], g00[:nn], g01[:nn], g11[:nn], logn)
 
-	splitFFTSlice(t[:hn], t[hn:nn], d00, logn)
-	splitFFTSlice(d00[:hn], d00[hn:nn], d11, logn)
+	splitFFT(t[:hn], t[hn:nn], d00, logn)
+	splitFFT(d00[:hn], d00[hn:nn], d11, logn)
 	copy(d11, t)
 
 	ffLDLFFTInner(tree[nn:], d11[:hn], d11[hn:nn], logn-1, t)
@@ -228,8 +235,8 @@ func ffLDLFFTInner(tree, g0, g1 []fpr, logn int, tmp []fpr) {
 	hn := nn >> 1
 	fftLDLMV(tmp[:nn], tree[:nn], g0[:nn], g1[:nn], g0[:nn], logn)
 
-	splitFFTSlice(g1[:hn], g1[hn:nn], g0[:nn], logn)
-	splitFFTSlice(g0[:hn], g0[hn:nn], tmp[:nn], logn)
+	splitFFT(g1[:hn], g1[hn:nn], g0[:nn], logn)
+	splitFFT(g0[:hn], g0[hn:nn], tmp[:nn], logn)
 
 	ffLDLFFTInner(tree[nn:], g1[:hn], g1[hn:nn], logn-1, tmp)
 	ffLDLFFTInner(tree[nn+ffLDLTreeSize(logn-1):], g0[:hn], g0[hn:nn], logn-1, tmp)
@@ -270,7 +277,7 @@ func ffLDLBinaryNormalize(tree []fpr, origLogn, logn int) {
 	ffLDLBinaryNormalize(tree[nn+ffLDLTreeSize(logn-1):], origLogn, logn-1)
 }
 
-func mulFFTSlice(a, b []fpr, logn int) {
+func mulFFT(a, b []fpr, logn int) {
 	hn := 1 << (logn - 1)
 	for u := range hn {
 		aRe := a[u]
@@ -282,7 +289,7 @@ func mulFFTSlice(a, b []fpr, logn int) {
 	}
 }
 
-func splitFFTSlice(f0, f1, f []fpr, logn int) {
+func splitFFT(f0, f1, f []fpr, logn int) {
 	nn := 1 << logn
 	hn := nn >> 1
 	qn := hn >> 1
@@ -310,7 +317,7 @@ func splitFFTSlice(f0, f1, f []fpr, logn int) {
 	}
 }
 
-func mergeFFTSlice(f, f0, f1 []fpr, logn int) {
+func mergeFFT(f, f0, f1 []fpr, logn int) {
 	nn := 1 << logn
 	hn := nn >> 1
 	qn := hn >> 1
@@ -482,25 +489,25 @@ func ffSamplingFFTRecursive(prng *samplerPRNG, z0, z1, tree, t0, t1, tmp []fpr, 
 	tree0 := tree[nn:]
 	tree1 := tree[nn+ffLDLTreeSize(logn-1):]
 
-	splitFFTSlice(z1[:hn], z1[hn:nn], t1[:nn], logn)
+	splitFFT(z1[:hn], z1[hn:nn], t1[:nn], logn)
 	ffSamplingFFTRecursive(prng, tmp[:hn], tmp[hn:nn], tree1, z1[:hn], z1[hn:nn], tmp[nn:], logn-1)
-	mergeFFTSlice(z1[:nn], tmp[:hn], tmp[hn:nn], logn)
+	mergeFFT(z1[:nn], tmp[:hn], tmp[hn:nn], logn)
 
 	copy(tmp[:nn], t1[:nn])
 	for i := range nn {
 		tmp[i] -= z1[i]
 	}
-	mulFFTSlice(tmp[:nn], tree[:nn], logn)
+	mulFFT(tmp[:nn], tree[:nn], logn)
 	for i := range nn {
 		tmp[i] += t0[i]
 	}
 
-	splitFFTSlice(z0[:hn], z0[hn:nn], tmp[:nn], logn)
+	splitFFT(z0[:hn], z0[hn:nn], tmp[:nn], logn)
 	ffSamplingFFTRecursive(prng, tmp[:hn], tmp[hn:nn], tree0, z0[:hn], z0[hn:nn], tmp[nn:], logn-1)
-	mergeFFTSlice(z0[:nn], tmp[:hn], tmp[hn:nn], logn)
+	mergeFFT(z0[:nn], tmp[:hn], tmp[hn:nn], logn)
 }
 
-func fftSlice(f []fpr, logn int) {
+func fft(f []fpr, logn int) {
 	if logn == 0 {
 		return
 	}
@@ -529,7 +536,7 @@ func fftSlice(f []fpr, logn int) {
 	}
 }
 
-func inverseFFTSlice(f []fpr, logn int) {
+func inverseFFT(f []fpr, logn int) {
 	if logn == 0 {
 		return
 	}
@@ -585,7 +592,7 @@ func fftAdj(a []fpr, logn int) {
 	}
 }
 
-func fftMulSlice(a, b []fpr, logn int) {
+func fftMul(a, b []fpr, logn int) {
 	hn := 1 << (logn - 1)
 	for i := range hn {
 		aRe := a[i]
@@ -597,16 +604,16 @@ func fftMulSlice(a, b []fpr, logn int) {
 	}
 }
 
-func fftMulConstSlice(a []fpr, x fpr, logn int) {
+func fftMulConst(a []fpr, x fpr, logn int) {
 	for i := range 1 << logn {
 		a[i] *= x
 	}
 }
 
-// fftSelfAdjSlice writes dst = src * adj(src) in FFT representation. The
+// fftSelfAdj writes dst = src * adj(src) in FFT representation. The
 // result is real-valued so the imaginary half is explicitly zeroed; callers
 // (notably expandPrivateKey's fftAdd composition) rely on that.
-func fftSelfAdjSlice(dst, src []fpr, logn int) {
+func fftSelfAdj(dst, src []fpr, logn int) {
 	hn := 1 << (logn - 1)
 	for i := range hn {
 		aRe := src[i]
@@ -616,13 +623,13 @@ func fftSelfAdjSlice(dst, src []fpr, logn int) {
 	}
 }
 
-func polyNegSlice(a []fpr, logn int) {
+func polyNeg(a []fpr, logn int) {
 	for i := range 1 << logn {
 		a[i] = -a[i]
 	}
 }
 
-func fftMulAdjSlice(dst, a, b []fpr, logn int) {
+func fftMulAdj(dst, a, b []fpr, logn int) {
 	hn := 1 << (logn - 1)
 	for i := range hn {
 		aRe := a[i]

@@ -332,8 +332,8 @@ func orthogonalizedNormExceedsBound(f, g smallPolynomial, bound float64) bool {
 	fftMulAutoAdj(rf[:], invNorm[:], logN)
 	fftMulAutoAdj(rg[:], invNorm[:], logN)
 
-	inverseFFTSlice(rf[:], logN)
-	inverseFFTSlice(rg[:], logN)
+	inverseFFT(rf[:], logN)
+	inverseFFT(rg[:], logN)
 
 	var norm float64
 	for i := range rf {

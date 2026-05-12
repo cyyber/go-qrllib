@@ -552,8 +552,8 @@ func reduceNTRUSolution(wk *ntruWorkspace, Ft, Gt, ft, gt []uint32, depth, logn,
 	minBitsFG := bitLength[depth].avg - 6*bitLength[depth].std
 	maxBitsFG := bitLength[depth].avg + 6*bitLength[depth].std
 
-	fftSlice(rt3, logn)
-	fftSlice(rt4, logn)
+	fft(rt3, logn)
+	fft(rt4, logn)
 	fftInvNorm2(rt5, rt3, rt4, logn)
 	fftAdj(rt3, logn)
 	fftAdj(rt4, logn)
@@ -568,13 +568,13 @@ func reduceNTRUSolution(wk *ntruWorkspace, Ft, Gt, ft, gt []uint32, depth, logn,
 		polyBigToFP(rt1, Ft[FGlen-rlen:], rlen, llen, logn)
 		polyBigToFP(rt2, Gt[FGlen-rlen:], rlen, llen, logn)
 
-		fftSlice(rt1, logn)
-		fftSlice(rt2, logn)
-		fftMulSlice(rt1, rt3, logn)
-		fftMulSlice(rt2, rt4, logn)
+		fft(rt1, logn)
+		fft(rt2, logn)
+		fftMul(rt1, rt3, logn)
+		fftMul(rt2, rt4, logn)
 		fftAdd(rt2, rt1, logn)
 		fftMulAutoAdj(rt2, rt5, logn)
-		inverseFFTSlice(rt2, logn)
+		inverseFFT(rt2, logn)
 
 		scaleCorrection := scaleK - scaleFGSolution + scaleFGBase
 		pdc := fpr(math.Ldexp(1, -scaleCorrection))
@@ -727,14 +727,14 @@ func solveNTRUBinaryDepth0(f, g smallPolynomial, wk *ntruWorkspace) bool {
 	for i := range nn {
 		work[i] = fpr(modPNorm(t3[i], p))
 	}
-	fftSlice(work, logN)
+	fft(work, logN)
 	copy(den, work[:hn])
 	for i := range nn {
 		num[i] = fpr(modPNorm(t2[i], p))
 	}
-	fftSlice(num, logN)
+	fft(num, logN)
 	fftDivAutoAdj(num, den, logN)
-	inverseFFTSlice(num, logN)
+	inverseFFT(num, logN)
 	for i := range nn {
 		t2[i] = modPSet(int32(fprRint(num[i])), p)
 	}
@@ -859,10 +859,10 @@ func solveNTRUBinaryDepth1(f, g smallPolynomial, wk *ntruWorkspace) bool {
 	polyBigToFP(rt3, ft, slen, slen, logn)
 	polyBigToFP(rt4, gt, slen, slen, logn)
 
-	fftSlice(rt1, logn)
-	fftSlice(rt2, logn)
-	fftSlice(rt3, logn)
-	fftSlice(rt4, logn)
+	fft(rt1, logn)
+	fft(rt2, logn)
+	fft(rt3, logn)
+	fft(rt4, logn)
 
 	rt5 := fprs.take(nn)
 	rt6 := fprs.take(nn >> 1)
@@ -870,7 +870,7 @@ func solveNTRUBinaryDepth1(f, g smallPolynomial, wk *ntruWorkspace) bool {
 	fftInvNorm2(rt6, rt3, rt4, logn)
 	fftMulAutoAdj(rt5, rt6, logn)
 
-	inverseFFTSlice(rt5, logn)
+	inverseFFT(rt5, logn)
 	for i := range nn {
 		z := rt5[i]
 		if !(z < 9223372036854775807.0) || !(-9223372036854775807.0 < z) {
@@ -878,18 +878,18 @@ func solveNTRUBinaryDepth1(f, g smallPolynomial, wk *ntruWorkspace) bool {
 		}
 		rt5[i] = fpr(fprRint(z))
 	}
-	fftSlice(rt5, logn)
+	fft(rt5, logn)
 
 	kf := fprs.take(nn)
 	kg := fprs.take(nn)
 	copy(kf, rt3)
 	copy(kg, rt4)
-	fftMulSlice(kf, rt5, logn)
-	fftMulSlice(kg, rt5, logn)
+	fftMul(kf, rt5, logn)
+	fftMul(kg, rt5, logn)
 	fftSub(rt1, kf, logn)
 	fftSub(rt2, kg, logn)
-	inverseFFTSlice(rt1, logn)
-	inverseFFTSlice(rt2, logn)
+	inverseFFT(rt1, logn)
+	inverseFFT(rt2, logn)
 	for i := range nn {
 		tmp[i] = uint32(fprRint(rt1[i]))
 		tmp[nn+i] = uint32(fprRint(rt2[i]))
