@@ -3,7 +3,10 @@ package falcon1024
 // zint values are little-endian arrays of 31-bit limbs. Callers own scratch
 // allocation and length invariants; these helpers assume correctly sized
 // buffers and keep limbs reduced under mask31.
-const mask31 = 0x7FFFFFFF
+const (
+	mask31    = 0x7FFFFFFF
+	signBit31 = 1 << 30 // sign bit of a 31-bit two's-complement limb
+)
 
 func zintSub(a, b []uint32, ctl uint32) uint32 {
 	var cc uint32
@@ -315,6 +318,6 @@ func zintSubScaled(x, y []uint32, sch, scl uint32) {
 }
 
 func zintOneToPlain(x uint32) int32 {
-	w := x | ((x & 0x40000000) << 1)
+	w := x | ((x & signBit31) << 1)
 	return int32(w)
 }

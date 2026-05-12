@@ -259,25 +259,49 @@ func TestZintRebuildCRT(t *testing.T) {
 	for _, tc := range []struct {
 		name            string
 		xx              []uint32
+		count           int
 		normalizeSigned bool
 		want            []uint32
 	}{
 		{
 			name:            "unsigned",
 			xx:              []uint32{1, 2, 3, 123, 456, 789},
+			count:           2,
 			normalizeSigned: false,
 			want:            []uint32{116849192, 1180448205, 612339150, 1776501976, 1643101678, 2064339632},
 		},
 		{
 			name:            "signed",
 			xx:              []uint32{1, 2, 3, 123, 456, 789},
+			count:           2,
 			normalizeSigned: true,
 			want:            []uint32{116849192, 1180448205, 612339150, 1495684311, 1362527950, 2064540328},
+		},
+		{
+			// Replicates the count=2 unsigned data four times; since each of
+			// the count entries is rebuilt independently, the expected output
+			// is the unsigned-case want concatenated four times. This exercises
+			// the outer batching loop with count > 2.
+			name: "unsigned count=8",
+			xx: []uint32{
+				1, 2, 3, 123, 456, 789,
+				1, 2, 3, 123, 456, 789,
+				1, 2, 3, 123, 456, 789,
+				1, 2, 3, 123, 456, 789,
+			},
+			count:           8,
+			normalizeSigned: false,
+			want: []uint32{
+				116849192, 1180448205, 612339150, 1776501976, 1643101678, 2064339632,
+				116849192, 1180448205, 612339150, 1776501976, 1643101678, 2064339632,
+				116849192, 1180448205, 612339150, 1776501976, 1643101678, 2064339632,
+				116849192, 1180448205, 612339150, 1776501976, 1643101678, 2064339632,
+			},
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			xx := slices.Clone(tc.xx)
-			zintRebuildCRT(xx, 3, 3, 2, primes[:], tc.normalizeSigned, make([]uint32, 3))
+			zintRebuildCRT(xx, 3, 3, tc.count, primes[:], tc.normalizeSigned, make([]uint32, 3))
 			requireEqualWords(t, "zintRebuildCRT", xx, tc.want)
 		})
 	}
