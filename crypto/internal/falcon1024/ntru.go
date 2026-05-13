@@ -210,15 +210,19 @@ func makeFGStep(data []uint32, logn, depth int, inNTT, outNTT bool) {
 	slen := maxBlSmall[depth]
 	tlen := maxBlSmall[depth+1]
 
-	fd := data[:hn*tlen]
-	gd := data[hn*tlen : 2*hn*tlen]
-	fs := data[2*hn*tlen : 2*hn*tlen+nn*slen]
-	gs := data[2*hn*tlen+nn*slen : 2*hn*tlen+2*nn*slen]
-	gm := data[2*hn*tlen+2*nn*slen : 2*hn*tlen+2*nn*slen+nn]
-	igm := data[2*hn*tlen+2*nn*slen+nn : 2*hn*tlen+2*nn*slen+2*nn]
-	t1 := data[2*hn*tlen+2*nn*slen+2*nn : 2*hn*tlen+2*nn*slen+3*nn]
+	fsOff := 2 * hn * tlen
+	gmOff := fsOff + 2*nn*slen
+	t1Off := gmOff + 2*nn
 
-	copy(data[2*hn*tlen:2*hn*tlen+2*nn*slen], data[:2*nn*slen])
+	fd := data[:hn*tlen]
+	gd := data[hn*tlen:fsOff]
+	fs := data[fsOff : fsOff+nn*slen]
+	gs := data[fsOff+nn*slen : gmOff]
+	gm := data[gmOff : gmOff+nn]
+	igm := data[gmOff+nn : t1Off]
+	t1 := data[t1Off : t1Off+nn]
+
+	copy(data[fsOff:gmOff], data[:2*nn*slen])
 	for u := range slen {
 		p := primes[u].p
 		p0i := modPNInv31(p)
@@ -261,9 +265,9 @@ func makeFGStep(data []uint32, logn, depth int, inNTT, outNTT bool) {
 		}
 	}
 
-	scratchOff := 2*hn*tlen + 2*nn*slen + 3*nn
 	crtScratch := t1
 	if len(crtScratch) < slen {
+		scratchOff := t1Off + nn
 		crtScratch = data[scratchOff : scratchOff+slen]
 	}
 	crtScratch = crtScratch[:slen]
