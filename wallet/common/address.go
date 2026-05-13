@@ -24,7 +24,7 @@ func UnsafeGetAddress(pk []byte, desc descriptor.Descriptor) [AddressSize]byte {
 	// noinspection GoBoolExpressions
 	if AddressSize > 64 {
 		//coverage:ignore
-		//rationale: compile-time assertion, AddressSize is a constant (48) which is <= 64
+		//rationale: compile-time assertion, AddressSize is a constant (64) which is <= 64
 		panic("AddressSize must be <= 64")
 	}
 
