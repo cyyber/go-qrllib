@@ -52,6 +52,10 @@ const (
 	falconLog2          fpr = 0.693147180559945309417232121458176568
 	falconInvLog2       fpr = 1.44269504088896340735992468100189214
 	falconPtwo63        fpr = 9223372036854775808
+	falconPtwo31m1      fpr = 2147483647
+	falconMtwo31m1      fpr = -2147483647
+	falconPtwo63m1      fpr = 9223372036854775807
+	falconMtwo63m1      fpr = -9223372036854775807
 )
 
 type u72 struct {

@@ -176,6 +176,7 @@ func checkNTRUEquation(f, g, ntruF, ntruG smallPolynomial, scratch []uint32) boo
 			return false
 		}
 	}
+
 	return true
 }
 
@@ -215,7 +216,7 @@ func makeFGStep(data []uint32, logn, depth int, inNTT, outNTT bool) {
 	t1Off := gmOff + 2*nn
 
 	fd := data[:hn*tlen]
-	gd := data[hn*tlen:fsOff]
+	gd := data[hn*tlen : fsOff]
 	fs := data[fsOff : fsOff+nn*slen]
 	gs := data[fsOff+nn*slen : gmOff]
 	gm := data[gmOff : gmOff+nn]
@@ -494,12 +495,13 @@ func liftNTRUSolution(wk *ntruWorkspace, Ft, Gt, Fd, Gd, ft, gt []uint32, logn, 
 		p := primes[u].p
 		p0i := modPNInv31(p)
 		r2 := modPR2(p, p0i)
-		modPMkgm2(gm, igm, logn, primes[u].g, p, p0i)
 
 		if u == slen {
 			zintRebuildCRT(ft, slen, slen, n, primes[:], true, crtScratch[:slen])
 			zintRebuildCRT(gt, slen, slen, n, primes[:], true, crtScratch[:slen])
 		}
+
+		modPMkgm2(gm, igm, logn, primes[u].g, p, p0i)
 
 		if u < slen {
 			for v := range n {
@@ -599,7 +601,7 @@ func reduceNTRUSolution(wk *ntruWorkspace, Ft, Gt, ft, gt []uint32, depth, logn,
 			x := rt2[i] * pdc
 			// Bounds written with !(<) on both sides to also reject NaN
 			// (NaN comparisons all return false; the negation captures them).
-			if !(-2147483647.0 < x) || !(x < 2147483647.0) {
+			if !(falconMtwo31m1 < x) || !(x < falconPtwo31m1) {
 				return false
 			}
 			k[i] = int32(fprRint(x))
@@ -655,6 +657,7 @@ func writeReducedNTRUSolution(tmp, Ft, Gt []uint32, n, slen, llen int) {
 func solveNTRUBinaryDepth0(f, g smallPolynomial, wk *ntruWorkspace) {
 	nn := n
 	hn := nn >> 1
+
 	p := primes[0].p
 	p0i := modPNInv31(p)
 	r2 := modPR2(p, p0i)
@@ -673,12 +676,14 @@ func solveNTRUBinaryDepth0(f, g smallPolynomial, wk *ntruWorkspace) {
 	igm := u32s.take(nn)
 
 	modPMkgm2(gm, igm, logN, primes[0].g, p, p0i)
+
 	for i := range hn {
 		prevF[i] = modPSet(zintOneToPlain(prevF[i]), p)
 		prevG[i] = modPSet(zintOneToPlain(prevG[i]), p)
 	}
 	modPNTT2(prevF, gm, logN-1, p, p0i)
 	modPNTT2(prevG, gm, logN-1, p, p0i)
+
 	for i := range nn {
 		ft[i] = modPSet(f[i], p)
 		gt[i] = modPSet(g[i], p)
@@ -717,6 +722,7 @@ func solveNTRUBinaryDepth0(f, g smallPolynomial, wk *ntruWorkspace) {
 	}
 	modPNTT2(t4, gm, logN, p, p0i)
 	modPNTT2(t5, gm, logN, p, p0i)
+
 	for i := range nn {
 		w := modPMontyMul(t5[i], r2, p, p0i)
 		t2[i] = modPMontyMul(w, Fp[i], p, p0i)
@@ -731,6 +737,7 @@ func solveNTRUBinaryDepth0(f, g smallPolynomial, wk *ntruWorkspace) {
 	}
 	modPNTT2(t4, gm, logN, p, p0i)
 	modPNTT2(t5, gm, logN, p, p0i)
+
 	for i := range nn {
 		w := modPMontyMul(t5[i], r2, p, p0i)
 		t2[i] = modPAdd(t2[i], modPMontyMul(w, Gp[i], p, p0i), p)
@@ -757,6 +764,7 @@ func solveNTRUBinaryDepth0(f, g smallPolynomial, wk *ntruWorkspace) {
 	for i := range nn {
 		t2[i] = modPSet(int32(fprRint(num[i])), p)
 	}
+
 	for i := range nn {
 		t4[i] = modPSet(f[i], p)
 		t5[i] = modPSet(g[i], p)
@@ -803,6 +811,7 @@ func solveNTRUBinaryDepth1(f, g smallPolynomial, wk *ntruWorkspace) bool {
 	Fp := u32s.take(hn)
 	Gp := u32s.take(hn)
 	crtScratch := u32s.take(max(llen, slen))
+
 	for u := range llen {
 		p := primes[u].p
 		p0i := modPNInv31(p)
@@ -813,16 +822,19 @@ func solveNTRUBinaryDepth1(f, g smallPolynomial, wk *ntruWorkspace) bool {
 			Gt[v*llen+u] = zintModSmallSigned(Gd[v*dlen:v*dlen+dlen], p, p0i, r2, rx)
 		}
 	}
+
 	for u := range llen {
 		p := primes[u].p
 		p0i := modPNInv31(p)
 		r2 := modPR2(p, p0i)
 
 		modPMkgm2(gmFull, igmFull, logN, primes[u].g, p, p0i)
+
 		for v := range n {
 			fx[v] = modPSet(f[v], p)
 			gx[v] = modPSet(g[v], p)
 		}
+
 		modPNTT2(fx, gmFull, logN, p, p0i)
 		modPNTT2(gx, gmFull, logN, p, p0i)
 		for e := logN; e > logn; e-- {
@@ -832,12 +844,14 @@ func solveNTRUBinaryDepth1(f, g smallPolynomial, wk *ntruWorkspace) bool {
 
 		gm := gmFull[:nn]
 		igm := igmFull[:nn]
+
 		for v := range hn {
 			Fp[v] = Ft[v*llen+u]
 			Gp[v] = Gt[v*llen+u]
 		}
 		modPNTT2(Fp, gm, logn-1, p, p0i)
 		modPNTT2(Gp, gm, logn-1, p, p0i)
+
 		for v := range hn {
 			ftA := fx[v<<1]
 			ftB := fx[(v<<1)+1]
@@ -893,7 +907,7 @@ func solveNTRUBinaryDepth1(f, g smallPolynomial, wk *ntruWorkspace) bool {
 		z := rt5[i]
 		// Bounds written with !(<) on both sides to also reject NaN
 		// (NaN comparisons all return false; the negation captures them).
-		if !(z < 9223372036854775807.0) || !(-9223372036854775807.0 < z) {
+		if !(z < falconPtwo63m1) || !(falconMtwo63m1 < z) {
 			return false
 		}
 		rt5[i] = fpr(fprRint(z))
@@ -910,9 +924,11 @@ func solveNTRUBinaryDepth1(f, g smallPolynomial, wk *ntruWorkspace) bool {
 	fftSub(rt2, kg, logn)
 	inverseFFT(rt1, logn)
 	inverseFFT(rt2, logn)
+
 	for i := range nn {
 		tmp[i] = uint32(fprRint(rt1[i]))
 		tmp[nn+i] = uint32(fprRint(rt2[i]))
 	}
+
 	return true
 }
