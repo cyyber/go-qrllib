@@ -598,6 +598,8 @@ func reduceNTRUSolution(wk *ntruWorkspace, Ft, Gt, ft, gt []uint32, depth, logn,
 		pdc := fpr(math.Ldexp(1, -scaleCorrection))
 		for i := range n {
 			x := rt2[i] * pdc
+			// Bounds written with !(<) on both sides to also reject NaN
+			// (NaN comparisons all return false; the negation captures them).
 			if !(-2147483647.0 < x) || !(x < 2147483647.0) {
 				return false
 			}
@@ -891,6 +893,8 @@ func solveNTRUBinaryDepth1(f, g smallPolynomial, wk *ntruWorkspace) bool {
 	inverseFFT(rt5, logn)
 	for i := range nn {
 		z := rt5[i]
+		// Bounds written with !(<) on both sides to also reject NaN
+		// (NaN comparisons all return false; the negation captures them).
 		if !(z < 9223372036854775807.0) || !(-9223372036854775807.0 < z) {
 			return false
 		}
