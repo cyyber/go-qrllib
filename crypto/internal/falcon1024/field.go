@@ -16,8 +16,7 @@ const (
 	qNegInv            = 12287
 	r2                 = 10952
 	nInverseMontgomery = 64
-	// mask16 is the low-16-bit mask used by the Montgomery reduction (R = 2^16).
-	mask16 = 0xFFFF
+	mask16             = 0xFFFF
 )
 
 type fieldElement uint32
