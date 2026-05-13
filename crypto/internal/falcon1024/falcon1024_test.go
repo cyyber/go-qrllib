@@ -577,8 +577,8 @@ func TestComputePublic(t *testing.T) {
 	// Derived from the Falcon reference implementation test_falcon.c
 	// ntru_f_1024, ntru_g_1024, and ntru_pkey_1024 arrays.
 	// Source: https://falcon-sign.info/impl/test_falcon.c.html
-	f := mustDecodeSmallPolynomialHex(t, ntru_f_1024Hex)
-	g := mustDecodeSmallPolynomialHex(t, ntru_g_1024Hex)
+	f := mustDecodeSmallPolynomialHex(t, ntruSmallF1024Hex)
+	g := mustDecodeSmallPolynomialHex(t, ntruSmallG1024Hex)
 
 	wantBytes := mustDecodeHex(t, verifyRawKATPublicKeyHex)
 	wantH, err := pkDecode(wantBytes)
@@ -607,10 +607,10 @@ func TestCompletePrivate(t *testing.T) {
 	// Derived from the Falcon reference implementation test_falcon.c
 	// ntru_f_1024, ntru_g_1024, ntru_F_1024, and ntru_G_1024 arrays.
 	// Source: https://falcon-sign.info/impl/test_falcon.c.html
-	f := mustDecodeSmallPolynomialHex(t, ntru_f_1024Hex)
-	g := mustDecodeSmallPolynomialHex(t, ntru_g_1024Hex)
-	ntruF := mustDecodeSmallPolynomialHex(t, ntru_F_1024Hex)
-	wantG := mustDecodeSmallPolynomialHex(t, ntru_G_1024Hex)
+	f := mustDecodeSmallPolynomialHex(t, ntruSmallF1024Hex)
+	g := mustDecodeSmallPolynomialHex(t, ntruSmallG1024Hex)
+	ntruF := mustDecodeSmallPolynomialHex(t, ntruF1024Hex)
+	wantG := mustDecodeSmallPolynomialHex(t, ntruG1024Hex)
 
 	gotG, ok := completePrivate(f, g, ntruF)
 	if !ok {
@@ -626,9 +626,9 @@ func TestNewPrivateKey(t *testing.T) {
 	// serialized secret key. Use those reference polynomials to check that
 	// private-key reconstruction produces the reference public key.
 	// Source: https://falcon-sign.info/impl/test_falcon.c.html
-	f := mustDecodeSmallPolynomialHex(t, ntru_f_1024Hex)
-	g := mustDecodeSmallPolynomialHex(t, ntru_g_1024Hex)
-	ntruF := mustDecodeSmallPolynomialHex(t, ntru_F_1024Hex)
+	f := mustDecodeSmallPolynomialHex(t, ntruSmallF1024Hex)
+	g := mustDecodeSmallPolynomialHex(t, ntruSmallG1024Hex)
+	ntruF := mustDecodeSmallPolynomialHex(t, ntruF1024Hex)
 
 	sk := make([]byte, privateKeySize)
 	if err := skEncode(sk, f, g, ntruF); err != nil {
@@ -651,10 +651,10 @@ func TestSignTree(t *testing.T) {
 	// deterministic sign-tree outputs, so this checks that signing with that
 	// reference key produces signatures accepted by the reference public key.
 	// Source: https://falcon-sign.info/impl/test_falcon.c.html
-	f := mustDecodeSmallPolynomialHex(t, ntru_f_1024Hex)
-	g := mustDecodeSmallPolynomialHex(t, ntru_g_1024Hex)
-	ntruF := mustDecodeSmallPolynomialHex(t, ntru_F_1024Hex)
-	ntruG := mustDecodeSmallPolynomialHex(t, ntru_G_1024Hex)
+	f := mustDecodeSmallPolynomialHex(t, ntruSmallF1024Hex)
+	g := mustDecodeSmallPolynomialHex(t, ntruSmallG1024Hex)
+	ntruF := mustDecodeSmallPolynomialHex(t, ntruF1024Hex)
+	ntruG := mustDecodeSmallPolynomialHex(t, ntruG1024Hex)
 
 	h, ok := computePublic(f, g)
 	if !ok {

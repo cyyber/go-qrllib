@@ -15,10 +15,10 @@ var ntruReferenceKATs = []struct {
 }{
 	{
 		name: "Falcon-1024/test_falcon.c",
-		f:    ntru_f_1024Hex,
-		g:    ntru_g_1024Hex,
-		F:    ntru_F_1024Hex,
-		G:    ntru_G_1024Hex,
+		f:    ntruSmallF1024Hex,
+		g:    ntruSmallG1024Hex,
+		F:    ntruF1024Hex,
+		G:    ntruG1024Hex,
 	},
 }
 
@@ -89,7 +89,7 @@ func TestSolveNTRU(t *testing.T) {
 	}
 }
 
-const ntru_f_1024Hex = "0302fcfd00fb04fdff01fe020300ff0000000000fefefd03fcffff0002fc00f7fd0503ff01fb01fffa00ffff05ff04ff" +
+const ntruSmallF1024Hex = "0302fcfd00fb04fdff01fe020300ff0000000000fefefd03fcffff0002fc00f7fd0503ff01fb01fffa00ffff05ff04ff" +
 	"fe02fdff01fd0101fbfefe000005f8ffff0000020004fd0403fdfe06fefe00030000fffe0001feff0700fc01fffe02ff" +
 	"fb05fffcfeff02ff02fffd03010201fe0303010402000300fd0007fb04fdff01fa00ff00fb01fe02fffffe0304ff00ff" +
 	"000103fe0604010101ff0301fd0000ff02fd02fc01ffff01fefffefaf8fd03fe0003ff010005fe00fe010201fefbfdfe" +
@@ -112,7 +112,7 @@ const ntru_f_1024Hex = "0302fcfd00fb04fdff01fe020300ff0000000000fefefd03fcffff00
 	"07ff03fffefe05000101fd03fa0201030301ff000201fbfffc01fe05fdfe00030001ffff010003ff03ff010200fc02ff" +
 	"fdfe00fdfe000100fbfe040107fb0101"
 
-const ntru_g_1024Hex = "03fff9ff04fe03fffdfdfb03ffff02fdfb000001fd0303fefe00fc0201ff03fb0500fffdfffe050304fefe00fc000303" +
+const ntruSmallG1024Hex = "03fff9ff04fe03fffdfdfb03ffff02fdfb000001fd0303fefe00fc0201ff03fb0500fffdfffe050304fefe00fc000303" +
 	"000103fffefdfffe030100fe00fe00000103fefd03fdfffefffdfd0101080104fefffbfc0305000007040101fcfe0404" +
 	"fdfc0503020001fa02fffdffff0102050003010300fcfdfdffff01010200fe00030303fc01fefc030305fcfbffff03fe" +
 	"fcfffb01ff0002ff0101fdfefffcfcffff00ffff03fefe03fa02020002fd0003fefe02ff0104fe00000000040002fcff" +
@@ -135,7 +135,7 @@ const ntru_g_1024Hex = "03fff9ff04fe03fffdfdfb03ffff02fdfb000001fd0303fefe00fc02
 	"0302fc04feff02fe0003feff060103000400feff0100fd030203fffdfd03fe03fe00ff03fdfe0104fc0205f90100fb01" +
 	"02ff03fe03fffe02000000fdfe040701"
 
-const ntru_F_1024Hex = "24f358010dbe09fef41e17eef108fe05130d0eeaea1dee08d31cfcd21e28e6fdfffeca0422dae037e7e804ddf7081718" +
+const ntruF1024Hex = "24f358010dbe09fef41e17eef108fe05130d0eeaea1dee08d31cfcd21e28e6fdfffeca0422dae037e7e804ddf7081718" +
 	"23111d0729fdf3271918de12c916c3e9120301fd20ecfec11315f303f9ef05d8e30806d51b1f03e4d24c1ff0fc3b26fa" +
 	"fafd22edf6d9ecf1fdf5d709a615e618feeedc12fefceebd0e07eaeae42ac7200719071ed3f7fe081cf213edd125de2d" +
 	"e0f8dd34e123f2f624bff0ebfb0415c3160dc9fbea0ef6dd08fb1be1e00300f4e71bfbea03fa0015fb2d24d610fef7f0" +
@@ -158,7 +158,7 @@ const ntru_F_1024Hex = "24f358010dbe09fef41e17eef108fe05130d0eeaea1dee08d31cfcd2
 	"f2f817ecd3f41e080709f4f3fee312ff1eefe6d73abefa08b2191d00d8e51028f1e412ca10f401fc11eb0c1ef92df8e4" +
 	"08d7ff2a03fad1162cb2d3290ce2e90d"
 
-const ntru_G_1024Hex = "38fce40d041af2f6ebe015eb003b1afaaff9d6ff081425df2401fa0effb70f120722d30713e20808c8f30714ec0e040b" +
+const ntruG1024Hex = "38fce40d041af2f6ebe015eb003b1afaaff9d6ff081425df2401fa0effb70f120722d30713e20808c8f30714ec0e040b" +
 	"dc1513f0ef0ad3fcf412f7171401e5f9010121e5e93823fb102bff0bee053b0ed90bdec506ee2be716f909e4f7d82f00" +
 	"f4eaf4d4eff4f6fb04ecf619260200ef0ef0060907e30b300e0a001804fb381401233e07e1242418eddf1309f3f00201" +
 	"e303fd2a081bed33100e1cff1803012ff3d5091103151aedfa04dc071a1328d41bec09ff13ff00cd05fbd30b1aff0127" +

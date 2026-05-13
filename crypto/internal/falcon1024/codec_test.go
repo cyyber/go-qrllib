@@ -70,9 +70,9 @@ func TestPublicKeyCodec(t *testing.T) {
 }
 
 func TestPrivateKeyCodec(t *testing.T) {
-	f := mustDecodeSmallPolynomialHex(t, ntru_f_1024Hex)
-	g := mustDecodeSmallPolynomialHex(t, ntru_g_1024Hex)
-	ntruF := mustDecodeSmallPolynomialHex(t, ntru_F_1024Hex)
+	f := mustDecodeSmallPolynomialHex(t, ntruSmallF1024Hex)
+	g := mustDecodeSmallPolynomialHex(t, ntruSmallG1024Hex)
+	ntruF := mustDecodeSmallPolynomialHex(t, ntruF1024Hex)
 
 	sk := make([]byte, privateKeySize)
 	if err := skEncode(sk, f, g, ntruF); err != nil {
@@ -377,21 +377,21 @@ func TestTrimI8Encode(t *testing.T) {
 	}{
 		{
 			name:   "f",
-			p:      mustDecodeSmallPolynomialHex(t, ntru_f_1024Hex),
+			p:      mustDecodeSmallPolynomialHex(t, ntruSmallF1024Hex),
 			bits:   fgBits,
 			length: 640,
 			digest: "0fd26e919032455f5e3a2c7ed5811cbb7bda70b453a538d18103b3620c082857",
 		},
 		{
 			name:   "g",
-			p:      mustDecodeSmallPolynomialHex(t, ntru_g_1024Hex),
+			p:      mustDecodeSmallPolynomialHex(t, ntruSmallG1024Hex),
 			bits:   fgBits,
 			length: 640,
 			digest: "b44b290bffb4bdb66b216c88d0de69e0fa877e4035d27e6ebf055d6844d01ee2",
 		},
 		{
 			name:   "F",
-			p:      mustDecodeSmallPolynomialHex(t, ntru_F_1024Hex),
+			p:      mustDecodeSmallPolynomialHex(t, ntruF1024Hex),
 			bits:   ntruFBits,
 			length: 1024,
 			digest: "b79fd83fac715a2942d4d76ad5c6b8b1ce62a9f35b4cdad78963db5c46c86939",
