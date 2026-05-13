@@ -1,4 +1,8 @@
-// Package falcon1024 implements Falcon-1024 key generation, signing, and verification.
+// Package falcon1024 implements Falcon-1024 key generation, signing, and
+// verification.
+//
+// The package currently supports padded Falcon signatures: fixed-size
+// signatures with a compressed payload and zero padding.
 package falcon1024
 
 import (
