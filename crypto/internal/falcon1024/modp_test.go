@@ -350,10 +350,10 @@ func TestModPNTT2(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			a := slices.Clone(tc.input)
-			modPNTT2(a, 3, gm, p, p0i)
+			modPNTT2(a, gm, 3, p, p0i)
 			requireEqualWords(t, "modPNTT2", a, tc.wantNTT)
 
-			modPINTT2(a, 3, igm, p, p0i)
+			modPINTT2(a, igm, 3, p, p0i)
 			requireEqualWords(t, "modPINTT2", a, tc.input)
 		})
 	}
@@ -373,7 +373,7 @@ func TestModPNTT2Ext(t *testing.T) {
 			5, sentinel, 6, sentinel, 7, sentinel, 8,
 		}
 
-		modPNTT2Ext(a, 2, 3, gm, p, p0i)
+		modPNTT2Ext(a, 2, gm, 3, p, p0i)
 		requireEqualWords(t, "modPNTT2Ext", a, []uint32{
 			1939742775, sentinel, 1889065586, sentinel,
 			1695103822, sentinel, 327325878, sentinel,
@@ -381,7 +381,7 @@ func TestModPNTT2Ext(t *testing.T) {
 			1880810079, sentinel, 1822640737,
 		})
 
-		modPINTT2Ext(a, 2, 3, igm, p, p0i)
+		modPINTT2Ext(a, 2, igm, 3, p, p0i)
 		requireEqualWords(t, "modPINTT2Ext", a, []uint32{
 			1, sentinel, 2, sentinel, 3, sentinel, 4, sentinel,
 			5, sentinel, 6, sentinel, 7, sentinel, 8,
@@ -392,7 +392,7 @@ func TestModPNTT2Ext(t *testing.T) {
 		a := []uint32{12345, 67890}
 		want := slices.Clone(a)
 
-		modPNTT2Ext(a, 2, 0, nil, p, p0i)
+		modPNTT2Ext(a, 2, nil, 0, p, p0i)
 		requireEqualWords(t, "modPNTT2Ext logn 0", a, want)
 	})
 
@@ -400,7 +400,7 @@ func TestModPNTT2Ext(t *testing.T) {
 		a := []uint32{12345, 67890}
 		want := slices.Clone(a)
 
-		modPINTT2Ext(a, 2, 0, nil, p, p0i)
+		modPINTT2Ext(a, 2, nil, 0, p, p0i)
 		requireEqualWords(t, "modPINTT2Ext logn 0", a, want)
 	})
 }

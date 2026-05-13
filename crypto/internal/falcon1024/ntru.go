@@ -38,9 +38,7 @@ func solveNTRU(f, g smallPolynomial) (ntruF, ntruG smallPolynomial, ok bool) {
 	if !solveNTRUBinaryDepth1(f, g, wk) {
 		return smallPolynomial{}, smallPolynomial{}, false
 	}
-	if !solveNTRUBinaryDepth0(f, g, wk) {
-		return smallPolynomial{}, smallPolynomial{}, false
-	}
+	solveNTRUBinaryDepth0(f, g, wk)
 
 	ntruF, ok = polyBigToSmall(wk.state[:n], ntruCoeffBound)
 	if !ok {
@@ -162,10 +160,10 @@ func checkNTRUEquation(f, g, ntruF, ntruG smallPolynomial, scratch []uint32) boo
 		Gt[i] = modPSet(ntruG[i], p)
 	}
 
-	modPNTT2(ft, logN, gm, p, p0i)
-	modPNTT2(gt, logN, gm, p, p0i)
-	modPNTT2(Ft, logN, gm, p, p0i)
-	modPNTT2(Gt, logN, gm, p, p0i)
+	modPNTT2(ft, gm, logN, p, p0i)
+	modPNTT2(gt, gm, logN, p, p0i)
+	modPNTT2(Ft, gm, logN, p, p0i)
+	modPNTT2(Gt, gm, logN, p, p0i)
 
 	target := modPMontyMul(q, 1, p, p0i)
 	for i := range n {
@@ -197,8 +195,8 @@ func makeFG(data []uint32, f, g smallPolynomial, depth int, outNTT bool) {
 		gm := data[2*nn : 3*nn]
 		igm := data[3*nn : 4*nn]
 		modPMkgm2(gm, igm, logN, primes[0].g, p, p0i)
-		modPNTT2(ft, logN, gm, p, p0i)
-		modPNTT2(gt, logN, gm, p, p0i)
+		modPNTT2(ft, gm, logN, p, p0i)
+		modPNTT2(gt, gm, logN, p, p0i)
 		return
 	}
 	for d := range depth {
@@ -231,7 +229,7 @@ func makeFGStep(data []uint32, logn, depth int, inNTT, outNTT bool) {
 			t1[v] = fs[x]
 		}
 		if !inNTT {
-			modPNTT2(t1, logn, gm, p, p0i)
+			modPNTT2(t1, gm, logn, p, p0i)
 		}
 		for v, x := 0, u; v < hn; v, x = v+1, x+tlen {
 			w0 := t1[v<<1]
@@ -239,14 +237,14 @@ func makeFGStep(data []uint32, logn, depth int, inNTT, outNTT bool) {
 			fd[x] = modPMontyMul(modPMontyMul(w0, w1, p, p0i), r2, p, p0i)
 		}
 		if inNTT {
-			modPINTT2Ext(fs[u:], slen, logn, igm, p, p0i)
+			modPINTT2Ext(fs[u:], slen, igm, logn, p, p0i)
 		}
 
 		for v, x := 0, u; v < nn; v, x = v+1, x+slen {
 			t1[v] = gs[x]
 		}
 		if !inNTT {
-			modPNTT2(t1, logn, gm, p, p0i)
+			modPNTT2(t1, gm, logn, p, p0i)
 		}
 		for v, x := 0, u; v < hn; v, x = v+1, x+tlen {
 			w0 := t1[v<<1]
@@ -254,12 +252,12 @@ func makeFGStep(data []uint32, logn, depth int, inNTT, outNTT bool) {
 			gd[x] = modPMontyMul(modPMontyMul(w0, w1, p, p0i), r2, p, p0i)
 		}
 		if inNTT {
-			modPINTT2Ext(gs[u:], slen, logn, igm, p, p0i)
+			modPINTT2Ext(gs[u:], slen, igm, logn, p, p0i)
 		}
 
 		if !outNTT {
-			modPINTT2Ext(fd[u:], tlen, logn-1, igm, p, p0i)
-			modPINTT2Ext(gd[u:], tlen, logn-1, igm, p, p0i)
+			modPINTT2Ext(fd[u:], tlen, igm, logn-1, p, p0i)
+			modPINTT2Ext(gd[u:], tlen, igm, logn-1, p, p0i)
 		}
 	}
 
@@ -282,7 +280,7 @@ func makeFGStep(data []uint32, logn, depth int, inNTT, outNTT bool) {
 		for v, x := 0, 0; v < nn; v, x = v+1, x+slen {
 			t1[v] = zintModSmallSigned(fs[x:x+slen], p, p0i, r2, rx)
 		}
-		modPNTT2(t1, logn, gm, p, p0i)
+		modPNTT2(t1, gm, logn, p, p0i)
 		for v, x := 0, u; v < hn; v, x = v+1, x+tlen {
 			w0 := t1[v<<1]
 			w1 := t1[(v<<1)+1]
@@ -292,7 +290,7 @@ func makeFGStep(data []uint32, logn, depth int, inNTT, outNTT bool) {
 		for v, x := 0, 0; v < nn; v, x = v+1, x+slen {
 			t1[v] = zintModSmallSigned(gs[x:x+slen], p, p0i, r2, rx)
 		}
-		modPNTT2(t1, logn, gm, p, p0i)
+		modPNTT2(t1, gm, logn, p, p0i)
 		for v, x := 0, u; v < hn; v, x = v+1, x+tlen {
 			w0 := t1[v<<1]
 			w1 := t1[(v<<1)+1]
@@ -300,8 +298,8 @@ func makeFGStep(data []uint32, logn, depth int, inNTT, outNTT bool) {
 		}
 
 		if !outNTT {
-			modPINTT2Ext(fd[u:], tlen, logn-1, igm, p, p0i)
-			modPINTT2Ext(gd[u:], tlen, logn-1, igm, p, p0i)
+			modPINTT2Ext(fd[u:], tlen, igm, logn-1, p, p0i)
+			modPINTT2Ext(gd[u:], tlen, igm, logn-1, p, p0i)
 		}
 	}
 }
@@ -401,17 +399,17 @@ func polySubScaledNTT(F []uint32, Flen, Fstride int, f []uint32, flen, fstride i
 		for v := range nn {
 			t1[v] = modPSet(k[v], p)
 		}
-		modPNTT2(t1, logn, gm, p, p0i)
+		modPNTT2(t1, gm, logn, p, p0i)
 
 		for v, x := 0, u; v < nn; v, x = v+1, x+tlen {
 			fk[x] = zintModSmallSigned(f[v*fstride:v*fstride+flen], p, p0i, r2, rx)
 		}
-		modPNTT2Ext(fk[u:], tlen, logn, gm, p, p0i)
+		modPNTT2Ext(fk[u:], tlen, gm, logn, p, p0i)
 
 		for v, x := 0, u; v < nn; v, x = v+1, x+tlen {
 			fk[x] = modPMontyMul(modPMontyMul(t1[v], fk[x], p, p0i), r2, p, p0i)
 		}
-		modPINTT2Ext(fk[u:], tlen, logn, igm, p, p0i)
+		modPINTT2Ext(fk[u:], tlen, igm, logn, p, p0i)
 	}
 
 	zintRebuildCRT(fk, tlen, tlen, nn, primes[:], true, t1)
@@ -441,9 +439,7 @@ func solveNTRUIntermediate(f, g smallPolynomial, depth int, wk *ntruWorkspace) b
 	Ft := wk.Ft[:n*llen]
 	Gt := wk.Gt[:n*llen]
 
-	if !liftNTRUSolution(wk, Ft, Gt, Fd, Gd, ft, gt, logn, slen, dlen, llen) {
-		return false
-	}
+	liftNTRUSolution(wk, Ft, Gt, Fd, Gd, ft, gt, logn, slen, dlen, llen)
 
 	if !reduceNTRUSolution(wk, Ft, Gt, ft, gt, depth, logn, slen, llen) {
 		return false
@@ -466,7 +462,7 @@ func makeFGPair(wk *ntruWorkspace, f, g smallPolynomial, depth int) (ft, gt []ui
 	return data[:n*slen], data[n*slen : 2*n*slen]
 }
 
-func liftNTRUSolution(wk *ntruWorkspace, Ft, Gt, Fd, Gd, ft, gt []uint32, logn, slen, dlen, llen int) bool {
+func liftNTRUSolution(wk *ntruWorkspace, Ft, Gt, Fd, Gd, ft, gt []uint32, logn, slen, dlen, llen int) {
 	n := 1 << logn
 	hn := n >> 1
 
@@ -506,24 +502,24 @@ func liftNTRUSolution(wk *ntruWorkspace, Ft, Gt, Fd, Gd, ft, gt []uint32, logn, 
 				fx[v] = ft[v*slen+u]
 				gx[v] = gt[v*slen+u]
 			}
-			modPINTT2Ext(ft[u:], slen, logn, igm, p, p0i)
-			modPINTT2Ext(gt[u:], slen, logn, igm, p, p0i)
+			modPINTT2Ext(ft[u:], slen, igm, logn, p, p0i)
+			modPINTT2Ext(gt[u:], slen, igm, logn, p, p0i)
 		} else {
 			rx := modPRx(slen, p, p0i, r2)
 			for v := range n {
 				fx[v] = zintModSmallSigned(ft[v*slen:v*slen+slen], p, p0i, r2, rx)
 				gx[v] = zintModSmallSigned(gt[v*slen:v*slen+slen], p, p0i, r2, rx)
 			}
-			modPNTT2(fx, logn, gm, p, p0i)
-			modPNTT2(gx, logn, gm, p, p0i)
+			modPNTT2(fx, gm, logn, p, p0i)
+			modPNTT2(gx, gm, logn, p, p0i)
 		}
 
 		for v := range hn {
 			Fp[v] = Ft[v*llen+u]
 			Gp[v] = Gt[v*llen+u]
 		}
-		modPNTT2(Fp, logn-1, gm, p, p0i)
-		modPNTT2(Gp, logn-1, gm, p, p0i)
+		modPNTT2(Fp, gm, logn-1, p, p0i)
+		modPNTT2(Gp, gm, logn-1, p, p0i)
 		for v := range hn {
 			ftA := fx[v<<1]
 			ftB := fx[(v<<1)+1]
@@ -536,13 +532,12 @@ func liftNTRUSolution(wk *ntruWorkspace, Ft, Gt, Fd, Gd, ft, gt []uint32, logn, 
 			Gt[(v<<1)*llen+u] = modPMontyMul(ftB, mGp, p, p0i)
 			Gt[((v<<1)+1)*llen+u] = modPMontyMul(ftA, mGp, p, p0i)
 		}
-		modPINTT2Ext(Ft[u:], llen, logn, igm, p, p0i)
-		modPINTT2Ext(Gt[u:], llen, logn, igm, p, p0i)
+		modPINTT2Ext(Ft[u:], llen, igm, logn, p, p0i)
+		modPINTT2Ext(Gt[u:], llen, igm, logn, p, p0i)
 	}
 
 	zintRebuildCRT(Ft, llen, llen, n, primes[:], true, crtScratch[:llen])
 	zintRebuildCRT(Gt, llen, llen, n, primes[:], true, crtScratch[:llen])
-	return true
 }
 
 const depthIntFG = 4
@@ -653,7 +648,7 @@ func writeReducedNTRUSolution(tmp, Ft, Gt []uint32, n, slen, llen int) {
 	}
 }
 
-func solveNTRUBinaryDepth0(f, g smallPolynomial, wk *ntruWorkspace) bool {
+func solveNTRUBinaryDepth0(f, g smallPolynomial, wk *ntruWorkspace) {
 	nn := n
 	hn := nn >> 1
 	p := primes[0].p
@@ -678,14 +673,14 @@ func solveNTRUBinaryDepth0(f, g smallPolynomial, wk *ntruWorkspace) bool {
 		prevF[i] = modPSet(zintOneToPlain(prevF[i]), p)
 		prevG[i] = modPSet(zintOneToPlain(prevG[i]), p)
 	}
-	modPNTT2(prevF, logN-1, gm, p, p0i)
-	modPNTT2(prevG, logN-1, gm, p, p0i)
+	modPNTT2(prevF, gm, logN-1, p, p0i)
+	modPNTT2(prevG, gm, logN-1, p, p0i)
 	for i := range nn {
 		ft[i] = modPSet(f[i], p)
 		gt[i] = modPSet(g[i], p)
 	}
-	modPNTT2(ft, logN, gm, p, p0i)
-	modPNTT2(gt, logN, gm, p, p0i)
+	modPNTT2(ft, gm, logN, p, p0i)
+	modPNTT2(gt, gm, logN, p, p0i)
 
 	for i := 0; i < nn; i += 2 {
 		ftA := ft[i]
@@ -699,11 +694,11 @@ func solveNTRUBinaryDepth0(f, g smallPolynomial, wk *ntruWorkspace) bool {
 		Gp[i] = modPMontyMul(ftB, mGp, p, p0i)
 		Gp[i+1] = modPMontyMul(ftA, mGp, p, p0i)
 	}
-	modPINTT2(Fp, logN, igm, p, p0i)
-	modPINTT2(Gp, logN, igm, p, p0i)
+	modPINTT2(Fp, igm, logN, p, p0i)
+	modPINTT2(Gp, igm, logN, p, p0i)
 
-	modPNTT2(Fp, logN, gm, p, p0i)
-	modPNTT2(Gp, logN, gm, p, p0i)
+	modPNTT2(Fp, gm, logN, p, p0i)
+	modPNTT2(Gp, gm, logN, p, p0i)
 
 	t2 := u32s.take(nn)
 	t3 := u32s.take(nn)
@@ -716,8 +711,8 @@ func solveNTRUBinaryDepth0(f, g smallPolynomial, wk *ntruWorkspace) bool {
 		t4[i] = modPSet(f[i], p)
 		t5[nn-i] = modPSet(-f[i], p)
 	}
-	modPNTT2(t4, logN, gm, p, p0i)
-	modPNTT2(t5, logN, gm, p, p0i)
+	modPNTT2(t4, gm, logN, p, p0i)
+	modPNTT2(t5, gm, logN, p, p0i)
 	for i := range nn {
 		w := modPMontyMul(t5[i], r2, p, p0i)
 		t2[i] = modPMontyMul(w, Fp[i], p, p0i)
@@ -730,16 +725,16 @@ func solveNTRUBinaryDepth0(f, g smallPolynomial, wk *ntruWorkspace) bool {
 		t4[i] = modPSet(g[i], p)
 		t5[nn-i] = modPSet(-g[i], p)
 	}
-	modPNTT2(t4, logN, gm, p, p0i)
-	modPNTT2(t5, logN, gm, p, p0i)
+	modPNTT2(t4, gm, logN, p, p0i)
+	modPNTT2(t5, gm, logN, p, p0i)
 	for i := range nn {
 		w := modPMontyMul(t5[i], r2, p, p0i)
 		t2[i] = modPAdd(t2[i], modPMontyMul(w, Gp[i], p, p0i), p)
 		t3[i] = modPAdd(t3[i], modPMontyMul(w, t4[i], p, p0i), p)
 	}
 
-	modPINTT2(t2, logN, igm, p, p0i)
-	modPINTT2(t3, logN, igm, p, p0i)
+	modPINTT2(t2, igm, logN, p, p0i)
+	modPINTT2(t3, igm, logN, p, p0i)
 
 	num := fprs.take(nn)
 	den := fprs.take(hn)
@@ -762,21 +757,20 @@ func solveNTRUBinaryDepth0(f, g smallPolynomial, wk *ntruWorkspace) bool {
 		t4[i] = modPSet(f[i], p)
 		t5[i] = modPSet(g[i], p)
 	}
-	modPNTT2(t2, logN, gm, p, p0i)
-	modPNTT2(t4, logN, gm, p, p0i)
-	modPNTT2(t5, logN, gm, p, p0i)
+	modPNTT2(t2, gm, logN, p, p0i)
+	modPNTT2(t4, gm, logN, p, p0i)
+	modPNTT2(t5, gm, logN, p, p0i)
 	for i := range nn {
 		kw := modPMontyMul(t2[i], r2, p, p0i)
 		Fp[i] = modPSub(Fp[i], modPMontyMul(kw, t4[i], p, p0i), p)
 		Gp[i] = modPSub(Gp[i], modPMontyMul(kw, t5[i], p, p0i), p)
 	}
-	modPINTT2(Fp, logN, igm, p, p0i)
-	modPINTT2(Gp, logN, igm, p, p0i)
+	modPINTT2(Fp, igm, logN, p, p0i)
+	modPINTT2(Gp, igm, logN, p, p0i)
 	for i := range nn {
 		tmp[i] = uint32(modPNorm(Fp[i], p))
 		tmp[nn+i] = uint32(modPNorm(Gp[i], p))
 	}
-	return true
 }
 
 func solveNTRUBinaryDepth1(f, g smallPolynomial, wk *ntruWorkspace) bool {
@@ -825,8 +819,8 @@ func solveNTRUBinaryDepth1(f, g smallPolynomial, wk *ntruWorkspace) bool {
 			fx[v] = modPSet(f[v], p)
 			gx[v] = modPSet(g[v], p)
 		}
-		modPNTT2(fx, logN, gmFull, p, p0i)
-		modPNTT2(gx, logN, gmFull, p, p0i)
+		modPNTT2(fx, gmFull, logN, p, p0i)
+		modPNTT2(gx, gmFull, logN, p, p0i)
 		for e := logN; e > logn; e-- {
 			modPPolyRecRes(fx, e, p, p0i, r2)
 			modPPolyRecRes(gx, e, p, p0i, r2)
@@ -838,8 +832,8 @@ func solveNTRUBinaryDepth1(f, g smallPolynomial, wk *ntruWorkspace) bool {
 			Fp[v] = Ft[v*llen+u]
 			Gp[v] = Gt[v*llen+u]
 		}
-		modPNTT2(Fp, logn-1, gm, p, p0i)
-		modPNTT2(Gp, logn-1, gm, p, p0i)
+		modPNTT2(Fp, gm, logn-1, p, p0i)
+		modPNTT2(Gp, gm, logn-1, p, p0i)
 		for v := range hn {
 			ftA := fx[v<<1]
 			ftB := fx[(v<<1)+1]
@@ -852,12 +846,12 @@ func solveNTRUBinaryDepth1(f, g smallPolynomial, wk *ntruWorkspace) bool {
 			Gt[(v<<1)*llen+u] = modPMontyMul(ftB, mGp, p, p0i)
 			Gt[((v<<1)+1)*llen+u] = modPMontyMul(ftA, mGp, p, p0i)
 		}
-		modPINTT2Ext(Ft[u:], llen, logn, igm, p, p0i)
-		modPINTT2Ext(Gt[u:], llen, logn, igm, p, p0i)
+		modPINTT2Ext(Ft[u:], llen, igm, logn, p, p0i)
+		modPINTT2Ext(Gt[u:], llen, igm, logn, p, p0i)
 
 		if u < slen {
-			modPINTT2(fx[:nn], logn, igm, p, p0i)
-			modPINTT2(gx[:nn], logn, igm, p, p0i)
+			modPINTT2(fx[:nn], igm, logn, p, p0i)
+			modPINTT2(gx[:nn], igm, logn, p, p0i)
 			for v := range nn {
 				ft[v*slen+u] = fx[v]
 				gt[v*slen+u] = gx[v]

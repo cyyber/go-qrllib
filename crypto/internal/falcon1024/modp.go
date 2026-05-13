@@ -110,11 +110,11 @@ func modPMkgm2(gm, igm []uint32, logn int, primitiveRoot, p, p0i uint32) {
 	}
 }
 
-func modPNTT2(a []uint32, logn int, gm []uint32, p, p0i uint32) {
-	modPNTT2Ext(a, 1, logn, gm, p, p0i)
+func modPNTT2(a, gm []uint32, logn int, p, p0i uint32) {
+	modPNTT2Ext(a, 1, gm, logn, p, p0i)
 }
 
-func modPNTT2Ext(a []uint32, stride, logn int, gm []uint32, p, p0i uint32) {
+func modPNTT2Ext(a []uint32, stride int, gm []uint32, logn int, p, p0i uint32) {
 	if logn == 0 {
 		return
 	}
@@ -140,11 +140,11 @@ func modPNTT2Ext(a []uint32, stride, logn int, gm []uint32, p, p0i uint32) {
 	}
 }
 
-func modPINTT2(a []uint32, logn int, igm []uint32, p, p0i uint32) {
-	modPINTT2Ext(a, 1, logn, igm, p, p0i)
+func modPINTT2(a, igm []uint32, logn int, p, p0i uint32) {
+	modPINTT2Ext(a, 1, igm, logn, p, p0i)
 }
 
-func modPINTT2Ext(a []uint32, stride, logn int, igm []uint32, p, p0i uint32) {
+func modPINTT2Ext(a []uint32, stride int, igm []uint32, logn int, p, p0i uint32) {
 	if logn == 0 {
 		return
 	}
