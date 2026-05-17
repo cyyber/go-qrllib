@@ -47,10 +47,7 @@ func TestGenerateKey(t *testing.T) {
 	if len(private.Bytes()) != PrivateKeySize {
 		t.Fatalf("private key has wrong size: got %d, want %d", len(private.Bytes()), PrivateKeySize)
 	}
-	cpublic, err := private.Public()
-	if err != nil {
-		t.Fatal(err)
-	}
+	cpublic := private.Public()
 	if !bytes.Equal(cpublic.(*PublicKey).Bytes(), public.Bytes()) {
 		t.Fatal("private key returned unexpected public key")
 	}
@@ -249,10 +246,7 @@ func TestEqual(t *testing.T) {
 	if !public.Equal(public) {
 		t.Errorf("public key is not equal to itself: %x", public.Bytes())
 	}
-	derivedPublic, err := private.Public()
-	if err != nil {
-		t.Fatal(err)
-	}
+	derivedPublic := private.Public()
 	if !public.Equal(derivedPublic) {
 		t.Errorf("private.Public() is not Equal to public: %x", public.Bytes())
 	}

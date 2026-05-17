@@ -32,8 +32,7 @@ func (priv *PrivateKey) Bytes() []byte {
 }
 
 func (priv *PrivateKey) PublicKey() *PublicKey {
-	pub := *priv.pub
-	return &pub
+	return priv.pub
 }
 
 type PublicKey struct {

@@ -69,10 +69,9 @@ func (priv *PrivateKey) Bytes() []byte {
 	return priv.key.Bytes()
 }
 
-// Public returns the [PublicKey] corresponding to priv, or an error if priv is
-// invalid.
-func (priv *PrivateKey) Public() (crypto.PublicKey, error) {
-	return &PublicKey{key: priv.key.PublicKey()}, nil
+// Public returns the [PublicKey] corresponding to priv.
+func (priv *PrivateKey) Public() crypto.PublicKey {
+	return &PublicKey{key: priv.key.PublicKey()}
 }
 
 // Equal reports whether priv and x have the same value.
