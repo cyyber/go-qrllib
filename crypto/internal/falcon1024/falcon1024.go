@@ -2,6 +2,7 @@ package falcon1024
 
 import (
 	"crypto/sha3"
+	"crypto/subtle"
 	"errors"
 	"io"
 	"strconv"
@@ -16,9 +17,13 @@ const (
 
 type PrivateKey struct {
 	raw                [privateKeySize]byte
-	pub                [publicKeySize]byte
+	pub                *PublicKey
 	b00, b01, b10, b11 fftPolynomial
 	tree               fprTree
+}
+
+func (priv *PrivateKey) Equal(x *PrivateKey) bool {
+	return subtle.ConstantTimeCompare(priv.raw[:], x.raw[:]) == 1
 }
 
 func (priv *PrivateKey) Bytes() []byte {
@@ -26,14 +31,18 @@ func (priv *PrivateKey) Bytes() []byte {
 	return k[:]
 }
 
-func (priv *PrivateKey) PublicKey() []byte {
-	pub := priv.pub
-	return pub[:]
+func (priv *PrivateKey) PublicKey() *PublicKey {
+	pub := *priv.pub
+	return &pub
 }
 
 type PublicKey struct {
-	raw [publicKeySize]byte
-	h   ringElement
+	raw  [publicKeySize]byte
+	hNTT ringElement
+}
+
+func (pub *PublicKey) Equal(x *PublicKey) bool {
+	return subtle.ConstantTimeCompare(pub.raw[:], x.raw[:]) == 1
 }
 
 func (pub *PublicKey) Bytes() []byte {
@@ -118,13 +127,25 @@ func initPrivateKey(priv *PrivateKey, f, g, ntruF, ntruG smallPolynomial, h ring
 		return nil, err
 	}
 
-	if err := pkEncode(priv.pub[:], h); err != nil {
+	pub, err := newPublicKeyFromH(h)
+	if err != nil {
 		return nil, err
 	}
+	priv.pub = pub
 
 	expandPrivateKey(priv, f, g, ntruF, ntruG)
 
 	return priv, nil
+}
+
+func newPublicKeyFromH(h ringElement) (*PublicKey, error) {
+	pub := &PublicKey{}
+	if err := pkEncode(pub.raw[:], h); err != nil {
+		return nil, err
+	}
+	pub.hNTT = h
+	toNTTMonty(pub.hNTT[:])
+	return pub, nil
 }
 
 func expandPrivateKey(priv *PrivateKey, f, g, ntruF, ntruG smallPolynomial) {
@@ -224,7 +245,8 @@ func newPublicKey(pub *PublicKey, pubBytes []byte) (*PublicKey, error) {
 	if err != nil {
 		return nil, err
 	}
-	pub.h = h
+	pub.hNTT = h
+	toNTTMonty(pub.hNTT[:])
 	copy(pub.raw[:], pubBytes)
 	return pub, nil
 }
@@ -364,24 +386,21 @@ func verify(pub *PublicKey, message []byte, sig *Signature) error {
 
 	c0 := hashToPoint(h)
 
-	if !verifyRaw(c0, sig.s2, pub.h) {
+	if !verifyRaw(c0, sig.s2, pub.hNTT) {
 		return errors.New("falcon-1024: invalid signature")
 	}
 
 	return nil
 }
 
-func verifyRaw(c0 ringElement, s2 smallPolynomial, h ringElement) bool {
+func verifyRaw(c0 ringElement, s2 smallPolynomial, hNTT ringElement) bool {
 	var t ringElement
 	for i := range t {
 		t[i] = fieldFromSmall(s2[i])
 	}
 
-	hMontNTT := h
-	toNTTMonty(hMontNTT[:])
-
 	ntt(t[:])
-	nttMul(t[:], hMontNTT[:])
+	nttMul(t[:], hNTT[:])
 	inverseNTT(t[:])
 
 	var s1 smallPolynomial

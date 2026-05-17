@@ -8,11 +8,8 @@ package falcon1024
 import (
 	"crypto"
 	"crypto/rand"
-	"crypto/subtle"
-	"errors"
 	"io"
 
-	"github.com/theQRL/go-qrllib/crypto/internal/cache"
 	"github.com/theQRL/go-qrllib/crypto/internal/falcon1024"
 )
 
@@ -28,66 +25,73 @@ const (
 )
 
 // PublicKey is the type of Falcon-1024 public keys.
-type PublicKey []byte
+type PublicKey struct{ key *falcon1024.PublicKey }
 
-// Equal reports whether pub and x have the same value.
-func (pub PublicKey) Equal(x crypto.PublicKey) bool {
-	xx, ok := x.(PublicKey)
-	if !ok {
-		return false
-	}
-	return subtle.ConstantTimeCompare(pub, xx) == 1
-}
-
-// PrivateKey is the type of Falcon-1024 private keys.
-type PrivateKey []byte
-
-// Public returns the [PublicKey] corresponding to priv, or an error if priv is
-// invalid.
-func (priv PrivateKey) Public() (crypto.PublicKey, error) {
-	k, err := cachedPrivateKey(priv)
+// NewPublicKey parses an encoded Falcon-1024 public key.
+func NewPublicKey(publicKey []byte) (*PublicKey, error) {
+	key, err := falcon1024.NewPublicKey(publicKey)
 	if err != nil {
 		return nil, err
 	}
 
-	pub := make(PublicKey, PublicKeySize)
-	copy(pub, k.PublicKey())
-	return pub, nil
+	return &PublicKey{key}, nil
 }
 
-// Equal reports whether priv and x have the same value.
-func (priv PrivateKey) Equal(x crypto.PrivateKey) bool {
-	xx, ok := x.(PrivateKey)
+// Bytes returns the encoded form of pub.
+func (pub *PublicKey) Bytes() []byte {
+	return pub.key.Bytes()
+}
+
+// Equal reports whether pub and x have the same value.
+func (pub *PublicKey) Equal(x crypto.PublicKey) bool {
+	xx, ok := x.(*PublicKey)
 	if !ok {
 		return false
 	}
-	return subtle.ConstantTimeCompare(priv, xx) == 1
+	return pub.key.Equal(xx.key)
 }
 
-// privateKeyCache uses a pointer to the first byte of underlying storage as a
-// key, because [PrivateKey] is a slice header passed around by value.
-var privateKeyCache cache.Cache[byte, falcon1024.PrivateKey]
+// PrivateKey is the type of Falcon-1024 private keys.
+type PrivateKey struct{ key *falcon1024.PrivateKey }
 
-func cachedPrivateKey(privateKey PrivateKey) (*falcon1024.PrivateKey, error) {
-	if len(privateKey) != PrivateKeySize {
-		return nil, errors.New("falcon-1024: invalid private key length")
+// NewPrivateKey parses an encoded Falcon-1024 private key.
+func NewPrivateKey(privateKey []byte) (*PrivateKey, error) {
+	key, err := falcon1024.NewPrivateKey(privateKey)
+	if err != nil {
+		return nil, err
 	}
 
-	return privateKeyCache.Get(&privateKey[0], func() (*falcon1024.PrivateKey, error) {
-		return falcon1024.NewPrivateKey(privateKey)
-	}, func(k *falcon1024.PrivateKey) bool {
-		return subtle.ConstantTimeCompare(privateKey, k.Bytes()) == 1
-	})
+	return &PrivateKey{key}, nil
+}
+
+// Bytes returns the encoded form of priv.
+func (priv *PrivateKey) Bytes() []byte {
+	return priv.key.Bytes()
+}
+
+// Public returns the [PublicKey] corresponding to priv, or an error if priv is
+// invalid.
+func (priv *PrivateKey) Public() (crypto.PublicKey, error) {
+	return &PublicKey{key: priv.key.PublicKey()}, nil
+}
+
+// Equal reports whether priv and x have the same value.
+func (priv *PrivateKey) Equal(x crypto.PrivateKey) bool {
+	xx, ok := x.(*PrivateKey)
+	if !ok {
+		return false
+	}
+	return priv.key.Equal(xx.key)
 }
 
 // Sign signs the message with priv and returns a signature.
-func (priv PrivateKey) Sign(random io.Reader, message []byte) (signature []byte, err error) {
+func (priv *PrivateKey) Sign(random io.Reader, message []byte) (signature []byte, err error) {
 	return Sign(random, priv, message)
 }
 
 // GenerateKey generates a public/private key pair using entropy from random.
 // If random is nil, GenerateKey uses crypto/rand.Reader.
-func GenerateKey(random io.Reader) (PublicKey, PrivateKey, error) {
+func GenerateKey(random io.Reader) (*PublicKey, *PrivateKey, error) {
 	if random == nil {
 		random = rand.Reader
 	}
@@ -101,33 +105,23 @@ func GenerateKey(random io.Reader) (PublicKey, PrivateKey, error) {
 }
 
 // NewKeyFromSeed generates a public/private key pair from a SeedSize-byte seed.
-func NewKeyFromSeed(seed []byte) (PublicKey, PrivateKey, error) {
-	privateKey := make([]byte, PrivateKeySize)
-	publicKey := make([]byte, PublicKeySize)
-	if err := newKeyFromSeed(publicKey, privateKey, seed); err != nil {
+func NewKeyFromSeed(seed []byte) (*PublicKey, *PrivateKey, error) {
+	key, err := falcon1024.NewPrivateKeyFromSeed(seed)
+	if err != nil {
 		return nil, nil, err
 	}
-	return publicKey, privateKey, nil
-}
-
-func newKeyFromSeed(publicKey, privateKey, seed []byte) error {
-	k, err := falcon1024.NewPrivateKeyFromSeed(seed)
-	if err != nil {
-		return err
-	}
-	copy(publicKey, k.PublicKey())
-	copy(privateKey, k.Bytes())
-	return nil
+	return &PublicKey{key: key.PublicKey()}, &PrivateKey{key}, nil
 }
 
 // Sign signs the message with privateKey and returns a signature.
 // If random is nil, Sign uses crypto/rand.Reader.
 //
 // It returns an error if privateKey is invalid or random fails.
-func Sign(random io.Reader, privateKey PrivateKey, message []byte) ([]byte, error) {
+func Sign(random io.Reader, privateKey *PrivateKey, message []byte) ([]byte, error) {
 	if random == nil {
 		random = rand.Reader
 	}
+
 	signature := make([]byte, SignatureSize)
 	if err := sign(random, signature, privateKey, message); err != nil {
 		return nil, err
@@ -135,12 +129,8 @@ func Sign(random io.Reader, privateKey PrivateKey, message []byte) ([]byte, erro
 	return signature, nil
 }
 
-func sign(random io.Reader, signature []byte, privateKey PrivateKey, message []byte) error {
-	k, err := cachedPrivateKey(privateKey)
-	if err != nil {
-		return err
-	}
-	sig, err := falcon1024.Sign(random, k, message)
+func sign(random io.Reader, signature []byte, privateKey *PrivateKey, message []byte) error {
+	sig, err := falcon1024.Sign(random, privateKey.key, message)
 	if err != nil {
 		return err
 	}
@@ -149,20 +139,14 @@ func sign(random io.Reader, signature []byte, privateKey PrivateKey, message []b
 }
 
 // Verify reports whether sig is a valid signature of message by publicKey.
-func Verify(publicKey PublicKey, message, sig []byte) bool {
+func Verify(publicKey *PublicKey, message, sig []byte) bool {
 	return verify(publicKey, message, sig) == nil
 }
 
-func verify(publicKey PublicKey, message, sig []byte) error {
-	k, err := falcon1024.NewPublicKey(publicKey)
-	if err != nil {
-		return err
-	}
-
+func verify(publicKey *PublicKey, message, sig []byte) error {
 	s, err := falcon1024.NewSignature(sig)
 	if err != nil {
 		return err
 	}
-
-	return falcon1024.Verify(k, message, s)
+	return falcon1024.Verify(publicKey.key, message, s)
 }

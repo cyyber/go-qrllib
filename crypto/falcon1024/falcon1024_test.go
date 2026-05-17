@@ -41,17 +41,17 @@ func TestGenerateKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(public) != PublicKeySize {
-		t.Fatalf("public key has wrong size: got %d, want %d", len(public), PublicKeySize)
+	if len(public.Bytes()) != PublicKeySize {
+		t.Fatalf("public key has wrong size: got %d, want %d", len(public.Bytes()), PublicKeySize)
 	}
-	if len(private) != PrivateKeySize {
-		t.Fatalf("private key has wrong size: got %d, want %d", len(private), PrivateKeySize)
+	if len(private.Bytes()) != PrivateKeySize {
+		t.Fatalf("private key has wrong size: got %d, want %d", len(private.Bytes()), PrivateKeySize)
 	}
 	cpublic, err := private.Public()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Equal(cpublic.(PublicKey), public) {
+	if !bytes.Equal(cpublic.(*PublicKey).Bytes(), public.Bytes()) {
 		t.Fatal("private key returned unexpected public key")
 	}
 
@@ -61,10 +61,10 @@ func TestGenerateKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Equal(publicFromSeed, public) {
+	if !bytes.Equal(publicFromSeed.Bytes(), public.Bytes()) {
 		t.Fatal("GenerateKey and NewKeyFromSeed returned different public keys")
 	}
-	if !bytes.Equal(privateFromSeed, private) {
+	if !bytes.Equal(privateFromSeed.Bytes(), private.Bytes()) {
 		t.Fatal("GenerateKey and NewKeyFromSeed returned different private keys")
 	}
 
@@ -72,7 +72,7 @@ func TestGenerateKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if bytes.Equal(private, k2) {
+	if bytes.Equal(private.Bytes(), k2.Bytes()) {
 		t.Errorf("GenerateKey returned the same private key twice")
 	}
 
@@ -80,7 +80,7 @@ func TestGenerateKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if bytes.Equal(private, k3) {
+	if bytes.Equal(private.Bytes(), k3.Bytes()) {
 		t.Errorf("GenerateKey returned the same private key twice")
 	}
 
@@ -97,7 +97,7 @@ func TestGenerateKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Equal(k4, k4n) {
+	if !bytes.Equal(k4.Bytes(), k4n.Bytes()) {
 		t.Errorf("GenerateKey with seed gave different private key")
 	}
 }
@@ -160,18 +160,24 @@ func TestNewKeyFromSeedInvalidSeed(t *testing.T) {
 	}
 }
 
-func TestInvalidPrivateKeyReturnsErrors(t *testing.T) {
-	var private PrivateKey
-	message := []byte("test message")
+func TestNewPrivateKeyInvalidInputs(t *testing.T) {
+	var zero zeroReader
+	_, private, err := GenerateKey(zero)
+	if err != nil {
+		t.Fatal(err)
+	}
+	badHeaderPrivate := bytes.Clone(private.Bytes())
+	badHeaderPrivate[0] ^= 0xFF
 
-	if _, err := private.Public(); err == nil {
-		t.Fatal("PrivateKey.Public accepted invalid private key")
-	}
-	if _, err := private.Sign(nil, message); err == nil {
-		t.Fatal("PrivateKey.Sign accepted invalid private key")
-	}
-	if _, err := Sign(nil, private, message); err == nil {
-		t.Fatal("Sign accepted invalid private key")
+	for _, privateKey := range [][]byte{
+		nil,
+		make([]byte, PrivateKeySize-1),
+		make([]byte, PrivateKeySize+1),
+		badHeaderPrivate,
+	} {
+		if _, err := NewPrivateKey(privateKey); err == nil {
+			t.Fatalf("NewPrivateKey accepted invalid private key with length %d", len(privateKey))
+		}
 	}
 }
 
@@ -187,57 +193,43 @@ func TestVerifyInvalidInputs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	badHeaderPublic := bytes.Clone(public)
+	badHeaderPublic := bytes.Clone(public.Bytes())
 	badHeaderPublic[0] ^= 0xFF
+
+	for _, publicKey := range [][]byte{
+		nil,
+		make([]byte, PublicKeySize-1),
+		make([]byte, PublicKeySize+1),
+		badHeaderPublic,
+	} {
+		if _, err := NewPublicKey(publicKey); err == nil {
+			t.Fatalf("NewPublicKey accepted invalid public key with length %d", len(publicKey))
+		}
+	}
 
 	for _, tc := range []struct {
 		name      string
-		publicKey PublicKey
 		signature []byte
 	}{
 		{
-			name:      "nil public key",
-			publicKey: nil,
-			signature: signature,
-		},
-		{
-			name:      "short public key",
-			publicKey: make(PublicKey, PublicKeySize-1),
-			signature: signature,
-		},
-		{
-			name:      "long public key",
-			publicKey: make(PublicKey, PublicKeySize+1),
-			signature: signature,
-		},
-		{
-			name:      "wrong public key header",
-			publicKey: badHeaderPublic,
-			signature: signature,
-		},
-		{
 			name:      "nil signature",
-			publicKey: public,
 			signature: nil,
 		},
 		{
 			name:      "short signature",
-			publicKey: public,
 			signature: make([]byte, SignatureSize-1),
 		},
 		{
 			name:      "long signature",
-			publicKey: public,
 			signature: make([]byte, SignatureSize+1),
 		},
 		{
 			name:      "wrong signature header",
-			publicKey: public,
 			signature: append([]byte{signature[0] ^ 0xFF}, signature[1:]...),
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if Verify(tc.publicKey, message, tc.signature) {
+			if Verify(public, message, tc.signature) {
 				t.Fatal("Verify accepted invalid input")
 			}
 		})
@@ -255,17 +247,17 @@ func TestEqual(t *testing.T) {
 	}
 
 	if !public.Equal(public) {
-		t.Errorf("public key is not equal to itself: %q", public)
+		t.Errorf("public key is not equal to itself: %x", public.Bytes())
 	}
 	derivedPublic, err := private.Public()
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !public.Equal(derivedPublic) {
-		t.Errorf("private.Public() is not Equal to public: %q", public)
+		t.Errorf("private.Public() is not Equal to public: %x", public.Bytes())
 	}
 	if !private.Equal(private) {
-		t.Errorf("private key is not equal to itself: %q", private)
+		t.Errorf("private key is not equal to itself: %x", private.Bytes())
 	}
 
 	otherPub, otherPriv, err := GenerateKey(rand.Reader)
@@ -299,8 +291,8 @@ func TestPublicAPIRegression(t *testing.T) {
 		t.Fatal("golden signature failed verification")
 	}
 
-	checkSHA256(t, "public key", public, "e6002a1133c82aa79254740e864960db9724b3f042ea8798d14cabddb8ef56be")
-	checkSHA256(t, "private key", private, "8692afea3c1d5cfcbb76f9867b30cc11bc6eca980a1f21abd7f2935a607d986b")
+	checkSHA256(t, "public key", public.Bytes(), "e6002a1133c82aa79254740e864960db9724b3f042ea8798d14cabddb8ef56be")
+	checkSHA256(t, "private key", private.Bytes(), "8692afea3c1d5cfcbb76f9867b30cc11bc6eca980a1f21abd7f2935a607d986b")
 	checkSHA256(t, "signature", signature, "31112e24ca1ed78a60fb2812591ce471dab85a77bda9d1b1af0fe7d52e92e35f")
 }
 

@@ -547,7 +547,7 @@ func TestVerifyRaw(t *testing.T) {
 			_, _ = h.Write([]byte(tc.message))
 
 			c0 := hashToPoint(h)
-			if !verifyRaw(c0, s2, pub.h) {
+			if !verifyRaw(c0, s2, pub.hNTT) {
 				t.Fatal("reference verify_raw vector rejected")
 			}
 		})
@@ -568,8 +568,10 @@ func TestNewPublicKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if pub.h != h {
-		t.Fatal("NewPublicKey decoded unexpected public key polynomial")
+	hNTT := h
+	toNTTMonty(hNTT[:])
+	if pub.hNTT != hNTT {
+		t.Fatal("NewPublicKey cached unexpected public key polynomial")
 	}
 }
 
@@ -639,7 +641,7 @@ func TestNewPrivateKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := mustDecodeHex(t, verifyRawKATPublicKeyHex); !bytes.Equal(priv.PublicKey(), want) {
+	if want := mustDecodeHex(t, verifyRawKATPublicKeyHex); !bytes.Equal(priv.PublicKey().Bytes(), want) {
 		t.Fatal("private key reconstructed unexpected public key")
 	}
 }
@@ -697,7 +699,7 @@ func TestSignTree(t *testing.T) {
 			rng := sha3.NewSHAKE256()
 			_, _ = rng.Write([]byte(tc.seed))
 			s2 := signTree(rng, priv, c0)
-			if !verifyRaw(c0, s2, pub.h) {
+			if !verifyRaw(c0, s2, pub.hNTT) {
 				t.Fatal("signTree output failed verifyRaw")
 			}
 		})
@@ -747,11 +749,8 @@ func TestSignTreeNISTKATVectors(t *testing.T) {
 			priv, c0, rng := nistKATSignTreeInput(t, tc.count)
 			s2 := signTree(rng, priv, c0)
 
-			pub, err := NewPublicKey(priv.PublicKey())
-			if err != nil {
-				t.Fatal(err)
-			}
-			if !verifyRaw(c0, s2, pub.h) {
+			pub := priv.PublicKey()
+			if !verifyRaw(c0, s2, pub.hNTT) {
 				t.Fatal("signTree output failed verifyRaw")
 			}
 
@@ -979,7 +978,7 @@ func testNISTKATDigest(t *testing.T) {
 		if err != nil {
 			t.Fatalf("NewPrivateKeyFromSeed: %v", err)
 		}
-		pub := priv.PublicKey()
+		pub := priv.PublicKey().Bytes()
 		sk := priv.Bytes()
 
 		var nonce [nonceSize]byte
