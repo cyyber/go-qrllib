@@ -16,10 +16,13 @@ import (
 const (
 	// PublicKeySize is the size, in bytes, of public keys as used in this package.
 	PublicKeySize = 1793
+
 	// PrivateKeySize is the size, in bytes, of private keys as used in this package.
 	PrivateKeySize = 2305
+
 	// SignatureSize is the size, in bytes, of signatures generated and verified by this package.
 	SignatureSize = 1280
+
 	// SeedSize is the size, in bytes, of private key seeds.
 	SeedSize = 48
 )
