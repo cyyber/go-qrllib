@@ -7,12 +7,27 @@ import (
 
 type DecapsulationKey struct{}
 
+func (dk *DecapsulationKey) Decapsulate(ciphertext []byte) (sharedKey []byte, err error) {
+	// TODO
+	return nil, nil
+}
+
+func (dk *DecapsulationKey) EncapsulationKey() *EncapsulationKey {
+	// TODO
+	return nil
+}
+
 func (dk *DecapsulationKey) Bytes() []byte {
 	// TODO
 	return nil
 }
 
 type EncapsulationKey struct{}
+
+func (ek *EncapsulationKey) Encapsulate() (sharedKey, ciphertext []byte) {
+	// TODO
+	return nil, nil
+}
 
 func (ek *EncapsulationKey) Bytes() []byte {
 	// TODO
