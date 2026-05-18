@@ -49,7 +49,7 @@ type EncapsulationKey struct {
 
 // Encapsulate produces a shared secret and ciphertext pair using this
 // encapsulation key.
-func (ek *EncapsulationKey) Encapsulate() (sharedKey, ciphertext []byte) {
+func (ek *EncapsulationKey) Encapsulate() (sharedKey, ciphertext []byte, err error) {
 	return ek.key.Encapsulate()
 }
 

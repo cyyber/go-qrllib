@@ -62,3 +62,11 @@ func samplePolyCBD(σ []byte, N byte) ringElement {
 func ntt(f []fieldElement) {
 	// TODO
 }
+
+func inverseNTT(f []fieldElement) {
+	// TODO
+}
+
+func nttMul(a, b []fieldElement) {
+	// TODO
+}

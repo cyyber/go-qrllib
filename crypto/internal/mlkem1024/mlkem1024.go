@@ -7,7 +7,11 @@ import (
 )
 
 const (
-	k = 4
+	k              = 4
+	encodingSize11 = n * 11 / 8
+	encodingSize5  = n * 5 / 8
+	ciphertextSize = k*encodingSize11 + encodingSize5
+	sharedKeySize  = 32
 )
 
 type DecapsulationKey struct {
@@ -29,16 +33,32 @@ func (dk *DecapsulationKey) Bytes() []byte {
 	return nil
 }
 
-type EncapsulationKey struct{}
-
-func (ek *EncapsulationKey) Encapsulate() (sharedKey, ciphertext []byte) {
-	// TODO
-	return nil, nil
+type EncapsulationKey struct {
+	h [32]byte // H(ek)
 }
 
-func (ek *EncapsulationKey) encapsulate() (sharedKey, ciphertext []byte) {
-	// TODO
-	return nil, nil
+func (ek *EncapsulationKey) Encapsulate() (sharedKey, ciphertext []byte, err error) {
+	var ct [ciphertextSize]byte
+	return ek.encapsulate(ct)
+}
+
+func (ek *EncapsulationKey) encapsulate(ct [ciphertextSize]byte) (sharedKey, ciphertext []byte, err error) {
+	var m [32]byte
+	if _, err := io.ReadFull(rand.Reader, m[:]); err != nil {
+		return nil, nil, err
+	}
+	K, c := kemEncaps(ct, ek, &m)
+	return K, c, nil
+}
+
+func kemEncaps(ct [ciphertextSize]byte, ek *EncapsulationKey, m *[32]byte) (K []byte, c []byte) {
+	g := sha3.New256()
+	_, _ = g.Write(m[:])
+	_, _ = g.Write(ek.h[:])
+	G := g.Sum(nil)
+	K, r := G[:sharedKeySize], G[sharedKeySize:]
+	c = pkeEncrypt(ct, ek, m, r)
+	return K, c
 }
 
 func (ek *EncapsulationKey) Bytes() []byte {
@@ -59,11 +79,11 @@ func generateKey(dk *DecapsulationKey) (*DecapsulationKey, error) {
 	if _, err := io.ReadFull(rand.Reader, z[:]); err != nil {
 		return nil, err
 	}
-	keygen(dk, &d, &z)
+	kemKeyGen(dk, &d, &z)
 	return dk, nil
 }
 
-func keygen(dk *DecapsulationKey, d *[32]byte, z *[32]byte) *DecapsulationKey {
+func kemKeyGen(dk *DecapsulationKey, d *[32]byte, z *[32]byte) *DecapsulationKey {
 	dk.d = *d
 	dk.z = *z
 
@@ -100,4 +120,9 @@ func keygen(dk *DecapsulationKey, d *[32]byte, z *[32]byte) *DecapsulationKey {
 	// dkPKE ← ByteEncode12(𝐬)
 
 	return dk
+}
+
+func pkeEncrypt(ct [ciphertextSize]byte, ek *EncapsulationKey, m *[32]byte, r []byte) []byte {
+	// TODO
+	return nil
 }
