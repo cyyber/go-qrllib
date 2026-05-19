@@ -16,11 +16,37 @@ const (
 
 type DecapsulationKey struct {
 	d, z [32]byte
+
+	encryptionKey
+	decryptionKey
 }
 
 func (dk *DecapsulationKey) Decapsulate(ciphertext []byte) (sharedKey []byte, err error) {
-	// TODO
+	kemDecaps(dk, ciphertext)
 	return nil, nil
+}
+
+func kemDecaps(dk *DecapsulationKey, ciphertext []byte) (K []byte) {
+	// TODO
+	// m := pkeDecrypt(dk, ciphertext)
+	// g := sha3.New512()
+	// _, _ = g.Write(m[:])
+	// _, _ = g.Write(dk.h[:])
+	// G := g.Sum(make([]byte, 0, 64))
+	// Kprime, r := G[:sharedKeySize], G[sharedKeySize:]
+	// J := sha3.New256()
+	// _, _ = J.Write(dk.z[:])
+	// _, _ = J.Write(c[:])
+	// Kout := make([]byte, sharedKeySize)
+	// J.Read(Kout)
+
+	// c := pkeEncrypt(dk.ek, m, r)
+	// if !bytes.Equal(ciphertext, c) {
+	// 	K = K2
+	// }
+
+	// return k
+	return nil
 }
 
 func (dk *DecapsulationKey) EncapsulationKey() *EncapsulationKey {
@@ -66,6 +92,10 @@ func (ek *EncapsulationKey) Bytes() []byte {
 	return nil
 }
 
+type encryptionKey struct{}
+
+type decryptionKey struct{}
+
 func GenerateKey() (*DecapsulationKey, error) {
 	dk := &DecapsulationKey{}
 	return generateKey(dk)
@@ -84,38 +114,38 @@ func generateKey(dk *DecapsulationKey) (*DecapsulationKey, error) {
 }
 
 func kemKeyGen(dk *DecapsulationKey, d *[32]byte, z *[32]byte) *DecapsulationKey {
-	dk.d = *d
-	dk.z = *z
-
-	g := sha3.New256()
-	_, _ = g.Write(d[:])
-	_, _ = g.Write([]byte{k})
-	G := g.Sum(make([]byte, 0, 64))
-	ρ, σ := G[:32], G[32:]
-
-	a := [k * k]ringElement{}
-
-	for i := range byte(k) {
-		for j := range byte(k) {
-			a[i*k+j] = sampleNTT(ρ, j, i)
-		}
-	}
-
-	var N byte
-	s := [k]ringElement{}
-	for i := range s {
-		s[i] = samplePolyCBD(σ, N)
-		// ntt()
-		N++
-	}
-	e := [k]ringElement{}
-	for i := range e {
-		e[i] = samplePolyCBD(σ, N)
-		// ntt()
-		N++
-	}
-
 	// TODO
+	// dk.d = *d
+	// dk.z = *z
+
+	// g := sha3.New256()
+	// _, _ = g.Write(d[:])
+	// _, _ = g.Write([]byte{k})
+	// G := g.Sum(make([]byte, 0, 64))
+	// ρ, σ := G[:32], G[32:]
+
+	// a := [k * k]ringElement{}
+
+	// for i := range byte(k) {
+	// 	for j := range byte(k) {
+	// 		a[i*k+j] = sampleNTT(ρ, j, i)
+	// 	}
+	// }
+
+	// var N byte
+	// s := [k]ringElement{}
+	// for i := range s {
+	// 	s[i] = samplePolyCBD(σ, N)
+	// 	// ntt()
+	// 	N++
+	// }
+	// e := [k]ringElement{}
+	// for i := range e {
+	// 	e[i] = samplePolyCBD(σ, N)
+	// 	// ntt()
+	// 	N++
+	// }
+
 	// ekPKE ← ByteEncode12(𝐭)‖�
 	// dkPKE ← ByteEncode12(𝐬)
 
@@ -123,6 +153,11 @@ func kemKeyGen(dk *DecapsulationKey, d *[32]byte, z *[32]byte) *DecapsulationKey
 }
 
 func pkeEncrypt(ct [ciphertextSize]byte, ek *EncapsulationKey, m *[32]byte, r []byte) []byte {
+	// TODO
+	return nil
+}
+
+func pkeDecrypt(ek *EncapsulationKey, ct [ciphertextSize]byte) []byte {
 	// TODO
 	return nil
 }
