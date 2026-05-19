@@ -63,7 +63,7 @@
 //	}
 //	defer w.Zeroize()
 //
-//	address := w.GetAddressStr()              // "Q" + hex(48 bytes)
+//	address := w.GetAddressStr()              // "Q" + hex(64 bytes)
 //	pk      := w.GetPK()
 //	desc    := w.GetDescriptor().ToDescriptor()
 //
