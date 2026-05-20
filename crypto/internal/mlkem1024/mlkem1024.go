@@ -35,7 +35,8 @@ func NewDecapsulationKey(seed []byte) (*DecapsulationKey, error) {
 	dk := &DecapsulationKey{}
 	d := (*[32]byte)(seed[:32])
 	z := (*[32]byte)(seed[32:])
-	return generateKey(dk, d, z), nil
+	generateKey(dk, d, z)
+	return dk, nil
 }
 
 func (dk *DecapsulationKey) Decapsulate(ciphertext []byte) (sharedKey []byte, err error) {
@@ -93,11 +94,11 @@ func NewEncapsulationKey(ekPKE []byte) (*EncapsulationKey, error) {
 
 	ek := &EncapsulationKey{}
 
-	// TODO
-	// h := sha3.New256()
-	// _, _ = h.Write(ekPKE)
-	// h.Sum(ek.h[:0])
+	H := sha3.New256()
+	_, _ = H.Write(ekPKE)
+	H.Sum(ek.h[:0])
 
+	// TODO
 	// var err error
 	// for i := range ek.t {
 	// 	// ek.t[i], err = polyByteDecode(ekPKE[:encodingSize12])
@@ -148,12 +149,12 @@ func (ek *EncapsulationKey) Bytes() []byte {
 }
 
 type encryptionKey struct {
-	t [k]fieldElement
-	a [k * k]fieldElement
+	t [k]ringElement
+	a [k * k]ringElement
 }
 
 type decryptionKey struct {
-	s [k]fieldElement
+	s [k]ringElement
 }
 
 func GenerateKey() (*DecapsulationKey, error) {
@@ -165,58 +166,56 @@ func GenerateKey() (*DecapsulationKey, error) {
 		return nil, err
 	}
 	dk := &DecapsulationKey{}
-	return generateKey(dk, &d, &z), nil
+	generateKey(dk, &d, &z)
+	return dk, nil
 }
 
-func generateKey(dk *DecapsulationKey, d, z *[32]byte) *DecapsulationKey {
+func generateKey(dk *DecapsulationKey, d, z *[32]byte) {
 	dk.d, dk.z = *d, *z
 
-	// TODO
-	// g := sha3.New256()
-	// _, _ = g.Write(dk.d[:])
-	// _, _ = g.Write([]byte{k})
-	// G := g.Sum(make([]byte, 0, 64))
-	// ρ, σ := G[:32], G[32:]x
+	g := sha3.New256()
+	_, _ = g.Write(d[:])
+	_, _ = g.Write([]byte{k})
+	G := g.Sum(make([]byte, 0, 64))
+	ρ, σ := G[:32], G[32:]
 
-	return dk
-}
+	A := &dk.a
+	for i := range byte(k) {
+		for j := range byte(k) {
+			A[i*k+j] = sampleNTT(ρ, j, i)
+		}
+	}
 
-func kemKeyGen(dk *DecapsulationKey, d *[32]byte, z *[32]byte) *DecapsulationKey {
-	dk.d, dk.z = *d, *z
+	var N byte
+	s := &dk.s
+	for i := range s {
+		s[i] = samplePolyCBD(σ, N)
+		ntt(s[i])
+		N++
+	}
 
-	// TODO
-	// g := sha3.New256()
-	// _, _ = g.Write(d[:])
-	// _, _ = g.Write([]byte{k})
-	// G := g.Sum(make([]byte, 0, 64))
-	// ρ, σ := G[:32], G[32:]
+	e := make([]ringElement, k)
+	for i := range e {
+		e[i] = samplePolyCBD(σ, N)
+		ntt(e[i])
+		N++
+	}
 
-	// a := [k * k]ringElement{}
+	t := &dk.t
+	for i := range t {
+		var acc ringElement
+		for j := range s {
+			product := s[j]
+			nttMul(product, A[i*k+j])
+			polyAdd(acc, product)
+		}
+		polyAdd(acc, e[i])
+		t[i] = acc
+	}
 
-	// for i := range byte(k) {
-	// 	for j := range byte(k) {
-	// 		a[i*k+j] = sampleNTT(ρ, j, i)
-	// 	}
-	// }
-
-	// var N byte
-	// s := [k]ringElement{}
-	// for i := range s {
-	// 	s[i] = samplePolyCBD(σ, N)
-	// 	// ntt()
-	// 	N++
-	// }
-	// e := [k]ringElement{}
-	// for i := range e {
-	// 	e[i] = samplePolyCBD(σ, N)
-	// 	// ntt()
-	// 	N++
-	// }
-
-	// ekPKE ← ByteEncode12(𝐭)‖�
-	// dkPKE ← ByteEncode12(𝐬)
-
-	return dk
+	H := sha3.New256()
+	_, _ = H.Write(dk.EncapsulationKey().Bytes())
+	H.Sum(dk.h[:0])
 }
 
 func pkeEncrypt(c *[ciphertextSize]byte, ek *EncapsulationKey, m *[32]byte, r []byte) []byte {
