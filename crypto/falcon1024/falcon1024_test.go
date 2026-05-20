@@ -1,31 +1,14 @@
-package falcon1024
+package falcon1024_test
 
 import (
 	"bytes"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
-	"log"
 	"testing"
+
+	"github.com/theQRL/go-qrllib/crypto/falcon1024"
 )
-
-func Example_falcon1024() {
-	pub, priv, err := GenerateKey(nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	msg := []byte("hello, world")
-
-	sig, err := priv.Sign(nil, msg)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	if ok := Verify(pub, msg, sig); !ok {
-		log.Fatal("invalid signature")
-	}
-}
 
 type zeroReader struct{}
 
@@ -36,25 +19,25 @@ func (zeroReader) Read(buf []byte) (int, error) {
 
 func TestGenerateKey(t *testing.T) {
 	var zero zeroReader
-	public, private, err := GenerateKey(zero)
+	public, private, err := falcon1024.GenerateKey(zero)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if len(public.Bytes()) != PublicKeySize {
-		t.Fatalf("public key has wrong size: got %d, want %d", len(public.Bytes()), PublicKeySize)
+	if len(public.Bytes()) != falcon1024.PublicKeySize {
+		t.Fatalf("public key has wrong size: got %d, want %d", len(public.Bytes()), falcon1024.PublicKeySize)
 	}
-	if len(private.Bytes()) != PrivateKeySize {
-		t.Fatalf("private key has wrong size: got %d, want %d", len(private.Bytes()), PrivateKeySize)
+	if len(private.Bytes()) != falcon1024.PrivateKeySize {
+		t.Fatalf("private key has wrong size: got %d, want %d", len(private.Bytes()), falcon1024.PrivateKeySize)
 	}
 	cpublic := private.Public()
-	if !bytes.Equal(cpublic.(*PublicKey).Bytes(), public.Bytes()) {
+	if !bytes.Equal(cpublic.(*falcon1024.PublicKey).Bytes(), public.Bytes()) {
 		t.Fatal("private key returned unexpected public key")
 	}
 
-	seed := make([]byte, SeedSize)
+	seed := make([]byte, falcon1024.SeedSize)
 	_, _ = zero.Read(seed)
-	publicFromSeed, privateFromSeed, err := NewKeyFromSeed(seed)
+	publicFromSeed, privateFromSeed, err := falcon1024.NewKeyFromSeed(seed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,7 +48,7 @@ func TestGenerateKey(t *testing.T) {
 		t.Fatal("GenerateKey and NewKeyFromSeed returned different private keys")
 	}
 
-	_, k2, err := GenerateKey(nil)
+	_, k2, err := falcon1024.GenerateKey(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,7 +56,7 @@ func TestGenerateKey(t *testing.T) {
 		t.Errorf("GenerateKey returned the same private key twice")
 	}
 
-	_, k3, err := GenerateKey(rand.Reader)
+	_, k3, err := falcon1024.GenerateKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,15 +65,15 @@ func TestGenerateKey(t *testing.T) {
 	}
 
 	// GenerateKey is documented to be the same as NewKeyFromSeed.
-	seed = make([]byte, SeedSize)
+	seed = make([]byte, falcon1024.SeedSize)
 	if _, err := rand.Read(seed); err != nil {
 		t.Fatal(err)
 	}
-	_, k4, err := GenerateKey(bytes.NewReader(seed))
+	_, k4, err := falcon1024.GenerateKey(bytes.NewReader(seed))
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, k4n, err := NewKeyFromSeed(seed)
+	_, k4n, err := falcon1024.NewKeyFromSeed(seed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,35 +84,35 @@ func TestGenerateKey(t *testing.T) {
 
 func TestSignVerify(t *testing.T) {
 	var zero zeroReader
-	public, private, err := GenerateKey(zero)
+	public, private, err := falcon1024.GenerateKey(zero)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	message := []byte("test message")
-	sig, err := Sign(zero, private, message)
+	sig, err := falcon1024.Sign(zero, private, message)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(sig) != SignatureSize {
-		t.Fatalf("signature has wrong size: got %d, want %d", len(sig), SignatureSize)
+	if len(sig) != falcon1024.SignatureSize {
+		t.Fatalf("signature has wrong size: got %d, want %d", len(sig), falcon1024.SignatureSize)
 	}
-	if !Verify(public, message, sig) {
+	if !falcon1024.Verify(public, message, sig) {
 		t.Fatal("valid signature rejected")
 	}
-	if Verify(public, []byte("wrong message"), sig) {
+	if falcon1024.Verify(public, []byte("wrong message"), sig) {
 		t.Fatal("signature of different message accepted")
 	}
 
-	sig[SignatureSize-1] ^= 1
-	if Verify(public, message, sig) {
+	sig[falcon1024.SignatureSize-1] ^= 1
+	if falcon1024.Verify(public, message, sig) {
 		t.Fatal("modified signature accepted")
 	}
 }
 
 func TestPrivateKeySign(t *testing.T) {
 	var zero zeroReader
-	public, private, err := GenerateKey(zero)
+	public, private, err := falcon1024.GenerateKey(zero)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -140,7 +123,7 @@ func TestPrivateKeySign(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !Verify(public, message, sig) {
+	if !falcon1024.Verify(public, message, sig) {
 		t.Fatal("PrivateKey.Sign signature rejected")
 	}
 }
@@ -148,10 +131,10 @@ func TestPrivateKeySign(t *testing.T) {
 func TestNewKeyFromSeedInvalidSeed(t *testing.T) {
 	for _, seed := range [][]byte{
 		nil,
-		make([]byte, SeedSize-1),
-		make([]byte, SeedSize+1),
+		make([]byte, falcon1024.SeedSize-1),
+		make([]byte, falcon1024.SeedSize+1),
 	} {
-		if _, _, err := NewKeyFromSeed(seed); err == nil {
+		if _, _, err := falcon1024.NewKeyFromSeed(seed); err == nil {
 			t.Fatalf("NewKeyFromSeed accepted seed with length %d", len(seed))
 		}
 	}
@@ -159,7 +142,7 @@ func TestNewKeyFromSeedInvalidSeed(t *testing.T) {
 
 func TestNewPrivateKeyInvalidInputs(t *testing.T) {
 	var zero zeroReader
-	_, private, err := GenerateKey(zero)
+	_, private, err := falcon1024.GenerateKey(zero)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -168,11 +151,11 @@ func TestNewPrivateKeyInvalidInputs(t *testing.T) {
 
 	for _, privateKey := range [][]byte{
 		nil,
-		make([]byte, PrivateKeySize-1),
-		make([]byte, PrivateKeySize+1),
+		make([]byte, falcon1024.PrivateKeySize-1),
+		make([]byte, falcon1024.PrivateKeySize+1),
 		badHeaderPrivate,
 	} {
-		if _, err := NewPrivateKey(privateKey); err == nil {
+		if _, err := falcon1024.NewPrivateKey(privateKey); err == nil {
 			t.Fatalf("NewPrivateKey accepted invalid private key with length %d", len(privateKey))
 		}
 	}
@@ -180,12 +163,12 @@ func TestNewPrivateKeyInvalidInputs(t *testing.T) {
 
 func TestVerifyInvalidInputs(t *testing.T) {
 	var zero zeroReader
-	public, private, err := GenerateKey(zero)
+	public, private, err := falcon1024.GenerateKey(zero)
 	if err != nil {
 		t.Fatal(err)
 	}
 	message := []byte("test message")
-	signature, err := Sign(zero, private, message)
+	signature, err := falcon1024.Sign(zero, private, message)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -195,11 +178,11 @@ func TestVerifyInvalidInputs(t *testing.T) {
 
 	for _, publicKey := range [][]byte{
 		nil,
-		make([]byte, PublicKeySize-1),
-		make([]byte, PublicKeySize+1),
+		make([]byte, falcon1024.PublicKeySize-1),
+		make([]byte, falcon1024.PublicKeySize+1),
 		badHeaderPublic,
 	} {
-		if _, err := NewPublicKey(publicKey); err == nil {
+		if _, err := falcon1024.NewPublicKey(publicKey); err == nil {
 			t.Fatalf("NewPublicKey accepted invalid public key with length %d", len(publicKey))
 		}
 	}
@@ -214,11 +197,11 @@ func TestVerifyInvalidInputs(t *testing.T) {
 		},
 		{
 			name:      "short signature",
-			signature: make([]byte, SignatureSize-1),
+			signature: make([]byte, falcon1024.SignatureSize-1),
 		},
 		{
 			name:      "long signature",
-			signature: make([]byte, SignatureSize+1),
+			signature: make([]byte, falcon1024.SignatureSize+1),
 		},
 		{
 			name:      "wrong signature header",
@@ -226,19 +209,19 @@ func TestVerifyInvalidInputs(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if Verify(public, message, tc.signature) {
+			if falcon1024.Verify(public, message, tc.signature) {
 				t.Fatal("Verify accepted invalid input")
 			}
 		})
 	}
 
-	if !Verify(public, message, signature) {
+	if !falcon1024.Verify(public, message, signature) {
 		t.Fatal("Verify rejected valid input")
 	}
 }
 
 func TestEqual(t *testing.T) {
-	public, private, err := GenerateKey(rand.Reader)
+	public, private, err := falcon1024.GenerateKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -254,7 +237,7 @@ func TestEqual(t *testing.T) {
 		t.Errorf("private key is not equal to itself: %x", private.Bytes())
 	}
 
-	otherPub, otherPriv, err := GenerateKey(rand.Reader)
+	otherPub, otherPriv, err := falcon1024.GenerateKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -271,17 +254,17 @@ func TestPublicAPIRegression(t *testing.T) {
 	// and Sign(zeroReader{}, ...).
 	// Reference Falcon KATs are covered in crypto/internal/falcon1024.
 	var zero zeroReader
-	public, private, err := GenerateKey(zero)
+	public, private, err := falcon1024.GenerateKey(zero)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	message := []byte("Falcon-1024 public API golden test")
-	signature, err := Sign(zero, private, message)
+	signature, err := falcon1024.Sign(zero, private, message)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !Verify(public, message, signature) {
+	if !falcon1024.Verify(public, message, signature) {
 		t.Fatal("golden signature failed verification")
 	}
 
@@ -302,16 +285,16 @@ func checkSHA256(t *testing.T, name string, got []byte, want string) {
 func BenchmarkKeyGeneration(b *testing.B) {
 	var zero zeroReader
 	for b.Loop() {
-		if _, _, err := GenerateKey(zero); err != nil {
+		if _, _, err := falcon1024.GenerateKey(zero); err != nil {
 			b.Fatal(err)
 		}
 	}
 }
 
 func BenchmarkNewKeyFromSeed(b *testing.B) {
-	seed := make([]byte, SeedSize)
+	seed := make([]byte, falcon1024.SeedSize)
 	for b.Loop() {
-		_, _, err := NewKeyFromSeed(seed)
+		_, _, err := falcon1024.NewKeyFromSeed(seed)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -320,13 +303,13 @@ func BenchmarkNewKeyFromSeed(b *testing.B) {
 
 func BenchmarkSigning(b *testing.B) {
 	var zero zeroReader
-	_, priv, err := GenerateKey(zero)
+	_, priv, err := falcon1024.GenerateKey(zero)
 	if err != nil {
 		b.Fatal(err)
 	}
 	message := []byte("Hello, world!")
 	for b.Loop() {
-		_, err := Sign(zero, priv, message)
+		_, err := falcon1024.Sign(zero, priv, message)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -335,17 +318,17 @@ func BenchmarkSigning(b *testing.B) {
 
 func BenchmarkVerification(b *testing.B) {
 	var zero zeroReader
-	pub, priv, err := GenerateKey(zero)
+	pub, priv, err := falcon1024.GenerateKey(zero)
 	if err != nil {
 		b.Fatal(err)
 	}
 	message := []byte("Hello, world!")
-	signature, err := Sign(zero, priv, message)
+	signature, err := falcon1024.Sign(zero, priv, message)
 	if err != nil {
 		b.Fatal(err)
 	}
 	for b.Loop() {
-		if !Verify(pub, message, signature) {
+		if !falcon1024.Verify(pub, message, signature) {
 			b.Fatal("signature rejected")
 		}
 	}
