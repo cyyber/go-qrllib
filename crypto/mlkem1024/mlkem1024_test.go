@@ -1,1 +1,1 @@
-package mlkem1024
+package mlkem1024_test

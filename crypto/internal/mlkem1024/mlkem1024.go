@@ -98,15 +98,15 @@ func NewEncapsulationKey(ekPKE []byte) (*EncapsulationKey, error) {
 	_, _ = H.Write(ekPKE)
 	H.Sum(ek.h[:0])
 
-	// TODO
-	// var err error
-	// for i := range ek.t {
-	// 	// ek.t[i], err = polyByteDecode(ekPKE[:encodingSize12])
-	// 	if err != nil {
-	// 		return nil, err
-	// 	}
-	// 	ekPKE = ekPKE[encodingSize12:]
-	// }
+	var err error
+	for i := range ek.t {
+		ek.t[i], err = polyByteDecode(ekPKE[:encodingSize12])
+		if err != nil {
+			return nil, err
+		}
+		ekPKE = ekPKE[encodingSize12:]
+	}
+	copy(ek.rho[:], ekPKE)
 
 	return ek, nil
 }
@@ -137,20 +137,17 @@ func (ek *EncapsulationKey) Bytes() []byte {
 	b := make([]byte, 0, encapsulationKeySize)
 	var encoded [encodingSize12]byte
 	for i := range ek.t {
-		// TODO
-		// polyByteEncode(encoded[:], ek.t[i])
-		_ = i
+		polyByteEncode(encoded[:], ek.t[i])
 		b = append(b, encoded[:]...)
 	}
-
-	// TODO calc a
-
+	b = append(b, ek.rho[:]...)
 	return b
 }
 
 type encryptionKey struct {
-	t [k]ringElement
-	a [k * k]ringElement
+	t   [k]ringElement
+	a   [k * k]ringElement
+	rho [32]byte
 }
 
 type decryptionKey struct {
@@ -177,26 +174,27 @@ func generateKey(dk *DecapsulationKey, d, z *[32]byte) {
 	_, _ = g.Write(d[:])
 	_, _ = g.Write([]byte{k})
 	G := g.Sum(make([]byte, 0, 64))
-	ρ, σ := G[:32], G[32:]
+	rho, sigma := G[:32], G[32:]
+	copy(dk.rho[:], rho)
 
 	A := &dk.a
 	for i := range byte(k) {
 		for j := range byte(k) {
-			A[i*k+j] = sampleNTT(ρ, j, i)
+			A[i*k+j] = sampleNTT(rho, j, i)
 		}
 	}
 
 	var N byte
 	s := &dk.s
 	for i := range s {
-		s[i] = samplePolyCBD(σ, N)
+		s[i] = samplePolyCBD(sigma, N)
 		ntt(s[i])
 		N++
 	}
 
 	e := make([]ringElement, k)
 	for i := range e {
-		e[i] = samplePolyCBD(σ, N)
+		e[i] = samplePolyCBD(sigma, N)
 		ntt(e[i])
 		N++
 	}

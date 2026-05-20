@@ -89,9 +89,14 @@ func polyByteEncode[T ~[n]fieldElement](dst []byte, p T) {
 	// TODO
 }
 
-func samplePolyCBD(σ []byte, N byte) ringElement {
+func polyByteDecode(p []byte) (ringElement, error) {
+	// TODO
+	return ringElement{}, nil
+}
+
+func samplePolyCBD(sigma []byte, N byte) ringElement {
 	prf := sha3.NewSHAKE256()
-	_, _ = prf.Write(σ)
+	_, _ = prf.Write(sigma)
 	_, _ = prf.Write([]byte{N})
 	B := make([]byte, 64*2)
 	_, _ = prf.Read(B)
