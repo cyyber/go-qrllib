@@ -1,4 +1,4 @@
-// Package mlkem1024 provides ML-KEM-1024 key encapsulation primitives.
+// Package mlkem1024 provides ML-KEM-1024 key encapsulation primitives as defined in FIPS 203.
 package mlkem1024
 
 import "github.com/theQRL/go-qrllib/crypto/internal/mlkem1024"
@@ -25,6 +25,16 @@ type DecapsulationKey struct {
 	key *mlkem1024.DecapsulationKey
 }
 
+// NewDecapsulationKey returns the decapsulation key deterministically generated
+// from seed, which must be a SeedSize-byte value in d || z form.
+func NewDecapsulationKey(seed []byte) (*DecapsulationKey, error) {
+	key, err := mlkem1024.NewDecapsulationKey(seed)
+	if err != nil {
+		return nil, err
+	}
+	return &DecapsulationKey{key}, nil
+}
+
 // Decapsulate recovers the shared secret from an ML-KEM-1024 ciphertext using
 // the decapsulation key.
 func (dk *DecapsulationKey) Decapsulate(ciphertext []byte) (sharedKey []byte, err error) {
@@ -45,6 +55,16 @@ func (dk *DecapsulationKey) Bytes() []byte {
 // secrets for the corresponding decapsulation key.
 type EncapsulationKey struct {
 	key *mlkem1024.EncapsulationKey
+}
+
+// NewEncapsulationKey constructs an encapsulation key from its
+// EncapsulationKeySize-byte encoded form.
+func NewEncapsulationKey(encapsulationKey []byte) (*EncapsulationKey, error) {
+	key, err := mlkem1024.NewEncapsulationKey(encapsulationKey)
+	if err != nil {
+		return nil, err
+	}
+	return &EncapsulationKey{key}, nil
 }
 
 // Encapsulate produces a shared secret and ciphertext pair using this
