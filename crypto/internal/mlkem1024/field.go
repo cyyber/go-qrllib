@@ -32,8 +32,6 @@ const (
 	barrettShift      = 24
 )
 
-// fieldReduce reduces a value a < 2q² using Barrett reduction, to avoid
-// potentially variable-time division.
 func fieldReduce(a uint32) fieldElement {
 	quotient := uint32((uint64(a) * barrettMultiplier) >> barrettShift)
 	return fieldReduceOnce(uint16(a - quotient*q))

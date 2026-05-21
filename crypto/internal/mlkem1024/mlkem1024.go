@@ -9,20 +9,20 @@ import (
 )
 
 const (
+	// k is the ML-KEM-1024 dimension; key vectors contain k polynomials
+	// and the public matrix has dimensions k by k.
 	k = 4
 
-	encodingSize11 = n * 11 / 8
-	encodingSize5  = n * 5 / 8
-	encodingSize12 = n * 12 / 8
-
-	ciphertextSize       = k*encodingSize11 + encodingSize5
+	ciphertextSize       = 1568
 	sharedKeySize        = 32
 	seedSize             = 64
 	encapsulationKeySize = 1568
+
+	encodingSize12 = 384
 )
 
 type DecapsulationKey struct {
-	d, z [32]byte
+	d, z [32]byte // decapsulation key seeds
 	h    [32]byte // H(ekPKE)
 	encryptionKey
 	decryptionKey
@@ -32,10 +32,13 @@ func NewDecapsulationKey(seed []byte) (*DecapsulationKey, error) {
 	if len(seed) != seedSize {
 		return nil, errors.New("ml-kem-1024: invalid seed length")
 	}
+
 	dk := &DecapsulationKey{}
 	d := (*[32]byte)(seed[:32])
 	z := (*[32]byte)(seed[32:])
+
 	generateKey(dk, d, z)
+
 	return dk, nil
 }
 
@@ -43,6 +46,7 @@ func (dk *DecapsulationKey) Decapsulate(ciphertext []byte) (sharedKey []byte, er
 	if len(ciphertext) != ciphertextSize {
 		return nil, errors.New("ml-kem-1024: invalid ciphertext length")
 	}
+
 	return decapsulate(dk, (*[ciphertextSize]byte)(ciphertext)), nil
 }
 
@@ -79,6 +83,7 @@ func (dk *DecapsulationKey) Bytes() []byte {
 	var b [seedSize]byte
 	copy(b[:], dk.d[:])
 	copy(b[32:], dk.z[:])
+
 	return b[:]
 }
 
@@ -116,8 +121,10 @@ func (ek *EncapsulationKey) Encapsulate() (sharedKey, ciphertext []byte, err err
 	if _, err := io.ReadFull(rand.Reader, m[:]); err != nil {
 		return nil, nil, err
 	}
+
 	var ct [ciphertextSize]byte
 	K, c := encapsulate(&ct, ek, &m)
+
 	return K, c, nil
 }
 
@@ -141,17 +148,18 @@ func (ek *EncapsulationKey) Bytes() []byte {
 		b = append(b, encoded[:]...)
 	}
 	b = append(b, ek.rho[:]...)
+
 	return b
 }
 
 type encryptionKey struct {
-	t   [k]ringElement
-	a   [k * k]ringElement
-	rho [32]byte
+	t   [k]ringElement     // public key vector
+	a   [k * k]ringElement // public matrix A
+	rho [32]byte           // matrix seed
 }
 
 type decryptionKey struct {
-	s [k]ringElement
+	s [k]ringElement // secret key vector
 }
 
 func GenerateKey() (*DecapsulationKey, error) {
@@ -163,7 +171,9 @@ func GenerateKey() (*DecapsulationKey, error) {
 		return nil, err
 	}
 	dk := &DecapsulationKey{}
+
 	generateKey(dk, &d, &z)
+
 	return dk, nil
 }
 
@@ -216,33 +226,34 @@ func generateKey(dk *DecapsulationKey, d, z *[32]byte) {
 	H.Sum(dk.h[:0])
 }
 
-func pkeEncrypt(c *[ciphertextSize]byte, ek *EncapsulationKey, m *[32]byte, r []byte) []byte {
-	// a := [k * k]ringElement{}
-	// for i := range byte(k) {
-	// 	for j := range byte(k) {
-	// 		// TODO arg
-	// 		a[i*k+j] = sampleNTT(nil, j, i)
-	// 	}
-	// }
+func pkeEncrypt(cc *[ciphertextSize]byte, ek *EncapsulationKey, m *[32]byte, r []byte) []byte {
+	var N byte
+	y, e1 := make([]ringElement, k), make([]ringElement, k)
+	for i := range k {
+		y[i] = samplePolyCBD(r, N)
+		ntt(y[i])
+		N++
+	}
+	for i := range k {
+		e1[i] = samplePolyCBD(r, N)
+		N++
+	}
+	e2 := samplePolyCBD(r, N)
+	_ = e2
 
-	// var N byte
-	// var y ringElement
-	// for i := range k {
-	// 	y[i] = samplePolyCBD(r, N)
-	// 	N++
-	// }
-	// for i := range k {
-	// 	y[i] = samplePolyCBD(r, N)
-	// 	N++
-	// }
-	// e2 := samplePolyCBD(r, N)
-	// ntt(y)
-	// inverseNTT()
+	// TODO
 
 	return nil
 }
 
 func pkeDecrypt(dk *DecapsulationKey, c *[ciphertextSize]byte) [32]byte {
-	// TODO
+	u := make([]ringElement, k)
+	for i := range u {
+		_ = u[i] // ringDecodeAndDecompress
+	}
+	// v := ringDecodeAndDecompress5(b)
+
+	// return ringCompressAndDecode1()
+
 	return [32]byte{}
 }
