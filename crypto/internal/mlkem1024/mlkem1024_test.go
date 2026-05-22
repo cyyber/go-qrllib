@@ -41,7 +41,8 @@ func TestEncapsulateInternalKAT(t *testing.T) {
 
 	m := katMessage()
 	var ct [ciphertextSize]byte
-	sharedKey, ciphertext := encapsulate(&ct, dk.EncapsulationKey(), &m)
+	sharedKey := encapsulateTo(&ct, dk.EncapsulationKey(), &m)
+	ciphertext := ct[:]
 
 	if got := hex.EncodeToString(sharedKey); got != "a9f52838faed39482c5769f3b8ea6152a09ca981da3a8816ced34be298e54e95" {
 		t.Fatalf("shared key = %s, want %s", got, "a9f52838faed39482c5769f3b8ea6152a09ca981da3a8816ced34be298e54e95")
@@ -81,9 +82,9 @@ func TestNewEncapsulationKeyExpandsMatrix(t *testing.T) {
 // These tests consume the official NIST ACVP sample JSON files for ML-KEM.
 // Source: https://github.com/usnistgov/ACVP-Server/tree/master/gen-val/json-files
 //
-// The checked-in fixtures live under testdata/acvp. Set MLKEM_ACVP_JSON_DIR to
-// either the gen-val/json-files directory or to one specific ML-KEM-* suite
-// directory to run against a fresh ACVP checkout.
+// The checked-in fixtures live under testdata/acvp as gzip-compressed JSON.
+// Set MLKEM_ACVP_JSON_DIR to either the gen-val/json-files directory or to one
+// specific ML-KEM-* suite directory to run against a fresh ACVP checkout.
 
 func TestACVPJSONKeyGen(t *testing.T) {
 	prompt := readACVPFile(t, "ML-KEM-keyGen-FIPS203", "prompt.json")
@@ -132,12 +133,12 @@ func TestACVPJSONEncapsulation(t *testing.T) {
 			var m [32]byte
 			copy(m[:], decodeACVPHex(t, test.M))
 			var ct [ciphertextSize]byte
-			gotK, gotC := encapsulate(&ct, ek, &m)
+			gotK := encapsulateTo(&ct, ek, &m)
 
 			if !bytes.Equal(gotK, decodeACVPHex(t, want.K)) {
 				t.Fatalf("tcId %d: shared key mismatch", test.TcID)
 			}
-			if !bytes.Equal(gotC, decodeACVPHex(t, want.C)) {
+			if !bytes.Equal(ct[:], decodeACVPHex(t, want.C)) {
 				t.Fatalf("tcId %d: ciphertext mismatch", test.TcID)
 			}
 		}
@@ -234,21 +235,55 @@ type acvpTest struct {
 func readACVPFile(t *testing.T, suite, name string) acvpFile {
 	t.Helper()
 
-	base := filepath.Join("testdata", "acvp")
+	base := os.Getenv("MLKEM_ACVP_JSON_DIR")
+	if base == "" {
+		base = filepath.Join("testdata", "acvp")
+	}
 	path := filepath.Join(base, suite, name)
-	if _, err := os.Stat(path); err != nil {
+	if !fileExists(path) && !fileExists(path+".gz") {
 		path = filepath.Join(base, name)
 	}
-	b, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("read ACVP JSON %q: %v", path, err)
-	}
+
+	b, path := readACVPBytes(t, path)
 
 	var f acvpFile
 	if err := json.Unmarshal(b, &f); err != nil {
 		t.Fatalf("parse ACVP JSON %q: %v", path, err)
 	}
 	return f
+}
+
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
+
+func readACVPBytes(t *testing.T, path string) ([]byte, string) {
+	t.Helper()
+
+	b, err := os.ReadFile(path)
+	if err == nil {
+		return b, path
+	}
+
+	gzPath := path + ".gz"
+	f, err := os.Open(gzPath)
+	if err != nil {
+		t.Fatalf("read ACVP JSON %q: %v", path, err)
+	}
+	defer f.Close()
+
+	gz, err := gzip.NewReader(f)
+	if err != nil {
+		t.Fatalf("open compressed ACVP JSON %q: %v", gzPath, err)
+	}
+	defer gz.Close()
+
+	b, err = io.ReadAll(gz)
+	if err != nil {
+		t.Fatalf("read compressed ACVP JSON %q: %v", gzPath, err)
+	}
+	return b, gzPath
 }
 
 func (f acvpFile) group(t *testing.T, tgID int) acvpGroup {

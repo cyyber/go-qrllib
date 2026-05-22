@@ -59,8 +59,8 @@ type EncapsulationKey struct {
 
 // NewEncapsulationKey constructs an encapsulation key from its
 // EncapsulationKeySize-byte encoded form.
-func NewEncapsulationKey(encapsulationKey []byte) (*EncapsulationKey, error) {
-	key, err := mlkem1024.NewEncapsulationKey(encapsulationKey)
+func NewEncapsulationKey(ekBytes []byte) (*EncapsulationKey, error) {
+	key, err := mlkem1024.NewEncapsulationKey(ekBytes)
 	if err != nil {
 		return nil, err
 	}

@@ -48,19 +48,29 @@ func fieldAddMul(a, b, c, d fieldElement) fieldElement {
 
 type ringElement [n]fieldElement // modulo-q polynomial
 
-const ()
+func ringCompressAndEncode1(dst *[encodingSize1]byte, p *ringElement) {
+	// TODO
+}
 
-func ringCompressAndEncode1(dst *[encodingSize1]byte, p *ringElement) {}
+func ringDecodeAndDecompress1(dst *ringElement, src *[encodingSize1]byte) {
+	// TODO
+}
 
-func ringDecodeAndDecompress1(dst *ringElement, src *[encodingSize1]byte) {}
+func ringCompressAndEncode5(dst *[encodingSize5]byte, p *ringElement) {
+	// TODO
+}
 
-func ringCompressAndEncode5(dst *[encodingSize5]byte, p *ringElement) {}
+func ringDecodeAndDecompress5(dst *ringElement, src *[encodingSize5]byte) {
+	// TODO
+}
 
-func ringDecodeAndDecompress5(dst *ringElement, src *[encodingSize5]byte) {}
+func ringCompressAndEncode11(dst *[encodingSize11]byte, p *ringElement) {
+	// TODO
+}
 
-func ringCompressAndEncode11(dst *[encodingSize11]byte, p *ringElement) {}
-
-func ringDecodeAndDecompress11(dst *ringElement, src *[encodingSize11]byte) {}
+func ringDecodeAndDecompress11(dst *ringElement, src *[encodingSize11]byte) {
+	// TODO
+}
 
 func sampleNTT(dst *ringElement, rho *[32]byte, jj, ii byte) {
 	ctx := sha3.NewSHAKE128()

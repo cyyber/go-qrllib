@@ -2,39 +2,111 @@ package mlkem1024_test
 
 import (
 	"bytes"
+	"crypto/mlkem"
+	"crypto/rand"
 	"testing"
 
-	"github.com/theQRL/go-qrllib/crypto/mlkem1024"
+	"github.com/theQRL/go-qrllib/crypto/internal/mlkem1024"
+	. "github.com/theQRL/go-qrllib/crypto/mlkem1024"
 )
 
+func TestRoundTrip(t *testing.T) {
+	dk, err := GenerateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ek := dk.EncapsulationKey()
+	Ke, c, err := ek.Encapsulate()
+	if err != nil {
+		t.Fatal(err)
+	}
+	Kd, err := dk.Decapsulate(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(Ke, Kd) {
+		t.Fail()
+	}
+
+	ek1, err := NewEncapsulationKey(ek.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(ek.Bytes(), ek1.Bytes()) {
+		t.Fail()
+	}
+
+	dk1, err := NewDecapsulationKey(dk.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(dk.Bytes(), dk1.Bytes()) {
+		t.Fail()
+	}
+
+	Ke1, c1, err := ek1.Encapsulate()
+	if err != nil {
+		t.Fatal(err)
+	}
+	Kd1, err := dk1.Decapsulate(c1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(Ke1, Kd1) {
+		t.Fail()
+	}
+
+	dk2, err := GenerateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Equal(dk.EncapsulationKey().Bytes(), dk2.EncapsulationKey().Bytes()) {
+		t.Fail()
+	}
+	if bytes.Equal(dk.Bytes(), dk2.Bytes()) {
+		t.Fail()
+	}
+
+	Ke2, c2, err := dk.EncapsulationKey().Encapsulate()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Equal(c, c2) {
+		t.Fail()
+	}
+	if bytes.Equal(Ke, Ke2) {
+		t.Fail()
+	}
+}
+
 func TestInvalidInputLengths(t *testing.T) {
-	if _, err := mlkem1024.NewDecapsulationKey(make([]byte, mlkem1024.SeedSize-1)); err == nil {
+	if _, err := NewDecapsulationKey(make([]byte, SeedSize-1)); err == nil {
 		t.Fatal("NewDecapsulationKey accepted a short seed")
 	}
-	if _, err := mlkem1024.NewDecapsulationKey(make([]byte, mlkem1024.SeedSize+1)); err == nil {
+	if _, err := NewDecapsulationKey(make([]byte, SeedSize+1)); err == nil {
 		t.Fatal("NewDecapsulationKey accepted a long seed")
 	}
-	if _, err := mlkem1024.NewEncapsulationKey(make([]byte, mlkem1024.EncapsulationKeySize-1)); err == nil {
+	if _, err := NewEncapsulationKey(make([]byte, EncapsulationKeySize-1)); err == nil {
 		t.Fatal("NewEncapsulationKey accepted a short encapsulation key")
 	}
-	if _, err := mlkem1024.NewEncapsulationKey(make([]byte, mlkem1024.EncapsulationKeySize+1)); err == nil {
+	if _, err := NewEncapsulationKey(make([]byte, EncapsulationKeySize+1)); err == nil {
 		t.Fatal("NewEncapsulationKey accepted a long encapsulation key")
 	}
 
-	dk, err := mlkem1024.NewDecapsulationKey(testSeed())
+	dk, err := NewDecapsulationKey(testSeed())
 	if err != nil {
 		t.Fatalf("NewDecapsulationKey returned error: %v", err)
 	}
-	if _, err := dk.Decapsulate(make([]byte, mlkem1024.CiphertextSize-1)); err == nil {
+	if _, err := dk.Decapsulate(make([]byte, CiphertextSize-1)); err == nil {
 		t.Fatal("Decapsulate accepted a short ciphertext")
 	}
-	if _, err := dk.Decapsulate(make([]byte, mlkem1024.CiphertextSize+1)); err == nil {
+	if _, err := dk.Decapsulate(make([]byte, CiphertextSize+1)); err == nil {
 		t.Fatal("Decapsulate accepted a long ciphertext")
 	}
 }
 
 func TestEncapsulateDecapsulateAgreement(t *testing.T) {
-	dk, err := mlkem1024.GenerateKey()
+	dk, err := GenerateKey()
 	if err != nil {
 		t.Fatalf("GenerateKey returned error: %v", err)
 	}
@@ -43,11 +115,11 @@ func TestEncapsulateDecapsulateAgreement(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Encapsulate returned error: %v", err)
 	}
-	if len(sharedKey) != mlkem1024.SharedKeySize {
-		t.Fatalf("shared key length = %d, want %d", len(sharedKey), mlkem1024.SharedKeySize)
+	if len(sharedKey) != SharedKeySize {
+		t.Fatalf("shared key length = %d, want %d", len(sharedKey), SharedKeySize)
 	}
-	if len(ciphertext) != mlkem1024.CiphertextSize {
-		t.Fatalf("ciphertext length = %d, want %d", len(ciphertext), mlkem1024.CiphertextSize)
+	if len(ciphertext) != CiphertextSize {
+		t.Fatalf("ciphertext length = %d, want %d", len(ciphertext), CiphertextSize)
 	}
 
 	decapsulated, err := dk.Decapsulate(ciphertext)
@@ -60,27 +132,84 @@ func TestEncapsulateDecapsulateAgreement(t *testing.T) {
 }
 
 func testSeed() []byte {
-	seed := make([]byte, mlkem1024.SeedSize)
+	seed := make([]byte, SeedSize)
 	for i := range seed {
 		seed[i] = byte(i)
 	}
 	return seed
 }
 
+// TODO
+var sink byte
+
 func BenchmarkGenerateKey(b *testing.B) {
-	// TOOD
+	var d, z [32]byte
+	_, _ = rand.Read(d[:])
+	_, _ = rand.Read(z[:])
+	for b.Loop() {
+		dk := mlkem1024.GenerateKeyInternal(&d, &z)
+		sink ^= dk.EncapsulationKey().Bytes()[0]
+	}
 }
 
 func BenchmarkEncapsulate(b *testing.B) {
-	// TODO
+	seed := make([]byte, SeedSize)
+	_, _ = rand.Read(seed[:])
+
+	dk, err := NewDecapsulationKey(seed)
+	if err != nil {
+		b.Fatal(err)
+	}
+	ekBytes := dk.EncapsulationKey().Bytes()
+
+	for b.Loop() {
+		ek, err := NewEncapsulationKey(ekBytes)
+		if err != nil {
+			b.Fatal(err)
+		}
+
+		sharedKey, ciphertext, err := ek.Encapsulate()
+		if err != nil {
+			b.Fatal(err)
+		}
+
+		sink ^= ciphertext[0] ^ sharedKey[0]
+	}
+
 }
 
 func BenchmarkDecapsulate(b *testing.B) {
-	// TODO
+	dk, err := GenerateKey()
+	if err != nil {
+		b.Fatal(err)
+	}
+	ek := dk.EncapsulationKey()
+
+	_, ciphertext, err := ek.Encapsulate()
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	for b.Loop() {
+		sharedKey, _ := dk.Decapsulate(ciphertext)
+		sink ^= sharedKey[0]
+	}
 }
 
-func BenchmarkRoundTrip(b *testing.B) {
-	// TODO
-}
+func TestConstantSizes(t *testing.T) {
+	if SharedKeySize != mlkem1024.SharedKeySize {
+		t.Errorf("SharedKeySize mismatch: got %d, want %d", SharedKeySize, mlkem.SharedKeySize)
+	}
 
-func TestConstantSizes(t *testing.T) {}
+	if SeedSize != mlkem1024.SeedSize {
+		t.Errorf("SeedSize mismatch: got %d, want %d", SeedSize, mlkem.SeedSize)
+	}
+
+	if CiphertextSize != mlkem1024.CiphertextSize {
+		t.Errorf("CiphertextSize mismatch: got %d, want %d", CiphertextSize, mlkem1024.CiphertextSize)
+	}
+
+	if EncapsulationKeySize != mlkem1024.EncapsulationKeySize {
+		t.Errorf("EncapsulationKeySize mismatch: got %d, want %d", EncapsulationKeySize, mlkem1024.EncapsulationKeySize)
+	}
+}

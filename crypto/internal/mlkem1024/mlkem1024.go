@@ -21,14 +21,14 @@ const (
 
 	messageSize = encodingSize1
 
-	sharedKeySize = 32
-	seedSize      = 32 + 32
+	SharedKeySize = 32
+	SeedSize      = 32 + 32
 
 	// ML-KEM-1024 parameters.
 	k = 4
 
-	ciphertextSize       = k*encodingSize11 + encodingSize5
-	encapsulationKeySize = 1568
+	CiphertextSize       = k*encodingSize11 + encodingSize5
+	EncapsulationKeySize = k*encodingSize12 + 32
 )
 
 type DecapsulationKey struct {
@@ -39,7 +39,7 @@ type DecapsulationKey struct {
 }
 
 func NewDecapsulationKey(seed []byte) (*DecapsulationKey, error) {
-	if len(seed) != seedSize {
+	if len(seed) != SeedSize {
 		return nil, errors.New("ml-kem-1024: invalid seed length")
 	}
 
@@ -53,14 +53,14 @@ func NewDecapsulationKey(seed []byte) (*DecapsulationKey, error) {
 }
 
 func (dk *DecapsulationKey) Decapsulate(ciphertext []byte) (sharedKey []byte, err error) {
-	if len(ciphertext) != ciphertextSize {
+	if len(ciphertext) != CiphertextSize {
 		return nil, errors.New("ml-kem-1024: invalid ciphertext length")
 	}
 
-	return decapsulate(dk, (*[ciphertextSize]byte)(ciphertext)), nil
+	return decapsulate(dk, (*[CiphertextSize]byte)(ciphertext)), nil
 }
 
-func decapsulate(dk *DecapsulationKey, ct *[ciphertextSize]byte) (sharedKey []byte) {
+func decapsulate(dk *DecapsulationKey, ct *[CiphertextSize]byte) (sharedKey []byte) {
 	var m [messageSize]byte
 
 	pkeDecrypt(&m, dk, ct)
@@ -69,16 +69,16 @@ func decapsulate(dk *DecapsulationKey, ct *[ciphertextSize]byte) (sharedKey []by
 	_, _ = g.Write(m[:])
 	_, _ = g.Write(dk.h[:])
 	G := g.Sum(make([]byte, 0, 64))
-	K, r := G[:sharedKeySize], G[sharedKeySize:]
+	K, r := G[:SharedKeySize], G[SharedKeySize:]
 
 	J := sha3.NewSHAKE256()
 	_, _ = J.Write(dk.z[:])
 	_, _ = J.Write(ct[:])
-	Kout := make([]byte, sharedKeySize)
+	Kout := make([]byte, SharedKeySize)
 	_, _ = J.Read(Kout)
 
-	var c [ciphertextSize]byte
-	pkeEncrypt(&c, dk.EncapsulationKey(), &m, r)
+	var c [CiphertextSize]byte
+	pkeEncrypt(&c, &dk.encryptionKey, &m, r)
 
 	subtle.ConstantTimeCopy(subtle.ConstantTimeCompare(ct[:], c[:]), Kout, K)
 
@@ -93,7 +93,7 @@ func (dk *DecapsulationKey) EncapsulationKey() *EncapsulationKey {
 }
 
 func (dk *DecapsulationKey) Bytes() []byte {
-	var b [seedSize]byte
+	var b [SeedSize]byte
 	copy(b[:], dk.d[:])
 	copy(b[32:], dk.z[:])
 
@@ -105,56 +105,63 @@ type EncapsulationKey struct {
 	encryptionKey
 }
 
-func NewEncapsulationKey(ekPKE []byte) (*EncapsulationKey, error) {
-	if len(ekPKE) != encapsulationKeySize {
+func NewEncapsulationKey(ekBytes []byte) (*EncapsulationKey, error) {
+	if len(ekBytes) != EncapsulationKeySize {
 		return nil, errors.New("ml-kem-1024: invalid encapsulation key length")
 	}
 
 	ek := &EncapsulationKey{}
 
 	H := sha3.New256()
-	_, _ = H.Write(ekPKE)
+	_, _ = H.Write(ekBytes)
 	H.Sum(ek.h[:0])
 
 	var err error
 	for i := range ek.t {
-		err = polyByteDecode(&ek.t[i], (*[encodingSize12]byte)(ekPKE[:encodingSize12]))
+		err = polyByteDecode(&ek.t[i], (*[encodingSize12]byte)(ekBytes[:encodingSize12]))
 		if err != nil {
 			return nil, err
 		}
-		ekPKE = ekPKE[encodingSize12:]
+		ekBytes = ekBytes[encodingSize12:]
 	}
-	copy(ek.rho[:], ekPKE)
+	copy(ek.rho[:], ekBytes)
+
+	for i := range k {
+		for j := range k {
+			sampleNTT(&ek.a[i*k+j], &ek.rho, byte(j), byte(i))
+		}
+	}
 
 	return ek, nil
 }
 
 func (ek *EncapsulationKey) Encapsulate() (sharedKey, ciphertext []byte, err error) {
+	// TODO
 	var m [32]byte
 	if _, err := io.ReadFull(rand.Reader, m[:]); err != nil {
 		return nil, nil, err
 	}
 
-	var ct [ciphertextSize]byte
-	K, c := encapsulate(&ct, ek, &m)
+	var ct [CiphertextSize]byte
+	sharedKey = encapsulateTo(&ct, ek, &m)
 
-	return K, c, nil
+	return sharedKey, ct[:], nil
 }
 
-func encapsulate(ct *[ciphertextSize]byte, ek *EncapsulationKey, m *[32]byte) (K []byte, c []byte) {
+func encapsulateTo(dst *[CiphertextSize]byte, ek *EncapsulationKey, m *[32]byte) []byte {
 	g := sha3.New512()
 	_, _ = g.Write(m[:])
 	_, _ = g.Write(ek.h[:])
 	G := g.Sum(nil)
-	K, r := G[:sharedKeySize], G[sharedKeySize:]
+	K, r := G[:SharedKeySize], G[SharedKeySize:]
 
-	pkeEncrypt(ct, ek, m, r)
+	pkeEncrypt(dst, &ek.encryptionKey, m, r)
 
-	return K, c
+	return K
 }
 
 func (ek *EncapsulationKey) Bytes() []byte {
-	b := make([]byte, 0, encapsulationKeySize)
+	b := make([]byte, 0, EncapsulationKeySize)
 	var encoded [encodingSize12]byte
 	for i := range ek.t {
 		polyByteEncode(&encoded, &ek.t[i])
@@ -198,4 +205,12 @@ func generateKey(dk *DecapsulationKey, d, z *[32]byte) {
 	H := sha3.New256()
 	_, _ = H.Write(dk.EncapsulationKey().Bytes())
 	H.Sum(dk.h[:0])
+}
+
+// GenerateKeyInternal is a derandomized version of GenerateKey,
+// exclusively for use in tests.
+func GenerateKeyInternal(d, z *[32]byte) *DecapsulationKey {
+	dk := &DecapsulationKey{}
+	generateKey(dk, d, z)
+	return dk
 }
