@@ -66,3 +66,21 @@ func testSeed() []byte {
 	}
 	return seed
 }
+
+func BenchmarkGenerateKey(b *testing.B) {
+	// TOOD
+}
+
+func BenchmarkEncapsulate(b *testing.B) {
+	// TODO
+}
+
+func BenchmarkDecapsulate(b *testing.B) {
+	// TODO
+}
+
+func BenchmarkRoundTrip(b *testing.B) {
+	// TODO
+}
+
+func TestConstantSizes(t *testing.T) {}

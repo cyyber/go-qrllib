@@ -9,16 +9,26 @@ import (
 )
 
 const (
-	// k is the ML-KEM-1024 dimension; key vectors contain k polynomials
-	// and the public matrix has dimensions k by k.
+	// ML-KEM global constants.
+	n = 256
+	q = 3329
+
+	// Byte lengths of ByteEncode_d(f) output (FIPS 203, Algorithm 5)
+	encodingSize1  = n * 1 / 8
+	encodingSize5  = n * 5 / 8
+	encodingSize11 = n * 11 / 8
+	encodingSize12 = n * 12 / 8
+
+	messageSize = encodingSize1
+
+	sharedKeySize = 32
+	seedSize      = 32 + 32
+
+	// ML-KEM-1024 parameters.
 	k = 4
 
-	ciphertextSize       = 1568
-	sharedKeySize        = 32
-	seedSize             = 64
+	ciphertextSize       = k*encodingSize11 + encodingSize5
 	encapsulationKeySize = 1568
-
-	encodingSize12 = 384
 )
 
 type DecapsulationKey struct {
@@ -51,7 +61,9 @@ func (dk *DecapsulationKey) Decapsulate(ciphertext []byte) (sharedKey []byte, er
 }
 
 func decapsulate(dk *DecapsulationKey, ct *[ciphertextSize]byte) (sharedKey []byte) {
-	m := pkeDecrypt(dk, ct)
+	var m [messageSize]byte
+
+	pkeDecrypt(&m, dk, ct)
 
 	g := sha3.New512()
 	_, _ = g.Write(m[:])
@@ -65,9 +77,10 @@ func decapsulate(dk *DecapsulationKey, ct *[ciphertextSize]byte) (sharedKey []by
 	Kout := make([]byte, sharedKeySize)
 	_, _ = J.Read(Kout)
 
-	c := pkeEncrypt(ct, dk.EncapsulationKey(), &m, r)
+	var c [ciphertextSize]byte
+	pkeEncrypt(&c, dk.EncapsulationKey(), &m, r)
 
-	subtle.ConstantTimeCopy(subtle.ConstantTimeCompare(ct[:], c), Kout, K)
+	subtle.ConstantTimeCopy(subtle.ConstantTimeCompare(ct[:], c[:]), Kout, K)
 
 	return Kout
 }
@@ -105,7 +118,7 @@ func NewEncapsulationKey(ekPKE []byte) (*EncapsulationKey, error) {
 
 	var err error
 	for i := range ek.t {
-		ek.t[i], err = polyByteDecode(ekPKE[:encodingSize12])
+		err = polyByteDecode(&ek.t[i], (*[encodingSize12]byte)(ekPKE[:encodingSize12]))
 		if err != nil {
 			return nil, err
 		}
@@ -135,7 +148,7 @@ func encapsulate(ct *[ciphertextSize]byte, ek *EncapsulationKey, m *[32]byte) (K
 	G := g.Sum(nil)
 	K, r := G[:sharedKeySize], G[sharedKeySize:]
 
-	c = pkeEncrypt(ct, ek, m, r)
+	pkeEncrypt(ct, ek, m, r)
 
 	return K, c
 }
@@ -144,7 +157,7 @@ func (ek *EncapsulationKey) Bytes() []byte {
 	b := make([]byte, 0, encapsulationKeySize)
 	var encoded [encodingSize12]byte
 	for i := range ek.t {
-		polyByteEncode(encoded[:], ek.t[i])
+		polyByteEncode(&encoded, &ek.t[i])
 		b = append(b, encoded[:]...)
 	}
 	b = append(b, ek.rho[:]...)
@@ -180,80 +193,9 @@ func GenerateKey() (*DecapsulationKey, error) {
 func generateKey(dk *DecapsulationKey, d, z *[32]byte) {
 	dk.d, dk.z = *d, *z
 
-	g := sha3.New256()
-	_, _ = g.Write(d[:])
-	_, _ = g.Write([]byte{k})
-	G := g.Sum(make([]byte, 0, 64))
-	rho, sigma := G[:32], G[32:]
-	copy(dk.rho[:], rho)
-
-	A := &dk.a
-	for i := range byte(k) {
-		for j := range byte(k) {
-			A[i*k+j] = sampleNTT(rho, j, i)
-		}
-	}
-
-	var N byte
-	s := &dk.s
-	for i := range s {
-		s[i] = samplePolyCBD(sigma, N)
-		ntt(s[i])
-		N++
-	}
-
-	e := make([]ringElement, k)
-	for i := range e {
-		e[i] = samplePolyCBD(sigma, N)
-		ntt(e[i])
-		N++
-	}
-
-	t := &dk.t
-	for i := range t {
-		var acc ringElement
-		for j := range s {
-			product := s[j]
-			nttMul(product, A[i*k+j])
-			polyAdd(acc, product)
-		}
-		polyAdd(acc, e[i])
-		t[i] = acc
-	}
+	pkeKeyGen(dk, d)
 
 	H := sha3.New256()
 	_, _ = H.Write(dk.EncapsulationKey().Bytes())
 	H.Sum(dk.h[:0])
-}
-
-func pkeEncrypt(cc *[ciphertextSize]byte, ek *EncapsulationKey, m *[32]byte, r []byte) []byte {
-	var N byte
-	y, e1 := make([]ringElement, k), make([]ringElement, k)
-	for i := range k {
-		y[i] = samplePolyCBD(r, N)
-		ntt(y[i])
-		N++
-	}
-	for i := range k {
-		e1[i] = samplePolyCBD(r, N)
-		N++
-	}
-	e2 := samplePolyCBD(r, N)
-	_ = e2
-
-	// TODO
-
-	return nil
-}
-
-func pkeDecrypt(dk *DecapsulationKey, c *[ciphertextSize]byte) [32]byte {
-	u := make([]ringElement, k)
-	for i := range u {
-		_ = u[i] // ringDecodeAndDecompress
-	}
-	// v := ringDecodeAndDecompress5(b)
-
-	// return ringCompressAndDecode1()
-
-	return [32]byte{}
 }
