@@ -26,6 +26,31 @@ func BenchmarkPKEEncrypt(b *testing.B) {
 	}
 }
 
+func BenchmarkPKEDecrypt(b *testing.B) {
+	var d, z [32]byte
+	for i := range d {
+		d[i] = byte(i)
+		z[i] = byte(255 - i)
+	}
+	dk := GenerateKeyInternal(&d, &z)
+
+	var m, r [32]byte
+	for i := range m {
+		m[i] = byte(3*i + 1)
+		r[i] = byte(5*i + 7)
+	}
+
+	var ct [CiphertextSize]byte
+	pkeEncrypt(&ct, &dk.encryptionKey, &m, r[:])
+
+	b.ReportAllocs()
+	for b.Loop() {
+		var out [32]byte
+		pkeDecrypt(&out, dk, &ct)
+		internalBenchmarkSink ^= out[0]
+	}
+}
+
 func BenchmarkExpandMatrix(b *testing.B) {
 	var rho [32]byte
 	for i := range rho {
@@ -42,6 +67,62 @@ func BenchmarkExpandMatrix(b *testing.B) {
 			}
 		}
 		internalBenchmarkSink ^= byte(a[k*k-1][n-1])
+	}
+}
+
+func BenchmarkSamplePolyCBD(b *testing.B) {
+	var sigma [32]byte
+	for i := range sigma {
+		sigma[i] = byte(11*i + 5)
+	}
+
+	b.ReportAllocs()
+	for b.Loop() {
+		var f ringElement
+		samplePolyCBD(&f, sigma[:], 7)
+		internalBenchmarkSink ^= byte(f[n-1])
+	}
+}
+
+func BenchmarkInverseNTT(b *testing.B) {
+	var f ringElement
+	for i := range f {
+		f[i] = fieldElement((13*i*i + 7*i + 19) % q)
+	}
+
+	b.ReportAllocs()
+	for b.Loop() {
+		g := f
+		inverseNTT(&g)
+		internalBenchmarkSink ^= byte(g[n-1])
+	}
+}
+
+func BenchmarkNTT(b *testing.B) {
+	var f ringElement
+	for i := range f {
+		f[i] = fieldElement((13*i*i + 7*i + 19) % q)
+	}
+
+	b.ReportAllocs()
+	for b.Loop() {
+		g := f
+		ntt(&g)
+		internalBenchmarkSink ^= byte(g[n-1])
+	}
+}
+
+func BenchmarkRingCompressAndEncode1(b *testing.B) {
+	var f ringElement
+	for i := range f {
+		f[i] = fieldElement((13*i*i + 7*i + 19) % q)
+	}
+
+	b.ReportAllocs()
+	for b.Loop() {
+		var out [encodingSize1]byte
+		ringCompressAndEncode1(&out, &f)
+		internalBenchmarkSink ^= out[encodingSize1-1]
 	}
 }
 

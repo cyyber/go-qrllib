@@ -2,6 +2,7 @@ package mlkem1024
 
 import (
 	"crypto/sha3"
+	"encoding/binary"
 	"errors"
 )
 
@@ -26,6 +27,9 @@ func fieldSub(a, b fieldElement) fieldElement {
 const (
 	barrettMultiplier = 5039
 	barrettShift      = 24
+
+	barrettWideMultiplier = 1290167
+	barrettWideShift      = 32
 )
 
 func fieldReduce(a uint32) fieldElement {
@@ -33,9 +37,21 @@ func fieldReduce(a uint32) fieldElement {
 	return fieldReduceOnce(uint16(a - quotient*q))
 }
 
+// fieldReduceWide reduces lazy accumulators and products that exceed the
+// 24-bit Barrett range.
+func fieldReduceWide(a uint32) fieldElement {
+	quotient := uint32((uint64(a) * barrettWideMultiplier) >> barrettWideShift)
+	return fieldReduceOnce(uint16(a - quotient*q))
+}
+
 func fieldMul(a, b fieldElement) fieldElement {
 	x := uint32(a) * uint32(b)
 	return fieldReduce(x)
+}
+
+func fieldMulWide(a, b fieldElement) fieldElement {
+	x := uint32(a) * uint32(b)
+	return fieldReduceWide(x)
 }
 
 func fieldMulSub(a, b, c fieldElement) fieldElement {
@@ -58,6 +74,18 @@ func compress(x fieldElement, d uint8) uint16 {
 	quotient += (q + q/2 - remainder) >> 31 & 1
 	var mask uint32 = (1 << d) - 1
 	return uint16(quotient & mask)
+}
+
+const (
+	compress1Lower = (q + 3) / 4 // ceil(q/4)
+	compress1Upper = (3 * q) / 4 // floor(3q/4)
+)
+
+func compress1(x fieldElement) byte {
+	ux := uint32(x)
+	geLower := ((ux - compress1Lower) >> 31) ^ 1
+	leUpper := ((compress1Upper - ux) >> 31) ^ 1
+	return byte(geLower & leUpper)
 }
 
 // stdlib
@@ -133,14 +161,14 @@ func ringDecodeAndDecompress11(dst *ringElement, src *[encodingSize11]byte) {
 
 func ringCompressAndEncode1(dst *[encodingSize1]byte, src *ringElement) {
 	for i, off := 0, 0; i < n; i, off = i+8, off+1 {
-		c0 := byte(compress(src[i], d1))
-		c1 := byte(compress(src[i+1], d1))
-		c2 := byte(compress(src[i+2], d1))
-		c3 := byte(compress(src[i+3], d1))
-		c4 := byte(compress(src[i+4], d1))
-		c5 := byte(compress(src[i+5], d1))
-		c6 := byte(compress(src[i+6], d1))
-		c7 := byte(compress(src[i+7], d1))
+		c0 := compress1(src[i])
+		c1 := compress1(src[i+1])
+		c2 := compress1(src[i+2])
+		c3 := compress1(src[i+3])
+		c4 := compress1(src[i+4])
+		c5 := compress1(src[i+5])
+		c6 := compress1(src[i+6])
+		c7 := compress1(src[i+7])
 
 		dst[off] = c0 | c1<<1 | c2<<2 | c3<<3 | c4<<4 | c5<<5 | c6<<6 | c7<<7
 	}
@@ -205,19 +233,19 @@ func sampleNTT(dst *ringElement, rho *[32]byte, jj, ii byte) {
 			off = 0
 		}
 
-		d1 := uint16(buf[off]) | (uint16(buf[off+1]&0x0f) << 8)
-		d2 := uint16(buf[off+1]>>4) | (uint16(buf[off+2]) << 4)
+		x0 := uint16(buf[off]) | (uint16(buf[off+1]&0x0f) << 8)
+		x1 := uint16(buf[off+1]>>4) | (uint16(buf[off+2]) << 4)
 		off += 3
 
-		if d1 < q {
-			dst[j] = fieldElement(d1)
+		if x0 < q {
+			dst[j] = fieldElement(x0)
 			j++
 		}
 		if j >= len(dst) {
 			break
 		}
-		if d2 < q {
-			dst[j] = fieldElement(d2)
+		if x1 < q {
+			dst[j] = fieldElement(x1)
 			j++
 		}
 		if j >= len(dst) {
@@ -233,17 +261,33 @@ func samplePolyCBD(dst *ringElement, sigma []byte, counter byte) {
 	var B [128]byte
 	_, _ = prf.Read(B[:])
 
-	for i, b := range B {
-		a0 := uint16(b&1) + uint16((b>>1)&1)
-		b0 := uint16((b>>2)&1) + uint16((b>>3)&1)
-		a1 := uint16((b>>4)&1) + uint16((b>>5)&1)
-		b1 := uint16((b>>6)&1) + uint16(b>>7)
-		dst[2*i] = fieldReduceOnce(q + a0 - b0)
-		dst[2*i+1] = fieldReduceOnce(q + a1 - b1)
+	for i, j := 0, 0; i < len(B); i, j = i+4, j+8 {
+		t := binary.LittleEndian.Uint32(B[i:])
+		// Each two-bit field in d is the Hamming weight of one input bit
+		// pair; CBD_2 maps adjacent weights to one coefficient as a-b mod q.
+		d := (t & 0x55555555) + ((t >> 1) & 0x55555555)
+
+		dst[j] = cbd2(d, d>>2)
+		dst[j+1] = cbd2(d>>4, d>>6)
+		dst[j+2] = cbd2(d>>8, d>>10)
+		dst[j+3] = cbd2(d>>12, d>>14)
+		dst[j+4] = cbd2(d>>16, d>>18)
+		dst[j+5] = cbd2(d>>20, d>>22)
+		dst[j+6] = cbd2(d>>24, d>>26)
+		dst[j+7] = cbd2(d>>28, d>>30)
 	}
 }
 
+func cbd2(a, b uint32) fieldElement {
+	return fieldReduceOnce(q + uint16(a&0x3) - uint16(b&0x3))
+}
+
 var zetas = [128]fieldElement{1, 1729, 2580, 3289, 2642, 630, 1897, 848, 1062, 1919, 193, 797, 2786, 3260, 569, 1746, 296, 2447, 1339, 1476, 3046, 56, 2240, 1333, 1426, 2094, 535, 2882, 2393, 2879, 1974, 821, 289, 331, 3253, 1756, 1197, 2304, 2277, 2055, 650, 1977, 2513, 632, 2865, 33, 1320, 1915, 2319, 1435, 807, 452, 1438, 2868, 1534, 2402, 2647, 2617, 1481, 648, 2474, 3110, 1227, 910, 17, 2761, 583, 2649, 1637, 723, 2288, 1100, 1409, 2662, 3281, 233, 756, 2156, 3015, 3050, 1703, 1651, 2789, 1789, 1847, 952, 1461, 2687, 939, 2308, 2437, 2388, 733, 2337, 268, 641, 1584, 2298, 2037, 3220, 375, 2549, 2090, 1645, 1063, 319, 2773, 757, 2099, 561, 2466, 2594, 2804, 1092, 403, 1026, 1143, 2150, 2775, 886, 1722, 1212, 1874, 1029, 2110, 2935, 885, 2154}
+
+const (
+	inverseNTTScale     = 3303
+	inverseNTTFinalZeta = 1652 // zetas[1] * inverseNTTScale mod q
+)
 
 func ntt(f *ringElement) {
 	i := 1
@@ -252,17 +296,21 @@ func ntt(f *ringElement) {
 			zeta := zetas[i]
 			i++
 			for j := start; j < start+length; j++ {
-				t := fieldMul(zeta, f[j+length])
-				f[j+length] = fieldSub(f[j], t)
-				f[j] = fieldAdd(f[j], t)
+				t := fieldMulWide(zeta, f[j+length])
+				a := uint16(f[j])
+				f[j] = fieldElement(a + uint16(t))
+				f[j+length] = fieldElement(a + q - uint16(t))
 			}
 		}
+	}
+	for i := range f {
+		f[i] = fieldReduce(uint32(f[i]))
 	}
 }
 
 func inverseNTT(f *ringElement) {
 	i := 127
-	for length := 2; length <= 128; length *= 2 {
+	for length := 2; length < 128; length *= 2 {
 		for start := 0; start < 256; start += 2 * length {
 			zeta := zetas[i]
 			i--
@@ -273,8 +321,11 @@ func inverseNTT(f *ringElement) {
 			}
 		}
 	}
-	for i := range f {
-		f[i] = fieldMul(f[i], 3303)
+
+	for j := range 128 {
+		t := f[j]
+		f[j] = fieldMul(fieldAdd(t, f[j+128]), inverseNTTScale)
+		f[j+128] = fieldMulSub(inverseNTTFinalZeta, f[j+128], t)
 	}
 }
 
@@ -294,29 +345,30 @@ func nttMulAdd(acc, a, b *ringElement) {
 func nttMulAdd4(acc, a0, b0, a1, b1, a2, b2, a3, b3 *ringElement) {
 	for i := 0; i < n; i += 2 {
 		gamma := gammas[i/2]
-		acc0, acc1 := acc[i], acc[i+1]
 
 		a00, a01 := a0[i], a0[i+1]
 		b00, b01 := b0[i], b0[i+1]
-		acc0 = fieldAdd(acc0, fieldAddMul(a00, b00, fieldMul(a01, b01), gamma))
-		acc1 = fieldAdd(acc1, fieldAddMul(a00, b01, a01, b00))
+		acc0 := uint32(acc[i])
+		acc0 += uint32(a00)*uint32(b00) + uint32(fieldMul(a01, b01))*uint32(gamma)
+		acc1 := uint32(acc[i+1])
+		acc1 += uint32(a00)*uint32(b01) + uint32(a01)*uint32(b00)
 
 		a10, a11 := a1[i], a1[i+1]
 		b10, b11 := b1[i], b1[i+1]
-		acc0 = fieldAdd(acc0, fieldAddMul(a10, b10, fieldMul(a11, b11), gamma))
-		acc1 = fieldAdd(acc1, fieldAddMul(a10, b11, a11, b10))
+		acc0 += uint32(a10)*uint32(b10) + uint32(fieldMul(a11, b11))*uint32(gamma)
+		acc1 += uint32(a10)*uint32(b11) + uint32(a11)*uint32(b10)
 
 		a20, a21 := a2[i], a2[i+1]
 		b20, b21 := b2[i], b2[i+1]
-		acc0 = fieldAdd(acc0, fieldAddMul(a20, b20, fieldMul(a21, b21), gamma))
-		acc1 = fieldAdd(acc1, fieldAddMul(a20, b21, a21, b20))
+		acc0 += uint32(a20)*uint32(b20) + uint32(fieldMul(a21, b21))*uint32(gamma)
+		acc1 += uint32(a20)*uint32(b21) + uint32(a21)*uint32(b20)
 
 		a30, a31 := a3[i], a3[i+1]
 		b30, b31 := b3[i], b3[i+1]
-		acc0 = fieldAdd(acc0, fieldAddMul(a30, b30, fieldMul(a31, b31), gamma))
-		acc1 = fieldAdd(acc1, fieldAddMul(a30, b31, a31, b30))
+		acc0 += uint32(a30)*uint32(b30) + uint32(fieldMul(a31, b31))*uint32(gamma)
+		acc1 += uint32(a30)*uint32(b31) + uint32(a31)*uint32(b30)
 
-		acc[i], acc[i+1] = acc0, acc1
+		acc[i], acc[i+1] = fieldReduceWide(acc0), fieldReduceWide(acc1)
 	}
 }
 

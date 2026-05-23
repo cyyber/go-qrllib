@@ -2,6 +2,7 @@ package mlkem1024
 
 import (
 	"bytes"
+	"crypto/sha3"
 	"testing"
 )
 
@@ -54,6 +55,16 @@ func TestRingCompressAndEncodeSpecialized(t *testing.T) {
 	var dst11 [encodingSize11]byte
 	ringCompressAndEncode11(&dst11, &src)
 	checkRingCompressAndEncode(t, "d11", d11, dst11[:], &src)
+}
+
+func TestCompress1MatchesGeneric(t *testing.T) {
+	for x := range q {
+		got := compress1(fieldElement(x))
+		want := byte(compress(fieldElement(x), d1))
+		if got != want {
+			t.Fatalf("compress1(%d) = %d, want %d", x, got, want)
+		}
+	}
 }
 
 func TestByteEncodeDecode12(t *testing.T) {
@@ -122,6 +133,24 @@ func TestNTTMulAdd4MatchesScalar(t *testing.T) {
 	}
 }
 
+func TestFieldReduceWide(t *testing.T) {
+	const maxNTTMulAdd4Lazy = 4*2*(q-1)*(q-1) + (q - 1)
+	for _, x := range []uint32{
+		0, 1, q - 1, q, q + 1, 2*q - 1, 2 * q,
+		maxNTTMulAdd4Lazy - 1, maxNTTMulAdd4Lazy,
+	} {
+		if got, want := fieldReduceWide(x), fieldElement(x%q); got != want {
+			t.Fatalf("fieldReduceWide(%d) = %d, want %d", x, got, want)
+		}
+	}
+
+	for x := uint32(0); x < maxNTTMulAdd4Lazy; x += 7919 {
+		if got, want := fieldReduceWide(x), fieldElement(x%q); got != want {
+			t.Fatalf("fieldReduceWide(%d) = %d, want %d", x, got, want)
+		}
+	}
+}
+
 func checkRingCompressAndEncode(t *testing.T, name string, d uint8, got []byte, src *ringElement) {
 	t.Helper()
 
@@ -173,6 +202,100 @@ func referenceRingDecodeAndDecompress(dst *ringElement, src []byte, d uint8) {
 			acc |= uint16(bit) << j
 		}
 		dst[i] = decompress(acc, d)
+	}
+}
+
+func TestSamplePolyCBDMatchesReference(t *testing.T) {
+	for counter := byte(0); counter < 8; counter++ {
+		sigma := make([]byte, 32)
+		for i := range sigma {
+			sigma[i] = byte(17*i + 29*int(counter) + 3)
+		}
+
+		var got, want ringElement
+		samplePolyCBD(&got, sigma, counter)
+		referenceSamplePolyCBD(&want, sigma, counter)
+		if got != want {
+			t.Fatalf("samplePolyCBD mismatch for counter %d", counter)
+		}
+	}
+}
+
+func TestNTTMatchesReference(t *testing.T) {
+	var got, want ringElement
+	for i := range got {
+		got[i] = fieldElement((19*i*i + 23*i + 31) % q)
+		want[i] = got[i]
+	}
+
+	ntt(&got)
+	referenceNTT(&want)
+	if got != want {
+		t.Fatal("ntt mismatch")
+	}
+}
+
+func TestInverseNTTMatchesReference(t *testing.T) {
+	var got, want ringElement
+	for i := range got {
+		got[i] = fieldElement((19*i*i + 23*i + 31) % q)
+		want[i] = got[i]
+	}
+
+	inverseNTT(&got)
+	referenceInverseNTT(&want)
+	if got != want {
+		t.Fatal("inverseNTT mismatch")
+	}
+}
+
+func referenceSamplePolyCBD(dst *ringElement, sigma []byte, counter byte) {
+	prf := sha3.NewSHAKE256()
+	_, _ = prf.Write(sigma)
+	_, _ = prf.Write([]byte{counter})
+	var B [128]byte
+	_, _ = prf.Read(B[:])
+
+	for i, b := range B {
+		a0 := uint16(b&1) + uint16((b>>1)&1)
+		b0 := uint16((b>>2)&1) + uint16((b>>3)&1)
+		a1 := uint16((b>>4)&1) + uint16((b>>5)&1)
+		b1 := uint16((b>>6)&1) + uint16(b>>7)
+		dst[2*i] = fieldReduceOnce(q + a0 - b0)
+		dst[2*i+1] = fieldReduceOnce(q + a1 - b1)
+	}
+}
+
+func referenceNTT(f *ringElement) {
+	i := 1
+	for length := 128; length >= 2; length /= 2 {
+		for start := 0; start < 256; start += 2 * length {
+			zeta := zetas[i]
+			i++
+			for j := start; j < start+length; j++ {
+				t := fieldMul(zeta, f[j+length])
+				f[j+length] = fieldSub(f[j], t)
+				f[j] = fieldAdd(f[j], t)
+			}
+		}
+	}
+}
+
+func referenceInverseNTT(f *ringElement) {
+	i := 127
+	for length := 2; length <= 128; length *= 2 {
+		for start := 0; start < 256; start += 2 * length {
+			zeta := zetas[i]
+			i--
+			for j := start; j < start+length; j++ {
+				t := f[j]
+				f[j] = fieldAdd(t, f[j+length])
+				f[j+length] = fieldMulSub(zeta, f[j+length], t)
+			}
+		}
+	}
+	for i := range f {
+		f[i] = fieldMul(f[i], inverseNTTScale)
 	}
 }
 

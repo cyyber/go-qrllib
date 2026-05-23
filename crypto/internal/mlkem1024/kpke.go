@@ -101,19 +101,24 @@ func pkeEncrypt(dst *[CiphertextSize]byte, ek *encryptionKey, m *[32]byte, r []b
 }
 
 func pkeDecrypt(dst *[32]byte, dk *DecapsulationKey, c *[CiphertextSize]byte) {
-	var acc ringElement
+	var u [k]ringElement
 	off := 0
 	for i := range k {
-		var u ringElement
-		ringDecodeAndDecompress11(&u, (*[encodingSize11]byte)(c[off:off+encodingSize11]))
+		ringDecodeAndDecompress11(&u[i], (*[encodingSize11]byte)(c[off:off+encodingSize11]))
 		off += encodingSize11
-		ntt(&u)
-		nttMulAdd(&acc, &dk.s[i], &u)
+		ntt(&u[i])
 	}
 
 	var v ringElement
 	ringDecodeAndDecompress5(&v, (*[encodingSize5]byte)(c[off:off+encodingSize5]))
 
+	var acc ringElement
+	nttMulAdd4(&acc,
+		&dk.s[0], &u[0],
+		&dk.s[1], &u[1],
+		&dk.s[2], &u[2],
+		&dk.s[3], &u[3],
+	)
 	inverseNTT(&acc)
 
 	polySubAssign(&v, &acc)
