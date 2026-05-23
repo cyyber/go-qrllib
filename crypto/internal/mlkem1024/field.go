@@ -290,6 +290,36 @@ func nttMulAdd(acc, a, b *ringElement) {
 	}
 }
 
+// nttMulAdd4 fuses four nttMulAdd operations for ML-KEM-1024 dot products.
+func nttMulAdd4(acc, a0, b0, a1, b1, a2, b2, a3, b3 *ringElement) {
+	for i := 0; i < n; i += 2 {
+		gamma := gammas[i/2]
+		acc0, acc1 := acc[i], acc[i+1]
+
+		a00, a01 := a0[i], a0[i+1]
+		b00, b01 := b0[i], b0[i+1]
+		acc0 = fieldAdd(acc0, fieldAddMul(a00, b00, fieldMul(a01, b01), gamma))
+		acc1 = fieldAdd(acc1, fieldAddMul(a00, b01, a01, b00))
+
+		a10, a11 := a1[i], a1[i+1]
+		b10, b11 := b1[i], b1[i+1]
+		acc0 = fieldAdd(acc0, fieldAddMul(a10, b10, fieldMul(a11, b11), gamma))
+		acc1 = fieldAdd(acc1, fieldAddMul(a10, b11, a11, b10))
+
+		a20, a21 := a2[i], a2[i+1]
+		b20, b21 := b2[i], b2[i+1]
+		acc0 = fieldAdd(acc0, fieldAddMul(a20, b20, fieldMul(a21, b21), gamma))
+		acc1 = fieldAdd(acc1, fieldAddMul(a20, b21, a21, b20))
+
+		a30, a31 := a3[i], a3[i+1]
+		b30, b31 := b3[i], b3[i+1]
+		acc0 = fieldAdd(acc0, fieldAddMul(a30, b30, fieldMul(a31, b31), gamma))
+		acc1 = fieldAdd(acc1, fieldAddMul(a30, b31, a31, b30))
+
+		acc[i], acc[i+1] = acc0, acc1
+	}
+}
+
 func polyAddAssign(a, b *ringElement) {
 	for i := range a {
 		a[i] = fieldAdd(a[i], b[i])

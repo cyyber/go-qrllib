@@ -92,6 +92,36 @@ func TestByteDecode12RejectsUnreducedCoefficient(t *testing.T) {
 	}
 }
 
+func TestNTTMulAdd4MatchesScalar(t *testing.T) {
+	var a, b [4]ringElement
+	for j := range 4 {
+		for i := range n {
+			a[j][i] = fieldElement((17*i*i + 31*i + 43*j + 7) % q)
+			b[j][i] = fieldElement((23*i*i + 19*i + 29*j + 11) % q)
+		}
+	}
+
+	var scalar, fused ringElement
+	for i := range n {
+		scalar[i] = fieldElement((13*i + 5) % q)
+		fused[i] = scalar[i]
+	}
+
+	for i := range 4 {
+		nttMulAdd(&scalar, &a[i], &b[i])
+	}
+	nttMulAdd4(&fused,
+		&a[0], &b[0],
+		&a[1], &b[1],
+		&a[2], &b[2],
+		&a[3], &b[3],
+	)
+
+	if fused != scalar {
+		t.Fatal("nttMulAdd4 mismatch")
+	}
+}
+
 func checkRingCompressAndEncode(t *testing.T, name string, d uint8, got []byte, src *ringElement) {
 	t.Helper()
 

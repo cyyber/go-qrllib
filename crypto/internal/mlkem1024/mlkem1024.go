@@ -64,10 +64,10 @@ func decapsulate(dk *DecapsulationKey, ct *[CiphertextSize]byte) (sharedKey []by
 
 	pkeDecrypt(&m, dk, ct)
 
-	g := sha3.New512()
-	_, _ = g.Write(m[:])
-	_, _ = g.Write(dk.h[:])
-	G := g.Sum(make([]byte, 0, 64))
+	var gInput [messageSize + 32]byte
+	copy(gInput[:messageSize], m[:])
+	copy(gInput[messageSize:], dk.h[:])
+	G := sha3.Sum512(gInput[:])
 	K, r := G[:SharedKeySize], G[SharedKeySize:]
 
 	J := sha3.NewSHAKE256()
@@ -111,9 +111,8 @@ func NewEncapsulationKey(ekBytes []byte) (*EncapsulationKey, error) {
 
 	ek := &EncapsulationKey{}
 
-	H := sha3.New256()
-	_, _ = H.Write(ekBytes)
-	H.Sum(ek.h[:0])
+	ek.h = sha3.Sum256(ekBytes)
+	copy(ek.encoded[:], ekBytes)
 
 	var err error
 	for i := range ek.t {
@@ -145,37 +144,31 @@ func (ek *EncapsulationKey) Encapsulate() (sharedKey, ciphertext []byte, err err
 }
 
 func encapsulateTo(dst *[CiphertextSize]byte, ek *EncapsulationKey, m *[32]byte) []byte {
-	g := sha3.New512()
-	_, _ = g.Write(m[:])
-	_, _ = g.Write(ek.h[:])
-	G := g.Sum(nil)
+	var gInput [messageSize + 32]byte
+	copy(gInput[:messageSize], m[:])
+	copy(gInput[messageSize:], ek.h[:])
+	G := sha3.Sum512(gInput[:])
 	K, r := G[:SharedKeySize], G[SharedKeySize:]
 
 	pkeEncrypt(dst, &ek.encryptionKey, m, r)
 
-	return K
+	sharedKey := make([]byte, SharedKeySize)
+	copy(sharedKey, K)
+	return sharedKey
 }
 
 func (ek *EncapsulationKey) Bytes() []byte {
 	b := new([EncapsulationKeySize]byte)
-	ek.encryptionKey.encode(b)
+	copy(b[:], ek.encoded[:])
 
 	return b[:]
 }
 
-func (ek *encryptionKey) encode(dst *[EncapsulationKeySize]byte) {
-	off := 0
-	for i := range ek.t {
-		byteEncode12((*[encodingSize12]byte)(dst[off:off+encodingSize12]), &ek.t[i])
-		off += encodingSize12
-	}
-	copy(dst[off:], ek.rho[:])
-}
-
 type encryptionKey struct {
-	t   [k]ringElement     // public key vector
-	a   [k * k]ringElement // public matrix A
-	rho [32]byte           // matrix seed
+	t       [k]ringElement             // public key vector
+	a       [k * k]ringElement         // public matrix A
+	rho     [32]byte                   // matrix seed
+	encoded [EncapsulationKeySize]byte // encoded t || rho
 }
 
 type decryptionKey struct {
@@ -198,12 +191,7 @@ func generateKey(dk *DecapsulationKey, d, z *[32]byte) {
 
 	pkeKeyGen(dk, d)
 
-	var ekBytes [EncapsulationKeySize]byte
-	dk.encryptionKey.encode(&ekBytes)
-
-	H := sha3.New256()
-	_, _ = H.Write(ekBytes[:])
-	H.Sum(dk.h[:0])
+	dk.h = sha3.Sum256(dk.encoded[:])
 }
 
 // GenerateKeyInternal is a derandomized version of GenerateKey,

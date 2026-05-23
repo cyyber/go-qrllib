@@ -6,12 +6,13 @@ import "crypto/sha3"
 // scheme that ML-KEM wraps with the FO transform.
 
 func pkeKeyGen(dk *DecapsulationKey, d *[32]byte) {
-	g := sha3.New512()
-	_, _ = g.Write(d[:])
-	_, _ = g.Write([]byte{k})
-	G := g.Sum(make([]byte, 0, 64))
+	var gInput [33]byte
+	copy(gInput[:32], d[:])
+	gInput[32] = k
+	G := sha3.Sum512(gInput[:])
 	rho, sigma := G[:32], G[32:]
 	copy(dk.rho[:], rho)
+	copy(dk.encoded[k*encodingSize12:], rho)
 
 	A := &dk.a
 	for i := range k {
@@ -28,26 +29,29 @@ func pkeKeyGen(dk *DecapsulationKey, d *[32]byte) {
 		N++
 	}
 
-	var e [k]ringElement
-	for i := range e {
-		samplePolyCBD(&e[i], sigma, N)
-		ntt(&e[i])
-		N++
-	}
-
 	t := &dk.t
 	for i := range t {
 		var acc ringElement
-		for j := range s {
-			nttMulAdd(&acc, &A[i*k+j], &s[j])
-		}
-		polyAddAssign(&acc, &e[i])
+		nttMulAdd4(&acc,
+			&A[i*k], &s[0],
+			&A[i*k+1], &s[1],
+			&A[i*k+2], &s[2],
+			&A[i*k+3], &s[3],
+		)
+
+		var e ringElement
+		samplePolyCBD(&e, sigma, N)
+		ntt(&e)
+		N++
+		polyAddAssign(&acc, &e)
+
 		t[i] = acc
+		byteEncode12((*[encodingSize12]byte)(dk.encoded[i*encodingSize12:(i+1)*encodingSize12]), &t[i])
 	}
 }
 
 func pkeEncrypt(dst *[CiphertextSize]byte, ek *encryptionKey, m *[32]byte, r []byte) {
-	var y, e1 [k]ringElement
+	var y [k]ringElement
 
 	var counter byte
 	for i := range y {
@@ -56,64 +60,62 @@ func pkeEncrypt(dst *[CiphertextSize]byte, ek *encryptionKey, m *[32]byte, r []b
 		counter++
 	}
 
-	for i := range e1 {
-		samplePolyCBD(&e1[i], r, counter)
+	off := 0
+	for i := range k {
+		var acc ringElement
+		nttMulAdd4(&acc,
+			&ek.a[i], &y[0],
+			&ek.a[k+i], &y[1],
+			&ek.a[2*k+i], &y[2],
+			&ek.a[3*k+i], &y[3],
+		)
+		inverseNTT(&acc)
+
+		var e1 ringElement
+		samplePolyCBD(&e1, r, counter)
 		counter++
+		polyAddAssign(&acc, &e1)
+
+		ringCompressAndEncode11((*[encodingSize11]byte)(dst[off:off+encodingSize11]), &acc)
+		off += encodingSize11
 	}
 
 	var e2 ringElement
 	samplePolyCBD(&e2, r, counter)
 
-	var u [k]ringElement
-	for i := range u {
-		var acc ringElement
-		for j := range k {
-			nttMulAdd(&acc, &ek.a[j*k+i], &y[j])
-		}
-		inverseNTT(&acc)
-		polyAddAssign(&acc, &e1[i])
-		u[i] = acc
-	}
-
 	var mu ringElement
 	ringDecodeAndDecompress1(&mu, m)
 
 	var v ringElement
-	for i := range k {
-		nttMulAdd(&v, &ek.t[i], &y[i])
-	}
+	nttMulAdd4(&v,
+		&ek.t[0], &y[0],
+		&ek.t[1], &y[1],
+		&ek.t[2], &y[2],
+		&ek.t[3], &y[3],
+	)
 	inverseNTT(&v)
 	polyAddAssign(&v, &e2)
 	polyAddAssign(&v, &mu)
 
-	off := 0
-	for i := range u {
-		ringCompressAndEncode11((*[encodingSize11]byte)(dst[off:off+encodingSize11]), &u[i])
-		off += encodingSize11
-	}
 	ringCompressAndEncode5((*[encodingSize5]byte)(dst[off:off+encodingSize5]), &v)
 }
 
 func pkeDecrypt(dst *[32]byte, dk *DecapsulationKey, c *[CiphertextSize]byte) {
-	var u [k]ringElement
-
+	var acc ringElement
 	off := 0
-	for i := range u {
-		ringDecodeAndDecompress11(&u[i], (*[encodingSize11]byte)(c[off:off+encodingSize11]))
+	for i := range k {
+		var u ringElement
+		ringDecodeAndDecompress11(&u, (*[encodingSize11]byte)(c[off:off+encodingSize11]))
 		off += encodingSize11
+		ntt(&u)
+		nttMulAdd(&acc, &dk.s[i], &u)
 	}
 
 	var v ringElement
 	ringDecodeAndDecompress5(&v, (*[encodingSize5]byte)(c[off:off+encodingSize5]))
 
-	var acc ringElement
-	for i := range k {
-		ntt(&u[i])
-		nttMulAdd(&acc, &dk.s[i], &u[i])
-	}
 	inverseNTT(&acc)
 
-	w := v
-	polySubAssign(&w, &acc)
-	ringCompressAndEncode1(dst, &w)
+	polySubAssign(&v, &acc)
+	ringCompressAndEncode1(dst, &v)
 }

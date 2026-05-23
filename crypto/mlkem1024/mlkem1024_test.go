@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/mlkem"
 	"crypto/rand"
+	"runtime"
 	"testing"
 
 	"github.com/theQRL/go-qrllib/crypto/internal/mlkem1024"
@@ -102,6 +103,30 @@ func TestInvalidInputLengths(t *testing.T) {
 	}
 	if _, err := dk.Decapsulate(make([]byte, CiphertextSize+1)); err == nil {
 		t.Fatal("Decapsulate accepted a long ciphertext")
+	}
+}
+
+func TestEncapsulationKeyBytesReturnsCopy(t *testing.T) {
+	dk, err := NewDecapsulationKey(testSeed())
+	if err != nil {
+		t.Fatalf("NewDecapsulationKey returned error: %v", err)
+	}
+
+	raw := dk.EncapsulationKey().Bytes()
+	ek, err := NewEncapsulationKey(raw)
+	if err != nil {
+		t.Fatalf("NewEncapsulationKey returned error: %v", err)
+	}
+
+	raw[0] ^= 0xff
+	if bytes.Equal(ek.Bytes(), raw) {
+		t.Fatal("NewEncapsulationKey retained caller-owned encapsulation key bytes")
+	}
+
+	encoded := ek.Bytes()
+	encoded[0] ^= 0xff
+	if bytes.Equal(ek.Bytes(), encoded) {
+		t.Fatal("EncapsulationKey.Bytes returned mutable internal storage")
 	}
 }
 
@@ -257,6 +282,79 @@ func BenchmarkCompareEncapsulate1024(b *testing.B) {
 				b.Fatal(err)
 			}
 			sharedKey, ciphertext := ek.Encapsulate()
+			sink ^= ciphertext[0] ^ sharedKey[0]
+		}
+	})
+}
+
+func BenchmarkCompareNewEncapsulationKey1024(b *testing.B) {
+	seed := make([]byte, SeedSize)
+	_, _ = rand.Read(seed)
+
+	oursDK, err := NewDecapsulationKey(seed)
+	if err != nil {
+		b.Fatal(err)
+	}
+	oursEKBytes := oursDK.EncapsulationKey().Bytes()
+
+	stdlibDK, err := mlkem.NewDecapsulationKey1024(seed)
+	if err != nil {
+		b.Fatal(err)
+	}
+	stdlibEKBytes := stdlibDK.EncapsulationKey().Bytes()
+
+	b.Run("ours", func(b *testing.B) {
+		b.ReportAllocs()
+		for b.Loop() {
+			ek, err := NewEncapsulationKey(oursEKBytes)
+			if err != nil {
+				b.Fatal(err)
+			}
+			runtime.KeepAlive(ek)
+		}
+	})
+	b.Run("stdlib", func(b *testing.B) {
+		b.ReportAllocs()
+		for b.Loop() {
+			ek, err := mlkem.NewEncapsulationKey1024(stdlibEKBytes)
+			if err != nil {
+				b.Fatal(err)
+			}
+			runtime.KeepAlive(ek)
+		}
+	})
+}
+
+func BenchmarkCompareEncapsulateParsed1024(b *testing.B) {
+	seed := make([]byte, SeedSize)
+	_, _ = rand.Read(seed)
+
+	oursDK, err := NewDecapsulationKey(seed)
+	if err != nil {
+		b.Fatal(err)
+	}
+	oursEK := oursDK.EncapsulationKey()
+
+	stdlibDK, err := mlkem.NewDecapsulationKey1024(seed)
+	if err != nil {
+		b.Fatal(err)
+	}
+	stdlibEK := stdlibDK.EncapsulationKey()
+
+	b.Run("ours", func(b *testing.B) {
+		b.ReportAllocs()
+		for b.Loop() {
+			sharedKey, ciphertext, err := oursEK.Encapsulate()
+			if err != nil {
+				b.Fatal(err)
+			}
+			sink ^= ciphertext[0] ^ sharedKey[0]
+		}
+	})
+	b.Run("stdlib", func(b *testing.B) {
+		b.ReportAllocs()
+		for b.Loop() {
+			sharedKey, ciphertext := stdlibEK.Encapsulate()
 			sink ^= ciphertext[0] ^ sharedKey[0]
 		}
 	})
