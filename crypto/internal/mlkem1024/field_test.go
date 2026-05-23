@@ -67,6 +67,17 @@ func TestCompress1MatchesGeneric(t *testing.T) {
 	}
 }
 
+func TestCompress5And11MatchGeneric(t *testing.T) {
+	for x := range q {
+		if got, want := compress5(fieldElement(x)), compress(fieldElement(x), d5); got != want {
+			t.Fatalf("compress5(%d) = %d, want %d", x, got, want)
+		}
+		if got, want := compress11(fieldElement(x)), compress(fieldElement(x), d11); got != want {
+			t.Fatalf("compress11(%d) = %d, want %d", x, got, want)
+		}
+	}
+}
+
 func TestByteEncodeDecode12(t *testing.T) {
 	var src ringElement
 	for i := range src {

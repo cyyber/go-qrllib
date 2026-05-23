@@ -126,6 +126,49 @@ func BenchmarkRingCompressAndEncode1(b *testing.B) {
 	}
 }
 
+func BenchmarkRingCompressAndEncode5(b *testing.B) {
+	var f ringElement
+	for i := range f {
+		f[i] = fieldElement((13*i*i + 7*i + 19) % q)
+	}
+
+	b.ReportAllocs()
+	for b.Loop() {
+		var out [encodingSize5]byte
+		ringCompressAndEncode5(&out, &f)
+		internalBenchmarkSink ^= out[encodingSize5-1]
+	}
+}
+
+func BenchmarkRingCompressAndEncode11(b *testing.B) {
+	var f ringElement
+	for i := range f {
+		f[i] = fieldElement((13*i*i + 7*i + 19) % q)
+	}
+
+	b.ReportAllocs()
+	for b.Loop() {
+		var out [encodingSize11]byte
+		ringCompressAndEncode11(&out, &f)
+		internalBenchmarkSink ^= out[encodingSize11-1]
+	}
+}
+
+func BenchmarkNTTMulAdd(b *testing.B) {
+	var a, c ringElement
+	for i := range n {
+		a[i] = fieldElement((17*i*i + 31*i + 7) % q)
+		c[i] = fieldElement((23*i*i + 19*i + 11) % q)
+	}
+
+	b.ReportAllocs()
+	for b.Loop() {
+		var acc ringElement
+		nttMulAdd(&acc, &a, &c)
+		internalBenchmarkSink ^= byte(acc[n-1])
+	}
+}
+
 func BenchmarkNTTMulAdd4(b *testing.B) {
 	var a, c [4]ringElement
 	for j := range 4 {

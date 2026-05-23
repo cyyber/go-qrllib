@@ -88,6 +88,24 @@ func compress1(x fieldElement) byte {
 	return byte(geLower & leUpper)
 }
 
+func compress5(x fieldElement) uint16 {
+	dividend := uint32(x) << d5
+	quotient := uint32(uint64(dividend) * barrettMultiplier >> barrettShift)
+	remainder := dividend - quotient*q
+	quotient += (q/2 - remainder) >> 31 & 1
+	quotient += (q + q/2 - remainder) >> 31 & 1
+	return uint16(quotient & 0x1f)
+}
+
+func compress11(x fieldElement) uint16 {
+	dividend := uint32(x) << d11
+	quotient := uint32(uint64(dividend) * barrettMultiplier >> barrettShift)
+	remainder := dividend - quotient*q
+	quotient += (q/2 - remainder) >> 31 & 1
+	quotient += (q + q/2 - remainder) >> 31 & 1
+	return uint16(quotient & 0x7ff)
+}
+
 // stdlib
 func decompress(y uint16, d uint8) fieldElement {
 	dividend := uint32(y) * q
@@ -176,14 +194,14 @@ func ringCompressAndEncode1(dst *[encodingSize1]byte, src *ringElement) {
 
 func ringCompressAndEncode5(dst *[encodingSize5]byte, src *ringElement) {
 	for i, off := 0, 0; i < n; i, off = i+8, off+5 {
-		c0 := compress(src[i], d5)
-		c1 := compress(src[i+1], d5)
-		c2 := compress(src[i+2], d5)
-		c3 := compress(src[i+3], d5)
-		c4 := compress(src[i+4], d5)
-		c5 := compress(src[i+5], d5)
-		c6 := compress(src[i+6], d5)
-		c7 := compress(src[i+7], d5)
+		c0 := compress5(src[i])
+		c1 := compress5(src[i+1])
+		c2 := compress5(src[i+2])
+		c3 := compress5(src[i+3])
+		c4 := compress5(src[i+4])
+		c5 := compress5(src[i+5])
+		c6 := compress5(src[i+6])
+		c7 := compress5(src[i+7])
 
 		dst[off] = byte(c0 | c1<<5)
 		dst[off+1] = byte(c1>>3 | c2<<2 | c3<<7)
@@ -195,14 +213,14 @@ func ringCompressAndEncode5(dst *[encodingSize5]byte, src *ringElement) {
 
 func ringCompressAndEncode11(dst *[encodingSize11]byte, src *ringElement) {
 	for i, off := 0, 0; i < n; i, off = i+8, off+11 {
-		c0 := uint32(compress(src[i], d11))
-		c1 := uint32(compress(src[i+1], d11))
-		c2 := uint32(compress(src[i+2], d11))
-		c3 := uint32(compress(src[i+3], d11))
-		c4 := uint32(compress(src[i+4], d11))
-		c5 := uint32(compress(src[i+5], d11))
-		c6 := uint32(compress(src[i+6], d11))
-		c7 := uint32(compress(src[i+7], d11))
+		c0 := uint32(compress11(src[i]))
+		c1 := uint32(compress11(src[i+1]))
+		c2 := uint32(compress11(src[i+2]))
+		c3 := uint32(compress11(src[i+3]))
+		c4 := uint32(compress11(src[i+4]))
+		c5 := uint32(compress11(src[i+5]))
+		c6 := uint32(compress11(src[i+6]))
+		c7 := uint32(compress11(src[i+7]))
 
 		dst[off] = byte(c0)
 		dst[off+1] = byte(c0>>8 | c1<<3)
@@ -336,8 +354,12 @@ func nttMulAdd(acc, a, b *ringElement) {
 		a0, a1 := a[i], a[i+1]
 		b0, b1 := b[i], b[i+1]
 
-		acc[i] = fieldAdd(acc[i], fieldAddMul(a0, b0, fieldMul(a1, b1), gammas[i/2]))
-		acc[i+1] = fieldAdd(acc[i+1], fieldAddMul(a0, b1, a1, b0))
+		acc0 := uint32(acc[i])
+		acc0 += uint32(a0)*uint32(b0) + uint32(fieldMul(a1, b1))*uint32(gammas[i/2])
+		acc1 := uint32(acc[i+1])
+		acc1 += uint32(a0)*uint32(b1) + uint32(a1)*uint32(b0)
+
+		acc[i], acc[i+1] = fieldReduceWide(acc0), fieldReduceWide(acc1)
 	}
 }
 
