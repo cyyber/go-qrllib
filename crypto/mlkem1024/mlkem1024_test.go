@@ -196,6 +196,110 @@ func BenchmarkDecapsulate(b *testing.B) {
 	}
 }
 
+func BenchmarkCompareGenerateKey1024(b *testing.B) {
+	b.Run("ours", func(b *testing.B) {
+		b.ReportAllocs()
+		for b.Loop() {
+			dk, err := GenerateKey()
+			if err != nil {
+				b.Fatal(err)
+			}
+			sink ^= dk.EncapsulationKey().Bytes()[0]
+		}
+	})
+	b.Run("stdlib", func(b *testing.B) {
+		b.ReportAllocs()
+		for b.Loop() {
+			dk, err := mlkem.GenerateKey1024()
+			if err != nil {
+				b.Fatal(err)
+			}
+			sink ^= dk.EncapsulationKey().Bytes()[0]
+		}
+	})
+}
+
+func BenchmarkCompareEncapsulate1024(b *testing.B) {
+	seed := make([]byte, SeedSize)
+	_, _ = rand.Read(seed)
+
+	oursDK, err := NewDecapsulationKey(seed)
+	if err != nil {
+		b.Fatal(err)
+	}
+	oursEKBytes := oursDK.EncapsulationKey().Bytes()
+
+	stdlibDK, err := mlkem.NewDecapsulationKey1024(seed)
+	if err != nil {
+		b.Fatal(err)
+	}
+	stdlibEKBytes := stdlibDK.EncapsulationKey().Bytes()
+
+	b.Run("ours", func(b *testing.B) {
+		b.ReportAllocs()
+		for b.Loop() {
+			ek, err := NewEncapsulationKey(oursEKBytes)
+			if err != nil {
+				b.Fatal(err)
+			}
+			sharedKey, ciphertext, err := ek.Encapsulate()
+			if err != nil {
+				b.Fatal(err)
+			}
+			sink ^= ciphertext[0] ^ sharedKey[0]
+		}
+	})
+	b.Run("stdlib", func(b *testing.B) {
+		b.ReportAllocs()
+		for b.Loop() {
+			ek, err := mlkem.NewEncapsulationKey1024(stdlibEKBytes)
+			if err != nil {
+				b.Fatal(err)
+			}
+			sharedKey, ciphertext := ek.Encapsulate()
+			sink ^= ciphertext[0] ^ sharedKey[0]
+		}
+	})
+}
+
+func BenchmarkCompareDecapsulate1024(b *testing.B) {
+	oursDK, err := GenerateKey()
+	if err != nil {
+		b.Fatal(err)
+	}
+	_, oursCiphertext, err := oursDK.EncapsulationKey().Encapsulate()
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	stdlibDK, err := mlkem.GenerateKey1024()
+	if err != nil {
+		b.Fatal(err)
+	}
+	_, stdlibCiphertext := stdlibDK.EncapsulationKey().Encapsulate()
+
+	b.Run("ours", func(b *testing.B) {
+		b.ReportAllocs()
+		for b.Loop() {
+			sharedKey, err := oursDK.Decapsulate(oursCiphertext)
+			if err != nil {
+				b.Fatal(err)
+			}
+			sink ^= sharedKey[0]
+		}
+	})
+	b.Run("stdlib", func(b *testing.B) {
+		b.ReportAllocs()
+		for b.Loop() {
+			sharedKey, err := stdlibDK.Decapsulate(stdlibCiphertext)
+			if err != nil {
+				b.Fatal(err)
+			}
+			sink ^= sharedKey[0]
+		}
+	})
+}
+
 func TestConstantSizes(t *testing.T) {
 	if SharedKeySize != mlkem1024.SharedKeySize {
 		t.Errorf("SharedKeySize mismatch: got %d, want %d", SharedKeySize, mlkem.SharedKeySize)

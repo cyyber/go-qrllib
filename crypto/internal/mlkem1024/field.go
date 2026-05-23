@@ -1,6 +1,9 @@
 package mlkem1024
 
-import "crypto/sha3"
+import (
+	"crypto/sha3"
+	"errors"
+)
 
 type fieldElement uint16
 
@@ -46,30 +49,145 @@ func fieldAddMul(a, b, c, d fieldElement) fieldElement {
 	return fieldReduce(x)
 }
 
+// stdlib
+func compress(x fieldElement, d uint8) uint16 {
+	dividend := uint32(x) << d
+	quotient := uint32(uint64(dividend) * barrettMultiplier >> barrettShift)
+	remainder := dividend - quotient*q
+	quotient += (q/2 - remainder) >> 31 & 1
+	quotient += (q + q/2 - remainder) >> 31 & 1
+	var mask uint32 = (1 << d) - 1
+	return uint16(quotient & mask)
+}
+
+// stdlib
+func decompress(y uint16, d uint8) fieldElement {
+	dividend := uint32(y) * q
+	quotient := dividend >> d
+	quotient += dividend >> (d - 1) & 1
+	return fieldElement(quotient)
+}
+
 type ringElement [n]fieldElement // modulo-q polynomial
 
-func ringCompressAndEncode1(dst *[encodingSize1]byte, p *ringElement) {
-	// TODO
-}
+const (
+	d1  = 1
+	d5  = 5
+	d11 = 11
+
+	halfQRoundedUp = (q + 1) / 2
+)
 
 func ringDecodeAndDecompress1(dst *ringElement, src *[encodingSize1]byte) {
-	// TODO
-}
-
-func ringCompressAndEncode5(dst *[encodingSize5]byte, p *ringElement) {
-	// TODO
+	for i := range dst {
+		// Decode one message bit, so the result is either 0 or 1; since
+		// q is odd, Decompress_1 maps 1 to (q+1)/2, rounding q/2 up.
+		b := src[i/8] >> (i % 8) & 1
+		dst[i] = fieldElement(b) * halfQRoundedUp
+	}
 }
 
 func ringDecodeAndDecompress5(dst *ringElement, src *[encodingSize5]byte) {
-	// TODO
-}
+	for i, off := 0, 0; i < n; i, off = i+8, off+5 {
+		b0 := uint16(src[off])
+		b1 := uint16(src[off+1])
+		b2 := uint16(src[off+2])
+		b3 := uint16(src[off+3])
+		b4 := uint16(src[off+4])
 
-func ringCompressAndEncode11(dst *[encodingSize11]byte, p *ringElement) {
-	// TODO
+		dst[i] = decompress(b0&0x1f, d5)
+		dst[i+1] = decompress((b0>>5|b1<<3)&0x1f, d5)
+		dst[i+2] = decompress((b1>>2)&0x1f, d5)
+		dst[i+3] = decompress((b1>>7|b2<<1)&0x1f, d5)
+		dst[i+4] = decompress((b2>>4|b3<<4)&0x1f, d5)
+		dst[i+5] = decompress((b3>>1)&0x1f, d5)
+		dst[i+6] = decompress((b3>>6|b4<<2)&0x1f, d5)
+		dst[i+7] = decompress((b4>>3)&0x1f, d5)
+	}
 }
 
 func ringDecodeAndDecompress11(dst *ringElement, src *[encodingSize11]byte) {
-	// TODO
+	for i, off := 0, 0; i < n; i, off = i+8, off+11 {
+		b0 := uint32(src[off])
+		b1 := uint32(src[off+1])
+		b2 := uint32(src[off+2])
+		b3 := uint32(src[off+3])
+		b4 := uint32(src[off+4])
+		b5 := uint32(src[off+5])
+		b6 := uint32(src[off+6])
+		b7 := uint32(src[off+7])
+		b8 := uint32(src[off+8])
+		b9 := uint32(src[off+9])
+		b10 := uint32(src[off+10])
+
+		dst[i] = decompress(uint16((b0|b1<<8)&0x7ff), d11)
+		dst[i+1] = decompress(uint16((b1>>3|b2<<5)&0x7ff), d11)
+		dst[i+2] = decompress(uint16((b2>>6|b3<<2|b4<<10)&0x7ff), d11)
+		dst[i+3] = decompress(uint16((b4>>1|b5<<7)&0x7ff), d11)
+		dst[i+4] = decompress(uint16((b5>>4|b6<<4)&0x7ff), d11)
+		dst[i+5] = decompress(uint16((b6>>7|b7<<1|b8<<9)&0x7ff), d11)
+		dst[i+6] = decompress(uint16((b8>>2|b9<<6)&0x7ff), d11)
+		dst[i+7] = decompress(uint16((b9>>5|b10<<3)&0x7ff), d11)
+	}
+}
+
+func ringCompressAndEncode1(dst *[encodingSize1]byte, src *ringElement) {
+	for i, off := 0, 0; i < n; i, off = i+8, off+1 {
+		c0 := byte(compress(src[i], d1))
+		c1 := byte(compress(src[i+1], d1))
+		c2 := byte(compress(src[i+2], d1))
+		c3 := byte(compress(src[i+3], d1))
+		c4 := byte(compress(src[i+4], d1))
+		c5 := byte(compress(src[i+5], d1))
+		c6 := byte(compress(src[i+6], d1))
+		c7 := byte(compress(src[i+7], d1))
+
+		dst[off] = c0 | c1<<1 | c2<<2 | c3<<3 | c4<<4 | c5<<5 | c6<<6 | c7<<7
+	}
+}
+
+func ringCompressAndEncode5(dst *[encodingSize5]byte, src *ringElement) {
+	for i, off := 0, 0; i < n; i, off = i+8, off+5 {
+		c0 := compress(src[i], d5)
+		c1 := compress(src[i+1], d5)
+		c2 := compress(src[i+2], d5)
+		c3 := compress(src[i+3], d5)
+		c4 := compress(src[i+4], d5)
+		c5 := compress(src[i+5], d5)
+		c6 := compress(src[i+6], d5)
+		c7 := compress(src[i+7], d5)
+
+		dst[off] = byte(c0 | c1<<5)
+		dst[off+1] = byte(c1>>3 | c2<<2 | c3<<7)
+		dst[off+2] = byte(c3>>1 | c4<<4)
+		dst[off+3] = byte(c4>>4 | c5<<1 | c6<<6)
+		dst[off+4] = byte(c6>>2 | c7<<3)
+	}
+}
+
+func ringCompressAndEncode11(dst *[encodingSize11]byte, src *ringElement) {
+	for i, off := 0, 0; i < n; i, off = i+8, off+11 {
+		c0 := uint32(compress(src[i], d11))
+		c1 := uint32(compress(src[i+1], d11))
+		c2 := uint32(compress(src[i+2], d11))
+		c3 := uint32(compress(src[i+3], d11))
+		c4 := uint32(compress(src[i+4], d11))
+		c5 := uint32(compress(src[i+5], d11))
+		c6 := uint32(compress(src[i+6], d11))
+		c7 := uint32(compress(src[i+7], d11))
+
+		dst[off] = byte(c0)
+		dst[off+1] = byte(c0>>8 | c1<<3)
+		dst[off+2] = byte(c1>>5 | c2<<6)
+		dst[off+3] = byte(c2 >> 2)
+		dst[off+4] = byte(c2>>10 | c3<<1)
+		dst[off+5] = byte(c3>>7 | c4<<4)
+		dst[off+6] = byte(c4>>4 | c5<<7)
+		dst[off+7] = byte(c5 >> 1)
+		dst[off+8] = byte(c5>>9 | c6<<2)
+		dst[off+9] = byte(c6>>6 | c7<<5)
+		dst[off+10] = byte(c7 >> 3)
+	}
 }
 
 func sampleNTT(dst *ringElement, rho *[32]byte, jj, ii byte) {
@@ -184,11 +302,25 @@ func polySubAssign(a, b *ringElement) {
 	}
 }
 
-func polyByteEncode(dst *[encodingSize12]byte, p *ringElement) {
-	// TODO
+func byteEncode12(dst *[encodingSize12]byte, p *ringElement) {
+	for i, off := 0, 0; i < n; i, off = i+2, off+3 {
+		x := uint32(p[i]) | uint32(p[i+1])<<12
+		dst[off] = byte(x)
+		dst[off+1] = byte(x >> 8)
+		dst[off+2] = byte(x >> 16)
+	}
 }
 
-func polyByteDecode(dst *ringElement, src *[encodingSize12]byte) error {
-	// TODO
+func byteDecode12(dst *ringElement, src *[encodingSize12]byte) error {
+	for i, off := 0, 0; i < n; i, off = i+2, off+3 {
+		x := uint32(src[off]) | uint32(src[off+1])<<8 | uint32(src[off+2])<<16
+		c0 := uint16(x & 0x0fff)
+		c1 := uint16(x >> 12)
+		if c0 >= q || c1 >= q {
+			return errors.New("ml-kem-1024: invalid polynomial encoding")
+		}
+		dst[i] = fieldElement(c0)
+		dst[i+1] = fieldElement(c1)
+	}
 	return nil
 }

@@ -1,6 +1,18 @@
 package mlkem1024
 
-// TODO
+import (
+	"bytes"
+	"compress/gzip"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"io"
+	"os"
+	"path/filepath"
+	"testing"
+)
+
+// TODO: refresh and re-enable these fixed internal KATs.
 /*
 // These KATs use fixed d || z and encapsulation randomness. Expected values are
 // derived from FIPS 203 and cross-checked against Go's crypto/mlkem package.
@@ -78,6 +90,7 @@ func TestNewEncapsulationKeyExpandsMatrix(t *testing.T) {
 		t.Fatal("NewEncapsulationKey did not regenerate A from rho")
 	}
 }
+*/
 
 // These tests consume the official NIST ACVP sample JSON files for ML-KEM.
 // Source: https://github.com/usnistgov/ACVP-Server/tree/master/gen-val/json-files
@@ -132,7 +145,7 @@ func TestACVPJSONEncapsulation(t *testing.T) {
 			}
 			var m [32]byte
 			copy(m[:], decodeACVPHex(t, test.M))
-			var ct [ciphertextSize]byte
+			var ct [CiphertextSize]byte
 			gotK := encapsulateTo(&ct, ek, &m)
 
 			if !bytes.Equal(gotK, decodeACVPHex(t, want.K)) {
@@ -318,10 +331,10 @@ func decodeACVPHex(t *testing.T, s string) []byte {
 }
 
 func expandedDecapsulationKeyBytes(dk *DecapsulationKey) []byte {
-	b := make([]byte, 0, k*encodingSize12+encapsulationKeySize+64)
+	b := make([]byte, 0, k*encodingSize12+EncapsulationKeySize+64)
 	var encoded [encodingSize12]byte
 	for i := range dk.s {
-		polyByteEncode(encoded[:], dk.s[i])
+		byteEncode12(&encoded, &dk.s[i])
 		b = append(b, encoded[:]...)
 	}
 	b = append(b, dk.EncapsulationKey().Bytes()...)
@@ -341,7 +354,7 @@ func newDecapsulationKeyFromExpandedACVP(t *testing.T, b []byte) *DecapsulationK
 }
 
 func newDecapsulationKeyFromExpandedACVPCheck(b []byte) (*DecapsulationKey, error) {
-	const expandedSize = k*encodingSize12 + encapsulationKeySize + 64
+	const expandedSize = k*encodingSize12 + EncapsulationKeySize + 64
 	if len(b) != expandedSize {
 		return nil, errors.New("invalid expanded decapsulation key length")
 	}
@@ -349,20 +362,20 @@ func newDecapsulationKeyFromExpandedACVPCheck(b []byte) (*DecapsulationKey, erro
 	dk := &DecapsulationKey{}
 	for i := range dk.s {
 		var err error
-		dk.s[i], err = polyByteDecode(b[:encodingSize12])
+		err = byteDecode12(&dk.s[i], (*[encodingSize12]byte)(b[:encodingSize12]))
 		if err != nil {
 			return nil, err
 		}
 		b = b[encodingSize12:]
 	}
 
-	ek, err := NewEncapsulationKey(b[:encapsulationKeySize])
+	ek, err := NewEncapsulationKey(b[:EncapsulationKeySize])
 	if err != nil {
 		return nil, err
 	}
 	dk.h = ek.h
 	dk.encryptionKey = ek.encryptionKey
-	b = b[encapsulationKeySize:]
+	b = b[EncapsulationKeySize:]
 
 	if !bytes.Equal(dk.h[:], b[:32]) {
 		return nil, errors.New("expanded decapsulation key has inconsistent H(ek)")
@@ -373,6 +386,7 @@ func newDecapsulationKeyFromExpandedACVPCheck(b []byte) (*DecapsulationKey, erro
 	return dk, nil
 }
 
+/*
 func katSeed() [seedSize]byte {
 	var seed [seedSize]byte
 	for i := range seed {

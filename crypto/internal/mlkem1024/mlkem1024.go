@@ -5,7 +5,6 @@ import (
 	"crypto/sha3"
 	"crypto/subtle"
 	"errors"
-	"io"
 )
 
 const (
@@ -118,7 +117,7 @@ func NewEncapsulationKey(ekBytes []byte) (*EncapsulationKey, error) {
 
 	var err error
 	for i := range ek.t {
-		err = polyByteDecode(&ek.t[i], (*[encodingSize12]byte)(ekBytes[:encodingSize12]))
+		err = byteDecode12(&ek.t[i], (*[encodingSize12]byte)(ekBytes[:encodingSize12]))
 		if err != nil {
 			return nil, err
 		}
@@ -136,11 +135,8 @@ func NewEncapsulationKey(ekBytes []byte) (*EncapsulationKey, error) {
 }
 
 func (ek *EncapsulationKey) Encapsulate() (sharedKey, ciphertext []byte, err error) {
-	// TODO
 	var m [32]byte
-	if _, err := io.ReadFull(rand.Reader, m[:]); err != nil {
-		return nil, nil, err
-	}
+	_, _ = rand.Read(m[:])
 
 	var ct [CiphertextSize]byte
 	sharedKey = encapsulateTo(&ct, ek, &m)
@@ -161,15 +157,19 @@ func encapsulateTo(dst *[CiphertextSize]byte, ek *EncapsulationKey, m *[32]byte)
 }
 
 func (ek *EncapsulationKey) Bytes() []byte {
-	b := make([]byte, 0, EncapsulationKeySize)
-	var encoded [encodingSize12]byte
-	for i := range ek.t {
-		polyByteEncode(&encoded, &ek.t[i])
-		b = append(b, encoded[:]...)
-	}
-	b = append(b, ek.rho[:]...)
+	b := new([EncapsulationKeySize]byte)
+	ek.encryptionKey.encode(b)
 
-	return b
+	return b[:]
+}
+
+func (ek *encryptionKey) encode(dst *[EncapsulationKeySize]byte) {
+	off := 0
+	for i := range ek.t {
+		byteEncode12((*[encodingSize12]byte)(dst[off:off+encodingSize12]), &ek.t[i])
+		off += encodingSize12
+	}
+	copy(dst[off:], ek.rho[:])
 }
 
 type encryptionKey struct {
@@ -184,12 +184,8 @@ type decryptionKey struct {
 
 func GenerateKey() (*DecapsulationKey, error) {
 	var d, z [32]byte
-	if _, err := io.ReadFull(rand.Reader, d[:]); err != nil {
-		return nil, err
-	}
-	if _, err := io.ReadFull(rand.Reader, z[:]); err != nil {
-		return nil, err
-	}
+	_, _ = rand.Read(d[:])
+	_, _ = rand.Read(z[:])
 	dk := &DecapsulationKey{}
 
 	generateKey(dk, &d, &z)
@@ -202,8 +198,11 @@ func generateKey(dk *DecapsulationKey, d, z *[32]byte) {
 
 	pkeKeyGen(dk, d)
 
+	var ekBytes [EncapsulationKeySize]byte
+	dk.encryptionKey.encode(&ekBytes)
+
 	H := sha3.New256()
-	_, _ = H.Write(dk.EncapsulationKey().Bytes())
+	_, _ = H.Write(ekBytes[:])
 	H.Sum(dk.h[:0])
 }
 

@@ -1,36 +1,179 @@
 package mlkem1024
 
+import (
+	"bytes"
+	"testing"
+)
+
 // These KATs are derived from the FIPS 203 algorithms and cross-checked against
 // Go's crypto/internal/fips140/mlkem implementation where matching operations
 // are exposed by the implementation.
 // Sources: https://doi.org/10.6028/NIST.FIPS.203 and
 // https://go.dev/src/crypto/internal/fips140/mlkem/.
 
-// TODO
-/*
-func TestPolyByteEncodeKAT(t *testing.T) {
-	var got [encodingSize12]byte
-	polyByteEncode(got[:], katRingElementA())
-	checkBytesHash(t, "ByteEncode12", got[:], "701f8ea4f16daa04c57079c3da04426f9dc6b0e4cb0054daee9906dd29f7360f")
+func TestRingDecodeAndDecompressSpecialized(t *testing.T) {
+	var src1 [encodingSize1]byte
+	for i := range src1 {
+		src1[i] = byte(37*i + 11)
+	}
+	checkRingDecodeAndDecompress(t, "d1", d1, src1[:], func(dst *ringElement) {
+		ringDecodeAndDecompress1(dst, &src1)
+	})
+
+	var src5 [encodingSize5]byte
+	for i := range src5 {
+		src5[i] = byte(31*i + 7)
+	}
+	checkRingDecodeAndDecompress(t, "d5", d5, src5[:], func(dst *ringElement) {
+		ringDecodeAndDecompress5(dst, &src5)
+	})
+
+	var src11 [encodingSize11]byte
+	for i := range src11 {
+		src11[i] = byte(17*i + 23)
+	}
+	checkRingDecodeAndDecompress(t, "d11", d11, src11[:], func(dst *ringElement) {
+		ringDecodeAndDecompress11(dst, &src11)
+	})
 }
 
-func TestPolyByteDecodeKAT(t *testing.T) {
-	f, err := polyByteDecode(referencePolyByteEncode(katRingElementA()))
-	if err != nil {
-		t.Fatalf("ByteDecode12 returned error: %v", err)
+func TestRingCompressAndEncodeSpecialized(t *testing.T) {
+	var src ringElement
+	for i := range src {
+		src[i] = fieldElement((7*i*i + 31*i + 42) % q)
 	}
+
+	var dst1 [encodingSize1]byte
+	ringCompressAndEncode1(&dst1, &src)
+	checkRingCompressAndEncode(t, "d1", d1, dst1[:], &src)
+
+	var dst5 [encodingSize5]byte
+	ringCompressAndEncode5(&dst5, &src)
+	checkRingCompressAndEncode(t, "d5", d5, dst5[:], &src)
+
+	var dst11 [encodingSize11]byte
+	ringCompressAndEncode11(&dst11, &src)
+	checkRingCompressAndEncode(t, "d11", d11, dst11[:], &src)
+}
+
+func TestByteEncodeDecode12(t *testing.T) {
+	var src ringElement
+	for i := range src {
+		src[i] = fieldElement((11*i*i + 19*i + 5) % q)
+	}
+
+	var got [encodingSize12]byte
+	byteEncode12(&got, &src)
+
+	want := make([]byte, encodingSize12)
+	referenceByteEncode12(want, &src)
+	if !bytes.Equal(got[:], want) {
+		t.Fatal("byteEncode12 mismatch")
+	}
+
+	var decoded ringElement
+	if err := byteDecode12(&decoded, &got); err != nil {
+		t.Fatalf("byteDecode12 returned error: %v", err)
+	}
+	if decoded != src {
+		t.Fatal("byteDecode12 round trip mismatch")
+	}
+}
+
+func TestByteDecode12RejectsUnreducedCoefficient(t *testing.T) {
+	var src [encodingSize12]byte
+	unreduced := uint16(q)
+	src[0] = byte(unreduced)
+	src[1] = byte(unreduced >> 8)
+
+	var dst ringElement
+	if err := byteDecode12(&dst, &src); err == nil {
+		t.Fatal("byteDecode12 accepted an unreduced coefficient")
+	}
+}
+
+func checkRingCompressAndEncode(t *testing.T, name string, d uint8, got []byte, src *ringElement) {
+	t.Helper()
+
+	want := make([]byte, len(got))
+	referenceRingCompressAndEncode(want, src, d)
+
+	if !bytes.Equal(got, want) {
+		t.Fatalf("ringCompressAndEncode%s mismatch", name)
+	}
+}
+
+func checkRingDecodeAndDecompress(t *testing.T, name string, d uint8, src []byte, decode func(*ringElement)) {
+	t.Helper()
+
+	var got, want ringElement
+	decode(&got)
+	referenceRingDecodeAndDecompress(&want, src, d)
+
+	if got != want {
+		t.Fatalf("ringDecodeAndDecompress%s mismatch", name)
+	}
+}
+
+func referenceByteEncode12(dst []byte, src *ringElement) {
+	for i, x := range src {
+		for j := range uint8(12) {
+			bitOffset := i*12 + int(j)
+			dst[bitOffset/8] |= byte(uint16(x)>>j&1) << (bitOffset % 8)
+		}
+	}
+}
+
+func referenceRingCompressAndEncode(dst []byte, src *ringElement, d uint8) {
+	for i, x := range src {
+		c := compress(x, d)
+		for j := uint8(0); j < d; j++ {
+			bitOffset := i*int(d) + int(j)
+			dst[bitOffset/8] |= byte(c>>j&1) << (bitOffset % 8)
+		}
+	}
+}
+
+func referenceRingDecodeAndDecompress(dst *ringElement, src []byte, d uint8) {
+	for i := range dst {
+		var acc uint16
+		for j := uint8(0); j < d; j++ {
+			bitOffset := i*int(d) + int(j)
+			bit := src[bitOffset/8] >> (bitOffset % 8) & 1
+			acc |= uint16(bit) << j
+		}
+		dst[i] = decompress(acc, d)
+	}
+}
+
+// TODO
+/*
+	func TestPolyByteEncodeKAT(t *testing.T) {
+		var got [encodingSize12]byte
+		f := katRingElementA()
+		byteEncode12(&got, &f)
+		checkBytesHash(t, "ByteEncode12", got[:], "701f8ea4f16daa04c57079c3da04426f9dc6b0e4cb0054daee9906dd29f7360f")
+	}
+
+	func TestPolyByteDecodeKAT(t *testing.T) {
+		var f ringElement
+		err := byteDecode12(&f, (*[encodingSize12]byte)(referencePolyByteEncode(katRingElementA())))
+		if err != nil {
+			t.Fatalf("ByteDecode12 returned error: %v", err)
+		}
 	checkRingHash(t, "ByteDecode12", f, "39c2ff68c3cd83c43d0683e377436f0e572077576a86bb96f6310025f26681bb")
 }
 
 func TestPolyByteDecodeRejectsUnreducedCoefficient(t *testing.T) {
 	var encoded [encodingSize12]byte
-	encoded[0] = byte(q & 0xff)
-	encoded[1] = byte(q >> 8)
+		encoded[0] = byte(q & 0xff)
+		encoded[1] = byte(q >> 8)
 
-	if _, err := polyByteDecode(encoded[:]); err == nil {
-		t.Fatal("ByteDecode12 accepted an unreduced coefficient")
+		var f ringElement
+		if err := byteDecode12(&f, &encoded); err == nil {
+			t.Fatal("ByteDecode12 accepted an unreduced coefficient")
+		}
 	}
-}
 
 func TestSampleNTTKAT(t *testing.T) {
 	rho := katBytes(32, func(i int) byte { return byte(3*i + 1) })
