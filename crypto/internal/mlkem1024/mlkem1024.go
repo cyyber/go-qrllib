@@ -165,14 +165,14 @@ func (ek *EncapsulationKey) Bytes() []byte {
 }
 
 type encryptionKey struct {
-	t       [k]ringElement             // public key vector
-	a       [k * k]ringElement         // public matrix A
+	t       [k]ringElement             // public key vector in NTT domain
+	a       [k * k]ringElement         // public matrix A in NTT domain
 	rho     [32]byte                   // matrix seed
 	encoded [EncapsulationKeySize]byte // encoded t || rho
 }
 
 type decryptionKey struct {
-	s [k]ringElement // secret key vector
+	s [k]ringElement // secret key vector in NTT domain
 }
 
 func GenerateKey() (*DecapsulationKey, error) {

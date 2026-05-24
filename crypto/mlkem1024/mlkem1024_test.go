@@ -164,7 +164,6 @@ func testSeed() []byte {
 	return seed
 }
 
-// TODO
 var sink byte
 
 func BenchmarkGenerateKey(b *testing.B) {
