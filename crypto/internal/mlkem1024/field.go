@@ -101,7 +101,6 @@ func compress11(x fieldElement) uint16 {
 	return uint16(quotient & 0x7ff)
 }
 
-// stdlib
 func decompress(y uint16, d uint8) fieldElement {
 	dividend := uint32(y) * q
 	quotient := dividend >> d

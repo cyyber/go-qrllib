@@ -12,8 +12,6 @@ import (
 	"testing"
 )
 
-// TODO: refresh and re-enable these fixed internal KATs.
-/*
 // These KATs use fixed d || z and encapsulation randomness. Expected values are
 // derived from FIPS 203 and cross-checked against Go's crypto/mlkem package.
 // Sources: https://doi.org/10.6028/NIST.FIPS.203,
@@ -38,8 +36,8 @@ func TestNewDecapsulationKeyKAT(t *testing.T) {
 	}
 
 	ek := dk.EncapsulationKey().Bytes()
-	if len(ek) != encapsulationKeySize {
-		t.Fatalf("encapsulation key length = %d, want %d", len(ek), encapsulationKeySize)
+	if len(ek) != EncapsulationKeySize {
+		t.Fatalf("encapsulation key length = %d, want %d", len(ek), EncapsulationKeySize)
 	}
 	checkBytesHash(t, "EncapsulationKey().Bytes", ek, "c7b8fa0aa471d5ae18922d6ccad5b31e1d84f92ae723abfd13747018740a8530")
 }
@@ -52,15 +50,15 @@ func TestEncapsulateInternalKAT(t *testing.T) {
 	}
 
 	m := katMessage()
-	var ct [ciphertextSize]byte
+	var ct [CiphertextSize]byte
 	sharedKey := encapsulateTo(&ct, dk.EncapsulationKey(), &m)
 	ciphertext := ct[:]
 
 	if got := hex.EncodeToString(sharedKey); got != "a9f52838faed39482c5769f3b8ea6152a09ca981da3a8816ced34be298e54e95" {
 		t.Fatalf("shared key = %s, want %s", got, "a9f52838faed39482c5769f3b8ea6152a09ca981da3a8816ced34be298e54e95")
 	}
-	if len(ciphertext) != ciphertextSize {
-		t.Fatalf("ciphertext length = %d, want %d", len(ciphertext), ciphertextSize)
+	if len(ciphertext) != CiphertextSize {
+		t.Fatalf("ciphertext length = %d, want %d", len(ciphertext), CiphertextSize)
 	}
 	checkBytesHash(t, "ciphertext", ciphertext, "80d9a3e8af2343685270dace8098e100c634dab5d503939b3e26053f86ee3202")
 
@@ -85,12 +83,12 @@ func TestNewEncapsulationKeyExpandsMatrix(t *testing.T) {
 		t.Fatalf("NewEncapsulationKey returned error: %v", err)
 	}
 
-	want := sampleNTT(ek.rho[:], 0, 0)
+	var want ringElement
+	sampleNTT(&want, &ek.rho, 0, 0)
 	if ek.a[0] != want {
 		t.Fatal("NewEncapsulationKey did not regenerate A from rho")
 	}
 }
-*/
 
 // These tests consume the official NIST ACVP sample JSON files for ML-KEM.
 // Source: https://github.com/usnistgov/ACVP-Server/tree/master/gen-val/json-files
@@ -386,9 +384,8 @@ func newDecapsulationKeyFromExpandedACVPCheck(b []byte) (*DecapsulationKey, erro
 	return dk, nil
 }
 
-/*
-func katSeed() [seedSize]byte {
-	var seed [seedSize]byte
+func katSeed() [SeedSize]byte {
+	var seed [SeedSize]byte
 	for i := range seed {
 		seed[i] = byte(i)
 	}
@@ -402,4 +399,3 @@ func katMessage() [32]byte {
 	}
 	return m
 }
-*/
