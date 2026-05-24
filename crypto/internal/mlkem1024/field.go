@@ -37,8 +37,10 @@ func fieldReduce(a uint32) fieldElement {
 	return fieldReduceOnce(uint16(a - quotient*q))
 }
 
-// fieldReduceWide reduces lazy accumulators and products that exceed the
-// 24-bit Barrett range.
+// fieldReduceWide reduces lazy products and accumulators that do not fit the
+// 24-bit Barrett reducer. Current callers stay below about 8*q*q: the lazy NTT
+// can multiply zetas by coefficients below 8q, and nttMulAdd accumulates
+// several coefficient products before reducing.
 func fieldReduceWide(a uint32) fieldElement {
 	quotient := uint32((uint64(a) * barrettWideMultiplier) >> barrettWideShift)
 	return fieldReduceOnce(uint16(a - quotient*q))
@@ -59,13 +61,6 @@ func fieldMulSub(a, b, c fieldElement) fieldElement {
 	return fieldReduce(x)
 }
 
-func fieldAddMul(a, b, c, d fieldElement) fieldElement {
-	x := uint32(a) * uint32(b)
-	x += uint32(c) * uint32(d)
-	return fieldReduce(x)
-}
-
-// stdlib
 func compress(x fieldElement, d uint8) uint16 {
 	dividend := uint32(x) << d
 	quotient := uint32(uint64(dividend) * barrettMultiplier >> barrettShift)
@@ -314,6 +309,9 @@ func ntt(f *ringElement) {
 			zeta := zetas[i]
 			i++
 			for j := start; j < start+length; j++ {
+				// Keep butterfly outputs unreduced between layers. Each layer
+				// can grow coefficients by at most q, so across the seven NTT
+				// layers they stay below 8q and are canonicalized at the end.
 				t := fieldMulWide(zeta, f[j+length])
 				a := uint16(f[j])
 				f[j] = fieldElement(a + uint16(t))
@@ -363,7 +361,10 @@ func nttMulAdd(acc, a, b *ringElement) {
 	}
 }
 
-// nttMulAdd4 fuses four nttMulAdd operations for ML-KEM-1024 dot products.
+// nttMulAdd4 fuses the four nttMulAdd terms in an ML-KEM-1024 dot product.
+// The repeated lane blocks are intentionally unrolled so each coefficient pair
+// loads acc and gamma once, accumulates all four products lazily, and reduces
+// only once per output coefficient.
 func nttMulAdd4(acc, a0, b0, a1, b1, a2, b2, a3, b3 *ringElement) {
 	for i := 0; i < n; i += 2 {
 		gamma := gammas[i/2]
