@@ -28,9 +28,9 @@ func TestIsValidAddress(t *testing.T) {
 			expected: true,
 		},
 		{
-			name:     "valid address with mixed case hex",
+			name:     "invalid address with wrong mixed-case checksum",
 			addr:     "Q" + strings.Repeat("aB", AddressSize),
-			expected: true,
+			expected: false,
 		},
 		{
 			name:     "invalid - missing Q prefix",
@@ -80,6 +80,106 @@ func TestIsValidAddress(t *testing.T) {
 				t.Errorf("IsValidAddress(%q) = %v, want %v", tt.addr, got, tt.expected)
 			}
 		})
+	}
+}
+
+func TestToChecksumAddress(t *testing.T) {
+	lowerAddr := "Q" + strings.Repeat("ab", AddressSize)
+
+	checksummed, err := ToChecksumAddress(lowerAddr)
+	if err != nil {
+		t.Fatalf("ToChecksumAddress returned error: %v", err)
+	}
+	if len(checksummed) != len(lowerAddr) {
+		t.Fatalf("checksummed address length = %d, want %d", len(checksummed), len(lowerAddr))
+	}
+	if checksummed[0] != 'Q' {
+		t.Fatalf("checksummed address prefix = %q, want Q", checksummed[0])
+	}
+	if strings.ToLower(checksummed[1:]) != lowerAddr[1:] {
+		t.Fatalf("checksummed address changed address bytes: %s", checksummed)
+	}
+	if checksummed == lowerAddr {
+		t.Fatalf("checksummed address should use mixed case for this vector")
+	}
+}
+
+func TestIsValidChecksumAddress(t *testing.T) {
+	lowerAddr := "Q" + strings.Repeat("ab", AddressSize)
+	upperAddr := "Q" + strings.Repeat("AB", AddressSize)
+	checksummed, err := ToChecksumAddress(lowerAddr)
+	if err != nil {
+		t.Fatalf("ToChecksumAddress returned error: %v", err)
+	}
+
+	tests := []struct {
+		name     string
+		addr     string
+		expected bool
+	}{
+		{
+			name:     "lowercase compatibility form",
+			addr:     lowerAddr,
+			expected: true,
+		},
+		{
+			name:     "uppercase compatibility form",
+			addr:     upperAddr,
+			expected: true,
+		},
+		{
+			name:     "valid checksum",
+			addr:     checksummed,
+			expected: true,
+		},
+		{
+			name:     "invalid mixed case checksum",
+			addr:     "Q" + strings.Repeat("aB", AddressSize),
+			expected: false,
+		},
+		{
+			name:     "invalid prefix",
+			addr:     "q" + strings.Repeat("ab", AddressSize),
+			expected: false,
+		},
+		{
+			name:     "invalid hex",
+			addr:     "Q" + strings.Repeat("ab", AddressSize-1) + "zz",
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := IsValidChecksumAddress(tt.addr); got != tt.expected {
+				t.Errorf("IsValidChecksumAddress(%q) = %v, want %v", tt.addr, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestChecksumAddressDetectsTypos(t *testing.T) {
+	lowerAddr := "Q" + strings.Repeat("ab", AddressSize)
+	checksummed, err := ToChecksumAddress(lowerAddr)
+	if err != nil {
+		t.Fatalf("ToChecksumAddress returned error: %v", err)
+	}
+
+	tampered := []byte(checksummed)
+	for i := 1; i < len(tampered); i++ {
+		if tampered[i] >= 'a' && tampered[i] <= 'f' {
+			tampered[i] = byte(strings.ToUpper(string(tampered[i]))[0])
+			if string(tampered) != checksummed {
+				break
+			}
+		} else if tampered[i] >= 'A' && tampered[i] <= 'F' {
+			tampered[i] = byte(strings.ToLower(string(tampered[i]))[0])
+			break
+		}
+	}
+
+	if IsValidChecksumAddress(string(tampered)) {
+		t.Fatalf("tampered checksum address should be invalid: %s", string(tampered))
 	}
 }
 

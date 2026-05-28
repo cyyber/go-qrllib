@@ -177,9 +177,9 @@ QRL v2.0 addresses are 64 bytes, derived as:
 Address = SHAKE256(Descriptor || PK)[:64]
 ```
 
-The 64-byte (512-bit) address exceeds **NIST Category 5** post-quantum collision resistance. NIST Category 5 targets 256-bit classical / 128-bit quantum security; the previous 48-byte (384-bit) size met that target and the 64-byte size provides additional headroom so the address never becomes the weakest link in the security chain (the underlying signature schemes — ML-DSA-87 and SPHINCS+-256s — both target NIST Level 5).
+The 64-byte (512-bit) address provides **NIST Category 5** post-quantum collision resistance with margin. A shorter address (e.g. 20 bytes / 160 bits) would reduce collision resistance below the security level of the underlying signature schemes (ML-DSA-87 and SPHINCS+-256s both target NIST Level 5). The 64-byte size ensures the address does not become the weakest link in the security chain.
 
-String form: `"Q" + hex(address)` = 129 characters.
+String form: `"Q" + hex(address)` = 129 characters. Display code may render the same address with an EIP-55-style mixed-case checksum using SHAKE256 over the lowercase ASCII hex address body; this changes only casing, not address bytes.
 
 ---
 

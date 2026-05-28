@@ -32,7 +32,14 @@
 //   - ML-DSA-87 and SPHINCS+-256s (byte form):
 //     SHAKE256(Descriptor || PK)[:64] (64 bytes total)
 //
-// Addresses are validated using [IsValidAddress]. For address generation:
+// Modern Q-prefixed addresses can also be rendered with an EIP-55-style
+// mixed-case checksum using [ToChecksumAddress]. The checksum uses SHAKE256 over
+// the lowercase ASCII hex address body, not Keccak. Lowercase and uppercase
+// address strings remain accepted as non-checksummed compatibility forms, while
+// mixed-case strings must match the checksum.
+//
+// Addresses are validated using [IsValidAddress]. For strict display checksum
+// validation use [IsValidChecksumAddress]. For address generation:
 //
 //   - Use [GetAddress] for untrusted inputs (validates descriptor and pk length)
 //

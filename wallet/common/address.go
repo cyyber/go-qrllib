@@ -3,6 +3,8 @@ package common
 import (
 	"encoding/hex"
 	"fmt"
+	"strings"
+	"unicode"
 
 	"github.com/theQRL/go-qrllib/wallet/common/descriptor"
 	"github.com/theQRL/go-qrllib/wallet/common/wallettype"
@@ -67,21 +69,84 @@ func expectedPKSize(desc descriptor.Descriptor) (int, error) {
 	}
 }
 
+// ToChecksumAddress returns the EIP-55-style mixed-case representation of a QRL
+// address using SHAKE256 instead of Keccak. Lowercase address strings remain the
+// canonical non-checksummed form; this helper is intended for display and typo
+// detection.
+func ToChecksumAddress(addr string) (string, error) {
+	body, err := addressBody(addr)
+	if err != nil {
+		return "", err
+	}
+
+	lowerBody := strings.ToLower(body)
+	hash := shake256ASCIIHex(lowerBody)
+	hashHex := hex.EncodeToString(hash)
+
+	var checksummed strings.Builder
+	checksummed.Grow(1 + len(lowerBody))
+	checksummed.WriteByte('Q')
+
+	for i, char := range lowerBody {
+		if char >= 'a' && char <= 'f' && hashHex[i] >= '8' {
+			checksummed.WriteRune(unicode.ToUpper(char))
+			continue
+		}
+		checksummed.WriteRune(char)
+	}
+
+	return checksummed.String(), nil
+}
+
+// IsValidChecksumAddress validates a checksummed QRL address. All-lowercase and
+// all-uppercase addresses are accepted as non-checksummed compatibility forms,
+// matching the common EIP-55 validation policy. Mixed-case addresses must match
+// the SHAKE256 checksum exactly.
+func IsValidChecksumAddress(addr string) bool {
+	body, err := addressBody(addr)
+	if err != nil {
+		return false
+	}
+	if body == strings.ToLower(body) || body == strings.ToUpper(body) {
+		return true
+	}
+
+	checksummed, err := ToChecksumAddress(addr)
+	if err != nil {
+		return false
+	}
+	return addr == checksummed
+}
+
 // IsValidAddress validates a QRL address string.
 // A valid address has the format "Q" followed by AddressSize*2 hex characters.
+// Lowercase and uppercase inputs are accepted as non-checksummed compatibility
+// forms; mixed-case inputs must pass the SHAKE256 checksum.
 func IsValidAddress(addr string) bool {
-	// Check length: "Q" prefix + hex-encoded address (2 chars per byte)
+	return IsValidChecksumAddress(addr)
+}
+
+func addressBody(addr string) (string, error) {
 	expectedLen := 1 + AddressSize*2
 	if len(addr) != expectedLen {
-		return false
+		return "", fmt.Errorf("address must be %d characters", expectedLen)
 	}
-
-	// Check Q prefix
 	if addr[0] != 'Q' {
-		return false
+		return "", fmt.Errorf("address must start with Q")
 	}
 
-	// Check that the rest is valid hex
-	_, err := hex.DecodeString(addr[1:])
-	return err == nil
+	body := addr[1:]
+	if _, err := hex.DecodeString(body); err != nil {
+		return "", fmt.Errorf("address contains invalid hex: %w", err)
+	}
+	return body, nil
+}
+
+func shake256ASCIIHex(body string) []byte {
+	sh := sha3.NewShake256()
+	_, _ = sh.Write([]byte(body))
+
+	hash := make([]byte, AddressSize)
+	_, _ = sh.Read(hash)
+	return hash
 }

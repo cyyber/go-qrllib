@@ -227,6 +227,12 @@ QRL addresses are commonly displayed with a leading "Q" prefix followed by the h
 encoded address bytes. This is a convention across legacy and modern tooling,
 but not every API in this library emits the "Q" prefix directly.
 
+Modern 64-byte addresses can also be displayed with an EIP-55-style mixed-case
+checksum using `wallet/common.ToChecksumAddress`. The checksum uses SHAKE256
+instead of Keccak and changes only letter casing; the underlying address bytes
+remain unchanged. Lowercase and uppercase forms are still accepted for
+compatibility, while mixed-case input must match the checksum.
+
 ---
 
 ## Thread Safety
