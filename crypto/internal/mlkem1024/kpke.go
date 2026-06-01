@@ -5,6 +5,7 @@ import "crypto/sha3"
 // K-PKE (FIPS 203, Section 5): the IND-CPA-secure public-key encryption
 // scheme that ML-KEM wraps with the FO transform.
 
+// pkeKeyGen implements K-PKE.KeyGen.
 func pkeKeyGen(dk *DecapsulationKey, d *[32]byte) {
 	var gInput [33]byte
 	copy(gInput[:32], d[:])
@@ -21,12 +22,12 @@ func pkeKeyGen(dk *DecapsulationKey, d *[32]byte) {
 		}
 	}
 
-	var N byte
+	var counter byte
 	s := &dk.s
 	for i := range s {
-		samplePolyCBD(&s[i], sigma, N)
+		samplePolyCBD(&s[i], sigma, counter)
 		ntt(&s[i])
-		N++
+		counter++
 	}
 
 	t := &dk.t
@@ -40,9 +41,9 @@ func pkeKeyGen(dk *DecapsulationKey, d *[32]byte) {
 		)
 
 		var e ringElement
-		samplePolyCBD(&e, sigma, N)
+		samplePolyCBD(&e, sigma, counter)
 		ntt(&e)
-		N++
+		counter++
 		polyAddAssign(&acc, &e)
 
 		t[i] = acc
@@ -50,6 +51,7 @@ func pkeKeyGen(dk *DecapsulationKey, d *[32]byte) {
 	}
 }
 
+// pkeEncrypt implements K-PKE.Encrypt.
 func pkeEncrypt(dst *[CiphertextSize]byte, ek *encryptionKey, m *[32]byte, r []byte) {
 	var y [k]ringElement
 
@@ -63,6 +65,8 @@ func pkeEncrypt(dst *[CiphertextSize]byte, ek *encryptionKey, m *[32]byte, r []b
 	off := 0
 	for i := range k {
 		var acc ringElement
+		// ek.a is stored row-major as A[row*k+column]. K-PKE.Encrypt needs
+		// A^T * y, so this walks one column of A for each output polynomial.
 		nttMulAdd4(&acc,
 			&ek.a[i], &y[0],
 			&ek.a[k+i], &y[1],
@@ -100,6 +104,7 @@ func pkeEncrypt(dst *[CiphertextSize]byte, ek *encryptionKey, m *[32]byte, r []b
 	ringCompressAndEncode5((*[encodingSize5]byte)(dst[off:off+encodingSize5]), &v)
 }
 
+// pkeDecrypt implements K-PKE.Decrypt.
 func pkeDecrypt(dst *[32]byte, dk *DecapsulationKey, c *[CiphertextSize]byte) {
 	var u [k]ringElement
 	off := 0

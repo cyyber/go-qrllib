@@ -61,16 +61,6 @@ func fieldMulSub(a, b, c fieldElement) fieldElement {
 	return fieldReduce(x)
 }
 
-func compress(x fieldElement, d uint8) uint16 {
-	dividend := uint32(x) << d
-	quotient := uint32(uint64(dividend) * barrettMultiplier >> barrettShift)
-	remainder := dividend - quotient*q
-	quotient += (q/2 - remainder) >> 31 & 1
-	quotient += (q + q/2 - remainder) >> 31 & 1
-	var mask uint32 = (1 << d) - 1
-	return uint16(quotient & mask)
-}
-
 const (
 	compress1Lower = (q + 3) / 4 // ceil(q/4)
 	compress1Upper = (3 * q) / 4 // floor(3q/4)
@@ -230,10 +220,11 @@ func ringCompressAndEncode11(dst *[encodingSize11]byte, src *ringElement) {
 	}
 }
 
-func sampleNTT(dst *ringElement, rho *[32]byte, jj, ii byte) {
+// sampleNTT samples the NTT-domain matrix entry A[i,j] from SHAKE128(rho || j || i).
+func sampleNTT(dst *ringElement, rho *[32]byte, jIndex, iIndex byte) {
 	ctx := sha3.NewSHAKE128()
 	_, _ = ctx.Write(rho[:])
-	_, _ = ctx.Write([]byte{jj, ii})
+	_, _ = ctx.Write([]byte{jIndex, iIndex})
 
 	var j int
 	var buf [168]byte
@@ -266,6 +257,7 @@ func sampleNTT(dst *ringElement, rho *[32]byte, jj, ii byte) {
 	}
 }
 
+// samplePolyCBD samples a noise polynomial with CBD_2 from SHAKE256(sigma || counter).
 func samplePolyCBD(dst *ringElement, sigma []byte, counter byte) {
 	prf := sha3.NewSHAKE256()
 	_, _ = prf.Write(sigma)
@@ -297,7 +289,8 @@ func cbd2(a, b uint32) fieldElement {
 var zetas = [128]fieldElement{1, 1729, 2580, 3289, 2642, 630, 1897, 848, 1062, 1919, 193, 797, 2786, 3260, 569, 1746, 296, 2447, 1339, 1476, 3046, 56, 2240, 1333, 1426, 2094, 535, 2882, 2393, 2879, 1974, 821, 289, 331, 3253, 1756, 1197, 2304, 2277, 2055, 650, 1977, 2513, 632, 2865, 33, 1320, 1915, 2319, 1435, 807, 452, 1438, 2868, 1534, 2402, 2647, 2617, 1481, 648, 2474, 3110, 1227, 910, 17, 2761, 583, 2649, 1637, 723, 2288, 1100, 1409, 2662, 3281, 233, 756, 2156, 3015, 3050, 1703, 1651, 2789, 1789, 1847, 952, 1461, 2687, 939, 2308, 2437, 2388, 733, 2337, 268, 641, 1584, 2298, 2037, 3220, 375, 2549, 2090, 1645, 1063, 319, 2773, 757, 2099, 561, 2466, 2594, 2804, 1092, 403, 1026, 1143, 2150, 2775, 886, 1722, 1212, 1874, 1029, 2110, 2935, 885, 2154}
 
 const (
-	inverseNTTScale     = 3303
+	inverseNTTScale = 3303
+	// The final inverse NTT layer folds the upper-half scaling into its zeta.
 	inverseNTTFinalZeta = 1652 // zetas[1] * inverseNTTScale mod q
 )
 

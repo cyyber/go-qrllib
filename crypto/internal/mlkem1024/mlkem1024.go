@@ -18,6 +18,7 @@ const (
 	encodingSize11 = n * 11 / 8
 	encodingSize12 = n * 12 / 8
 
+	// ML-KEM messages are 32-byte values encoded as ByteEncode_1(m).
 	messageSize = encodingSize1
 
 	SharedKeySize = 32

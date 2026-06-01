@@ -62,7 +62,7 @@ func TestRingCompressAndEncodeSpecialized(t *testing.T) {
 func TestCompress1MatchesGeneric(t *testing.T) {
 	for x := range q {
 		got := compress1(fieldElement(x))
-		want := byte(compress(fieldElement(x), d1))
+		want := byte(referenceCompress(fieldElement(x), d1))
 		if got != want {
 			t.Fatalf("compress1(%d) = %d, want %d", x, got, want)
 		}
@@ -71,10 +71,10 @@ func TestCompress1MatchesGeneric(t *testing.T) {
 
 func TestCompress5And11MatchGeneric(t *testing.T) {
 	for x := range q {
-		if got, want := compress5(fieldElement(x)), compress(fieldElement(x), d5); got != want {
+		if got, want := compress5(fieldElement(x)), referenceCompress(fieldElement(x), d5); got != want {
 			t.Fatalf("compress5(%d) = %d, want %d", x, got, want)
 		}
-		if got, want := compress11(fieldElement(x)), compress(fieldElement(x), d11); got != want {
+		if got, want := compress11(fieldElement(x)), referenceCompress(fieldElement(x), d11); got != want {
 			t.Fatalf("compress11(%d) = %d, want %d", x, got, want)
 		}
 	}
@@ -198,12 +198,22 @@ func referenceByteEncode12(dst []byte, src *ringElement) {
 
 func referenceRingCompressAndEncode(dst []byte, src *ringElement, d uint8) {
 	for i, x := range src {
-		c := compress(x, d)
+		c := referenceCompress(x, d)
 		for j := uint8(0); j < d; j++ {
 			bitOffset := i*int(d) + int(j)
 			dst[bitOffset/8] |= byte(c>>j&1) << (bitOffset % 8)
 		}
 	}
+}
+
+func referenceCompress(x fieldElement, d uint8) uint16 {
+	dividend := uint32(x) << d
+	quotient := uint32(uint64(dividend) * barrettMultiplier >> barrettShift)
+	remainder := dividend - quotient*q
+	quotient += (q/2 - remainder) >> 31 & 1
+	quotient += (q + q/2 - remainder) >> 31 & 1
+	var mask uint32 = (1 << d) - 1
+	return uint16(quotient & mask)
 }
 
 func referenceRingDecodeAndDecompress(dst *ringElement, src []byte, d uint8) {
