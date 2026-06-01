@@ -57,7 +57,7 @@
 //
 // # Thread Safety
 //
-// An MLDSA87 instance is safe for concurrent reads (GetPK, GetSK, GetSeed),
+// A MLDSA87 instance is safe for concurrent reads (GetPK, GetSK, GetSeed),
 // but Sign and SignAttached should not be called concurrently on the same instance.
 // The package-level Verify and Open functions are safe for concurrent use.
 package ml_dsa_87
@@ -70,7 +70,7 @@ import (
 	cryptoerrors "github.com/theQRL/go-qrllib/crypto/errors"
 )
 
-// MLDSA87 holds an ML-DSA-87 keypair. Signing is **always hedged**
+// MLDSA87 holds a ML-DSA-87 keypair. Signing is **always hedged**
 // (per FIPS 204 §3.4 — the recommended mode); the previous
 // `randomizedSigning bool` field was removed in TOB-QRLLIB-6 alongside
 // the dead deterministic-default path. Callers needing
@@ -211,7 +211,7 @@ func (d *MLDSA87) Sign(ctx, message []uint8) ([CRYPTO_BYTES]uint8, error) {
 	return signature, err
 }
 
-// SignDeterministic produces an ML-DSA-87 signature using the FIPS 204
+// SignDeterministic produces a ML-DSA-87 signature using the FIPS 204
 // §3.5 deterministic mode (per-signature RND_BYTES = 32 zero bytes).
 // Two SignDeterministic calls with the same (key, ctx, message) produce
 // byte-identical signatures.

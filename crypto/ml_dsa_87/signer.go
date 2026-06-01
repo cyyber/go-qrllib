@@ -34,7 +34,7 @@ func (pk *CryptoPublicKey) Bytes() [CRYPTO_PUBLIC_KEY_BYTES]uint8 {
 	return pk.key
 }
 
-// CryptoSigner wraps an MLDSA87 instance to implement crypto.Signer.
+// CryptoSigner wraps a MLDSA87 instance to implement crypto.Signer.
 type CryptoSigner struct {
 	d *MLDSA87
 }
