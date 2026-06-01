@@ -16,8 +16,6 @@ import (
 // Source: https://github.com/usnistgov/ACVP-Server/tree/master/gen-val/json-files
 //
 // The checked-in fixtures live under testdata/acvp as gzip-compressed JSON.
-// Set MLKEM_ACVP_JSON_DIR to either the gen-val/json-files directory or to one
-// specific ML-KEM-* suite directory to run against a fresh ACVP checkout.
 
 func TestACVPJSONKeyGen(t *testing.T) {
 	prompt := readACVPFile(t, "ML-KEM-keyGen-FIPS203", "prompt.json")
