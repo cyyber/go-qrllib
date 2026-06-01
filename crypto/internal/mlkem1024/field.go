@@ -360,7 +360,7 @@ func nttMulAdd(acc, a, b *ringElement) {
 	}
 }
 
-// nttMulAdd4 fuses the four nttMulAdd terms in an ML-KEM-1024 dot product.
+// nttMulAdd4 fuses the four nttMulAdd terms in a ML-KEM-1024 dot product.
 // The repeated lane blocks are intentionally unrolled so each coefficient pair
 // loads acc and gamma once, accumulates all four products lazily, and reduces
 // only once per output coefficient.

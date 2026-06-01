@@ -5,13 +5,13 @@ import "github.com/theQRL/go-qrllib/crypto/internal/mlkem1024"
 
 const (
 	// SeedSize is the size in bytes of the seed used to deterministically generate
-	// an ML-KEM-1024 decapsulation key.
+	// a ML-KEM-1024 decapsulation key.
 	SeedSize = 64
 
-	// SharedKeySize is the size in bytes of an ML-KEM-1024 shared secret.
+	// SharedKeySize is the size in bytes of a ML-KEM-1024 shared secret.
 	SharedKeySize = 32
 
-	// CiphertextSize is the size in bytes of an ML-KEM-1024 ciphertext.
+	// CiphertextSize is the size in bytes of a ML-KEM-1024 ciphertext.
 	CiphertextSize = 1568
 
 	// EncapsulationKeySize is the size in bytes of an encoded ML-KEM-1024
@@ -19,7 +19,7 @@ const (
 	EncapsulationKeySize = 1568
 )
 
-// DecapsulationKey is an ML-KEM-1024 private key used to decapsulate
+// DecapsulationKey is a ML-KEM-1024 private key used to decapsulate
 // ciphertexts and recover shared secrets.
 type DecapsulationKey struct {
 	key *mlkem1024.DecapsulationKey
@@ -35,7 +35,7 @@ func NewDecapsulationKey(seed []byte) (*DecapsulationKey, error) {
 	return &DecapsulationKey{key}, nil
 }
 
-// Decapsulate recovers the shared secret from an ML-KEM-1024 ciphertext using
+// Decapsulate recovers the shared secret from a ML-KEM-1024 ciphertext using
 // the decapsulation key.
 func (dk *DecapsulationKey) Decapsulate(ciphertext []byte) (sharedKey []byte, err error) {
 	return dk.key.Decapsulate(ciphertext)
@@ -51,7 +51,7 @@ func (dk *DecapsulationKey) Bytes() []byte {
 	return dk.key.Bytes()
 }
 
-// EncapsulationKey is an ML-KEM-1024 public key used to encapsulate shared
+// EncapsulationKey is a ML-KEM-1024 public key used to encapsulate shared
 // secrets for the corresponding decapsulation key.
 type EncapsulationKey struct {
 	key *mlkem1024.EncapsulationKey
