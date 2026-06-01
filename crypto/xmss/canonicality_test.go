@@ -116,7 +116,7 @@ func TestCanonicalityIndexCorruption(t *testing.T) {
 	}
 
 	// Test corruption of each index byte
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		t.Run("index_byte", func(t *testing.T) {
 			corruptedSig := make([]byte, len(validSig))
 			copy(corruptedSig, validSig)
@@ -213,7 +213,7 @@ func TestCanonicalityAuthPathCorruption(t *testing.T) {
 	authStart := sigBaseSize // After index, R, and WOTS
 
 	// Test corruption at each auth path level
-	for level := 0; level < 4; level++ { // Height 4 = 4 auth path nodes
+	for level := range 4 { // Height 4 = 4 auth path nodes
 		t.Run("auth_level", func(t *testing.T) {
 			pos := authStart + level*32
 
@@ -272,7 +272,7 @@ func TestCanonicalityRandomSignatures(t *testing.T) {
 	sigSize := getCanonicalityTestSignatureSize(4)
 
 	// Test multiple random signatures
-	for i := 0; i < 50; i++ {
+	for i := range 50 {
 		randomSig := make([]byte, sigSize)
 		_, _ = rand.Read(randomSig)
 

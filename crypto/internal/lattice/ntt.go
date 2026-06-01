@@ -39,7 +39,7 @@ func InvNTTToMont(a *[N]int32) {
 		}
 	}
 
-	for j = 0; j < N; j++ {
+	for j = range N {
 		a[j] = MontgomeryReduce(int64(f) * int64(a[j]))
 	}
 }

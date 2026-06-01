@@ -226,7 +226,7 @@ func TestSignAndVerifyMultiple(t *testing.T) {
 	copy(pk[32:], xmss.GetPKSeed())
 
 	// Verify multiple times (should always succeed)
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		if !Verify(SHAKE_128, message, signature, pk) {
 			t.Errorf("Verify failed on iteration %d", i)
 		}
@@ -394,7 +394,7 @@ func TestMultipleSignatures(t *testing.T) {
 	copy(pk[32:], xmss.GetPKSeed())
 
 	// Sign multiple messages
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		message := make([]uint8, 32)
 		message[0] = uint8(i)
 

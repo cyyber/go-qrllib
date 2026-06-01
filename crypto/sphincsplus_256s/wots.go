@@ -20,7 +20,7 @@ func BaseW(output []uint8, outLen int, input []byte) {
 	var total byte
 	bits := 0
 
-	for consumed := 0; consumed < outLen; consumed++ {
+	for range outLen {
 		if bits == 0 {
 			total = input[in]
 			in++
@@ -37,7 +37,7 @@ func WotsChecksum(csumBaseW []uint8, msgBaseW []uint8) {
 	csum := uint(0)
 	csumBytes := make([]byte, (params.SPX_WOTS_LEN2*params.SPX_WOTS_LOGW+7)/8)
 
-	for i := 0; i < params.SPX_WOTS_LEN1; i++ {
+	for i := range params.SPX_WOTS_LEN1 {
 		csum += params.SPX_WOTS_W - 1 - uint(msgBaseW[i])
 	}
 	csum = csum << ((8 - ((params.SPX_WOTS_LEN2 * params.SPX_WOTS_LOGW) % 8)) % 8)
@@ -56,7 +56,7 @@ func WotsPKFromSig(pk, sig, msg []byte, ctx *SPXCtx, addr *[8]uint32) {
 	var lengths [params.SPX_WOTS_LEN]uint8
 	chainLengths(lengths[:], msg)
 
-	for i := 0; i < params.SPX_WOTS_LEN; i++ {
+	for i := range params.SPX_WOTS_LEN {
 		setChainAddr(addr, uint32(i))
 		GenChain(pk[i*params.SPX_N:], sig[i*params.SPX_N:], uint(lengths[i]), uint(params.SPX_WOTS_W-1-lengths[i]), ctx, addr)
 	}

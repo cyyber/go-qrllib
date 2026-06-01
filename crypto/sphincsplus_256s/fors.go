@@ -33,9 +33,9 @@ func forsGenLeafX1(leaf []byte, ctx *SPXCtx, addrIdx uint32, info any) {
 func messageToIndices(indices []uint32, m []byte) {
 	offset := uint(0)
 
-	for i := 0; i < params.SPX_FORS_TREES; i++ {
+	for i := range params.SPX_FORS_TREES {
 		indices[i] = 0
-		for j := 0; j < params.SPX_FORS_HEIGHT; j++ {
+		for j := range params.SPX_FORS_HEIGHT {
 			byteIdx := int(offset >> 3)
 			bitOffset := ^offset & 0x7
 			bit := (m[byteIdx] >> bitOffset) & 1
@@ -64,7 +64,7 @@ func forsSign(sig []byte, pk []byte, m []byte, ctx *SPXCtx, forsAddr *[8]uint32)
 	messageToIndices(indices[:], m)
 
 	sigOffset := 0
-	for i := 0; i < params.SPX_FORS_TREES; i++ {
+	for i := range params.SPX_FORS_TREES {
 		idxOffset := uint32(i) * (1 << params.SPX_FORS_HEIGHT)
 
 		setTreeHeight(&forsTreeAddr, 0)
@@ -119,7 +119,7 @@ func forsPKFromSig(
 	messageToIndices(indices[:], m)
 
 	sigOffset := 0
-	for i := 0; i < params.SPX_FORS_TREES; i++ {
+	for i := range params.SPX_FORS_TREES {
 		idxOffset := uint32(i) * (1 << params.SPX_FORS_HEIGHT)
 
 		setTreeHeight(&forsTreeAddr, 0)

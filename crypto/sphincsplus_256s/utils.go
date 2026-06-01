@@ -18,7 +18,7 @@ func U32ToBytes(out []byte, in uint32) {
 
 func BytesToUll(in []byte, inLen int) uint64 {
 	var out uint64
-	for i := 0; i < inLen; i++ {
+	for i := range inLen {
 		out |= uint64(in[i]) << (8 * (inLen - 1 - i))
 	}
 	return out

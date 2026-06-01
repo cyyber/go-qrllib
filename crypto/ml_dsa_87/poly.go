@@ -11,31 +11,31 @@ type poly struct {
 }
 
 func polyCAddQ(a *poly) {
-	for i := 0; i < N; i++ {
+	for i := range N {
 		a.coeffs[i] = cAddQ(a.coeffs[i])
 	}
 }
 
 func polyReduce(a *poly) {
-	for i := 0; i < N; i++ {
+	for i := range N {
 		a.coeffs[i] = reduce32(a.coeffs[i])
 	}
 }
 
 func polyAdd(c, a, b *poly) {
-	for i := 0; i < N; i++ {
+	for i := range N {
 		c.coeffs[i] = a.coeffs[i] + b.coeffs[i]
 	}
 }
 
 func polySub(c, a, b *poly) {
-	for i := 0; i < N; i++ {
+	for i := range N {
 		c.coeffs[i] = a.coeffs[i] - b.coeffs[i]
 	}
 }
 
 func polyShiftL(a *poly) {
-	for i := 0; i < N; i++ {
+	for i := range N {
 		a.coeffs[i] <<= D
 	}
 }
@@ -49,26 +49,26 @@ func polyInvNTTToMont(a *poly) {
 }
 
 func polyPointWiseMontgomery(c, a, b *poly) {
-	for i := 0; i < N; i++ {
+	for i := range N {
 		c.coeffs[i] = montgomeryReduce(int64(a.coeffs[i]) * int64(b.coeffs[i]))
 	}
 }
 
 func polyPower2Round(a1, a0, a *poly) {
-	for i := 0; i < N; i++ {
+	for i := range N {
 		a1.coeffs[i] = power2Round(&a0.coeffs[i], a.coeffs[i])
 	}
 }
 
 func polyDecompose(a1, a0, a *poly) {
-	for i := 0; i < N; i++ {
+	for i := range N {
 		a1.coeffs[i] = decompose(&a0.coeffs[i], a.coeffs[i])
 	}
 }
 
 func polyMakeHint(h, a0, a1 *poly) uint {
 	var s uint
-	for i := 0; i < N; i++ {
+	for i := range N {
 		h.coeffs[i] = int32(makeHint(a0.coeffs[i], a1.coeffs[i]))
 		s += uint(h.coeffs[i])
 	}
@@ -77,7 +77,7 @@ func polyMakeHint(h, a0, a1 *poly) uint {
 }
 
 func polyUseHint(b, a, h *poly) {
-	for i := 0; i < N; i++ {
+	for i := range N {
 		b.coeffs[i] = useHint(a.coeffs[i], int(h.coeffs[i]))
 	}
 
@@ -104,7 +104,7 @@ func polyChkNorm(a *poly, B int32) int {
 	// — a different operation in general. The parentheses below pin the
 	// intended C grouping explicitly; do NOT remove them.
 	var violation int32
-	for i := 0; i < N; i++ {
+	for i := range N {
 		t = a.coeffs[i] >> 31
 		t = a.coeffs[i] - (t & (2 * a.coeffs[i]))
 		violation |= (B - 1 - t) >> 31
@@ -142,7 +142,7 @@ func polyUniform(a *poly, seed *[SEED_BYTES]uint8, nonce uint16) error {
 		//           contain enough valid samples with overwhelming probability (rejection rate ~0.02%)
 		off := bufLen % 3
 		//coverage:ignore
-		for i := 0; i < off; i++ {
+		for i := range off {
 			//coverage:ignore
 			buf[i] = buf[bufLen-off+i]
 		}
@@ -267,12 +267,12 @@ func polyChallenge(c *poly, seed []uint8) error {
 	}
 
 	signs := uint64(0)
-	for i := uint64(0); i < 8; i++ {
+	for i := range uint64(8) {
 		signs |= uint64(buf[i]) << (8 * i)
 	}
 	pos = 8
 
-	for i := 0; i < N; i++ {
+	for i := range N {
 		c.coeffs[i] = 0
 	}
 	for i := N - TAU; i < N; i++ {
@@ -307,8 +307,8 @@ func polyChallenge(c *poly, seed []uint8) error {
 func polyEtaPack(r []uint8, a *poly) {
 	var t [8]uint8
 
-	for i := 0; i < N/8; i++ {
-		t[0] = uint8(ETA - a.coeffs[8*i+0])
+	for i := range N / 8 {
+		t[0] = uint8(ETA - a.coeffs[8*i])
 		t[1] = uint8(ETA - a.coeffs[8*i+1])
 		t[2] = uint8(ETA - a.coeffs[8*i+2])
 		t[3] = uint8(ETA - a.coeffs[8*i+3])
@@ -317,24 +317,24 @@ func polyEtaPack(r []uint8, a *poly) {
 		t[6] = uint8(ETA - a.coeffs[8*i+6])
 		t[7] = uint8(ETA - a.coeffs[8*i+7])
 
-		r[3*i+0] = (t[0] >> 0) | (t[1] << 3) | (t[2] << 6)
+		r[3*i] = (t[0] >> 0) | (t[1] << 3) | (t[2] << 6)
 		r[3*i+1] = (t[2] >> 2) | (t[3] << 1) | (t[4] << 4) | (t[5] << 7)
 		r[3*i+2] = (t[5] >> 1) | (t[6] << 2) | (t[7] << 5)
 	}
 }
 
 func polyEtaUnpack(r *poly, a []uint8) {
-	for i := 0; i < N/8; i++ {
-		r.coeffs[8*i+0] = int32((a[3*i+0] >> 0) & 7)
-		r.coeffs[8*i+1] = int32((a[3*i+0] >> 3) & 7)
-		r.coeffs[8*i+2] = int32(((a[3*i+0] >> 6) | (a[3*i+1] << 2)) & 7)
+	for i := range N / 8 {
+		r.coeffs[8*i] = int32((a[3*i] >> 0) & 7)
+		r.coeffs[8*i+1] = int32((a[3*i] >> 3) & 7)
+		r.coeffs[8*i+2] = int32(((a[3*i] >> 6) | (a[3*i+1] << 2)) & 7)
 		r.coeffs[8*i+3] = int32((a[3*i+1] >> 1) & 7)
 		r.coeffs[8*i+4] = int32((a[3*i+1] >> 4) & 7)
 		r.coeffs[8*i+5] = int32(((a[3*i+1] >> 7) | (a[3*i+2] << 1)) & 7)
 		r.coeffs[8*i+6] = int32((a[3*i+2] >> 2) & 7)
 		r.coeffs[8*i+7] = int32((a[3*i+2] >> 5) & 7)
 
-		r.coeffs[8*i+0] = ETA - r.coeffs[8*i+0]
+		r.coeffs[8*i] = ETA - r.coeffs[8*i]
 		r.coeffs[8*i+1] = ETA - r.coeffs[8*i+1]
 		r.coeffs[8*i+2] = ETA - r.coeffs[8*i+2]
 		r.coeffs[8*i+3] = ETA - r.coeffs[8*i+3]
@@ -347,9 +347,9 @@ func polyEtaUnpack(r *poly, a []uint8) {
 }
 
 func polyT1Pack(r []uint8, a *poly) {
-	for i := 0; i < N/4; i++ {
-		r[5*i+0] = uint8(a.coeffs[4*i+0] >> 0)
-		r[5*i+1] = uint8((a.coeffs[4*i+0] >> 8) | (a.coeffs[4*i+1] << 2))
+	for i := range N / 4 {
+		r[5*i] = uint8(a.coeffs[4*i] >> 0)
+		r[5*i+1] = uint8((a.coeffs[4*i] >> 8) | (a.coeffs[4*i+1] << 2))
 		r[5*i+2] = uint8((a.coeffs[4*i+1] >> 6) | (a.coeffs[4*i+2] << 4))
 		r[5*i+3] = uint8((a.coeffs[4*i+2] >> 4) | (a.coeffs[4*i+3] << 6))
 		r[5*i+4] = uint8(a.coeffs[4*i+3] >> 2)
@@ -357,8 +357,8 @@ func polyT1Pack(r []uint8, a *poly) {
 }
 
 func polyT1Unpack(r *poly, a []uint8) {
-	for i := 0; i < N/4; i++ {
-		r.coeffs[4*i+0] = int32((uint32(a[5*i+0]>>0) | (uint32(a[5*i+1]) << 8)) & 0x3FF)
+	for i := range N / 4 {
+		r.coeffs[4*i] = int32((uint32(a[5*i]>>0) | (uint32(a[5*i+1]) << 8)) & 0x3FF)
 		r.coeffs[4*i+1] = int32((uint32(a[5*i+1]>>2) | (uint32(a[5*i+2]) << 6)) & 0x3FF)
 		r.coeffs[4*i+2] = int32((uint32(a[5*i+2]>>4) | (uint32(a[5*i+3]) << 4)) & 0x3FF)
 		r.coeffs[4*i+3] = int32((uint32(a[5*i+3]>>6) | (uint32(a[5*i+4]) << 2)) & 0x3FF)
@@ -368,8 +368,8 @@ func polyT1Unpack(r *poly, a []uint8) {
 func polyT0Pack(r []uint8, a *poly) {
 	var t [8]uint32
 
-	for i := 0; i < N/8; i++ {
-		t[0] = uint32((1 << (D - 1)) - a.coeffs[8*i+0])
+	for i := range N / 8 {
+		t[0] = uint32((1 << (D - 1)) - a.coeffs[8*i])
 		t[1] = uint32((1 << (D - 1)) - a.coeffs[8*i+1])
 		t[2] = uint32((1 << (D - 1)) - a.coeffs[8*i+2])
 		t[3] = uint32((1 << (D - 1)) - a.coeffs[8*i+3])
@@ -378,7 +378,7 @@ func polyT0Pack(r []uint8, a *poly) {
 		t[6] = uint32((1 << (D - 1)) - a.coeffs[8*i+6])
 		t[7] = uint32((1 << (D - 1)) - a.coeffs[8*i+7])
 
-		r[13*i+0] = uint8(t[0])
+		r[13*i] = uint8(t[0])
 		r[13*i+1] = uint8(t[0] >> 8)
 		r[13*i+1] |= uint8(t[1] << 5)
 		r[13*i+2] = uint8(t[1] >> 3)
@@ -402,10 +402,10 @@ func polyT0Pack(r []uint8, a *poly) {
 }
 
 func polyT0Unpack(r *poly, a []uint8) {
-	for i := 0; i < N/8; i++ {
-		r.coeffs[8*i+0] = int32(a[13*i+0])
-		r.coeffs[8*i+0] |= int32(uint32(a[13*i+1]) << 8)
-		r.coeffs[8*i+0] &= 0x1FFF
+	for i := range N / 8 {
+		r.coeffs[8*i] = int32(a[13*i])
+		r.coeffs[8*i] |= int32(uint32(a[13*i+1]) << 8)
+		r.coeffs[8*i] &= 0x1FFF
 
 		r.coeffs[8*i+1] = int32(a[13*i+1] >> 5)
 		r.coeffs[8*i+1] |= int32(uint32(a[13*i+2]) << 3)
@@ -439,7 +439,7 @@ func polyT0Unpack(r *poly, a []uint8) {
 		r.coeffs[8*i+7] |= int32(uint32(a[13*i+12]) << 5)
 		r.coeffs[8*i+7] &= 0x1FFF
 
-		r.coeffs[8*i+0] = (1 << (D - 1)) - r.coeffs[8*i+0]
+		r.coeffs[8*i] = (1 << (D - 1)) - r.coeffs[8*i]
 		r.coeffs[8*i+1] = (1 << (D - 1)) - r.coeffs[8*i+1]
 		r.coeffs[8*i+2] = (1 << (D - 1)) - r.coeffs[8*i+2]
 		r.coeffs[8*i+3] = (1 << (D - 1)) - r.coeffs[8*i+3]
@@ -453,11 +453,11 @@ func polyT0Unpack(r *poly, a []uint8) {
 func polyZPack(r []uint8, a *poly) {
 	var t [4]uint32
 
-	for i := 0; i < N/2; i++ {
-		t[0] = uint32(GAMMA1 - a.coeffs[2*i+0])
+	for i := range N / 2 {
+		t[0] = uint32(GAMMA1 - a.coeffs[2*i])
 		t[1] = uint32(GAMMA1 - a.coeffs[2*i+1])
 
-		r[5*i+0] = uint8(t[0])
+		r[5*i] = uint8(t[0])
 		r[5*i+1] = uint8(t[0] >> 8)
 		r[5*i+2] = uint8(t[0] >> 16)
 		r[5*i+2] |= uint8(t[1] << 4)
@@ -467,23 +467,23 @@ func polyZPack(r []uint8, a *poly) {
 }
 
 func polyZUnpack(r *poly, a []uint8) {
-	for i := 0; i < N/2; i++ {
-		r.coeffs[2*i+0] = int32(a[5*i+0])
-		r.coeffs[2*i+0] |= int32(uint32(a[5*i+1]) << 8)
-		r.coeffs[2*i+0] |= int32(uint32(a[5*i+2]) << 16)
-		r.coeffs[2*i+0] &= 0xFFFFF
+	for i := range N / 2 {
+		r.coeffs[2*i] = int32(a[5*i])
+		r.coeffs[2*i] |= int32(uint32(a[5*i+1]) << 8)
+		r.coeffs[2*i] |= int32(uint32(a[5*i+2]) << 16)
+		r.coeffs[2*i] &= 0xFFFFF
 
 		r.coeffs[2*i+1] = int32(a[5*i+2] >> 4)
 		r.coeffs[2*i+1] |= int32(uint32(a[5*i+3]) << 4)
 		r.coeffs[2*i+1] |= int32(uint32(a[5*i+4]) << 12)
 
-		r.coeffs[2*i+0] = GAMMA1 - r.coeffs[2*i+0]
+		r.coeffs[2*i] = GAMMA1 - r.coeffs[2*i]
 		r.coeffs[2*i+1] = GAMMA1 - r.coeffs[2*i+1]
 	}
 }
 
 func polyW1Pack(r []uint8, a *poly) {
-	for i := 0; i < N/2; i++ {
-		r[i] = uint8(a.coeffs[2*i+0] | (a.coeffs[2*i+1] << 4))
+	for i := range N / 2 {
+		r[i] = uint8(a.coeffs[2*i] | (a.coeffs[2*i+1] << 4))
 	}
 }

@@ -124,7 +124,7 @@ func TestCanonicalityHintIndexOutOfBounds(t *testing.T) {
 		malformedSig := validSig
 		// Set one hint at index 255
 		malformedSig[hintStart+OMEGA] = 1 // cumulative count = 1 for first poly
-		malformedSig[hintStart+0] = 255   // index 255
+		malformedSig[hintStart] = 255     // index 255
 		// Clear remaining cumulative counts
 		for i := 1; i < K; i++ {
 			malformedSig[hintStart+OMEGA+i] = 1
@@ -157,10 +157,10 @@ func TestCanonicalityCumulativeCountDecreasing(t *testing.T) {
 	t.Run("cumulative_count_decreases", func(t *testing.T) {
 		malformedSig := validSig
 		// Set cumulative counts that decrease: 3, 2 (invalid!)
-		malformedSig[hintStart+OMEGA+0] = 3
+		malformedSig[hintStart+OMEGA] = 3
 		malformedSig[hintStart+OMEGA+1] = 2 // Decreases from 3 to 2
 		// Set valid indices for first 3 hints
-		malformedSig[hintStart+0] = 10
+		malformedSig[hintStart] = 10
 		malformedSig[hintStart+1] = 20
 		malformedSig[hintStart+2] = 30
 
@@ -173,9 +173,9 @@ func TestCanonicalityCumulativeCountDecreasing(t *testing.T) {
 		malformedSig := validSig
 		// Set cumulative counts: 0, 2 (valid - can have no hints in first poly)
 		// But then we need strictly increasing indices starting at position 0
-		malformedSig[hintStart+OMEGA+0] = 0
+		malformedSig[hintStart+OMEGA] = 0
 		malformedSig[hintStart+OMEGA+1] = 2
-		malformedSig[hintStart+0] = 5
+		malformedSig[hintStart] = 5
 		malformedSig[hintStart+1] = 10
 		for i := 2; i < K; i++ {
 			malformedSig[hintStart+OMEGA+i] = 2
@@ -219,7 +219,7 @@ func TestCanonicalityCumulativeCountExceedsOmega(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			malformedSig := validSig
 			// Set cumulative count exceeding OMEGA
-			malformedSig[hintStart+OMEGA+0] = tc.count
+			malformedSig[hintStart+OMEGA] = tc.count
 
 			if Verify(ctx, msg, malformedSig, &pk) {
 				t.Errorf("Signature with cumulative count %d (> OMEGA=%d) should not verify", tc.count, OMEGA)
@@ -316,7 +316,7 @@ func TestCanonicalityNonZeroPadding(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			malformedSig := validSig
 			// Set all cumulative counts to 0 (no hints)
-			for i := 0; i < K; i++ {
+			for i := range K {
 				malformedSig[hintStart+OMEGA+i] = 0
 			}
 			// Add non-zero value in padding area
@@ -450,7 +450,7 @@ func TestCanonicalityRandomSignatures(t *testing.T) {
 	pk := mldsa.GetPK()
 
 	// Test multiple random signatures
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		var randomSig [CRYPTO_BYTES]uint8
 		_, _ = rand.Read(randomSig[:])
 

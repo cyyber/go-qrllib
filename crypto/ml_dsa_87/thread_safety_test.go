@@ -34,7 +34,7 @@ func TestThreadSafetyConcurrentVerify(t *testing.T) {
 
 	errors := make(chan error, numGoroutines)
 
-	for i := 0; i < numGoroutines; i++ {
+	for range numGoroutines {
 		go func() {
 			defer wg.Done()
 			if !Verify(ctx, msg, sig, &pk) {
@@ -61,7 +61,7 @@ func TestThreadSafetyConcurrentSign(t *testing.T) {
 
 	errors := make(chan string, numGoroutines)
 
-	for i := 0; i < numGoroutines; i++ {
+	for i := range numGoroutines {
 		go func(idx int) {
 			defer wg.Done()
 
@@ -105,7 +105,7 @@ func TestThreadSafetyConcurrentKeyGeneration(t *testing.T) {
 
 	results := make(chan *MLDSA87, numGoroutines)
 
-	for i := 0; i < numGoroutines; i++ {
+	for range numGoroutines {
 		go func() {
 			defer wg.Done()
 			mldsa, err := New()
@@ -151,7 +151,7 @@ func TestThreadSafetyConcurrentSignAttachedOpen(t *testing.T) {
 
 	// Pre-create some attached-signature messages
 	sealedMsgs := make([][]byte, numGoroutines)
-	for i := 0; i < numGoroutines; i++ {
+	for i := range numGoroutines {
 		msg := []byte("message " + string(rune(i)))
 		sealed, err := mldsa.SignAttached(ctx, msg)
 		if err != nil {
@@ -161,7 +161,7 @@ func TestThreadSafetyConcurrentSignAttachedOpen(t *testing.T) {
 	}
 
 	// Concurrent sealing
-	for i := 0; i < numGoroutines; i++ {
+	for i := range numGoroutines {
 		go func(idx int) {
 			defer wg.Done()
 			msg := []byte("concurrent message")
@@ -173,7 +173,7 @@ func TestThreadSafetyConcurrentSignAttachedOpen(t *testing.T) {
 	}
 
 	// Concurrent opening
-	for i := 0; i < numGoroutines; i++ {
+	for i := range numGoroutines {
 		go func(idx int) {
 			defer wg.Done()
 			opened, err := Open(ctx, sealedMsgs[idx], &pk)
@@ -207,7 +207,7 @@ func TestThreadSafetyConcurrentExtract(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(numGoroutines * 2)
 
-	for i := 0; i < numGoroutines; i++ {
+	for range numGoroutines {
 		go func() {
 			defer wg.Done()
 			sig := ExtractSignature(sealed)
@@ -242,7 +242,7 @@ func TestThreadSafetySameInstanceSign(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(numGoroutines)
 
-	for i := 0; i < numGoroutines; i++ {
+	for i := range numGoroutines {
 		go func(idx int) {
 			defer wg.Done()
 			msg := []byte("message")

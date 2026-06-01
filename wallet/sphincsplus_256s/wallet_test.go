@@ -91,7 +91,7 @@ func mockGenerateOptRand(mockOptRand []byte) func([]byte) error {
 }
 
 func TestNewWallet(t *testing.T) {
-	for i := 0; i < 5; i++ {
+	for range 5 {
 
 		w, err := NewWallet()
 		if err != nil {

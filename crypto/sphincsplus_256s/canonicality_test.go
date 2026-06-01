@@ -185,7 +185,7 @@ func TestCanonicalityRandomSignatures(t *testing.T) {
 	pk := spx.GetPK()
 
 	// Test multiple random signatures (fewer due to SPHINCS+ performance)
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		var randomSig [params.SPX_BYTES]uint8
 		_, _ = rand.Read(randomSig[:])
 
@@ -259,7 +259,7 @@ func TestCanonicalityWOTSCorruption(t *testing.T) {
 	wotsStart := params.SPX_N + params.SPX_FORS_BYTES
 
 	// Test corruption at each WOTS signature (D layers)
-	for layer := 0; layer < params.SPX_D; layer++ {
+	for layer := range params.SPX_D {
 		t.Run("wots_layer", func(t *testing.T) {
 			pos := wotsStart + layer*params.SPX_WOTS_BYTES
 			if pos >= params.SPX_BYTES {

@@ -40,7 +40,7 @@ func TestThreadSafetyConcurrentVerify(t *testing.T) {
 
 	errors := make(chan error, numGoroutines)
 
-	for i := 0; i < numGoroutines; i++ {
+	for range numGoroutines {
 		go func() {
 			defer wg.Done()
 			if !Verify(hashFunc, msg, sig, pk) {
@@ -67,7 +67,7 @@ func TestThreadSafetySeparateInstances(t *testing.T) {
 
 	errors := make(chan string, numGoroutines)
 
-	for i := 0; i < numGoroutines; i++ {
+	for i := range numGoroutines {
 		go func(idx int) {
 			defer wg.Done()
 
@@ -113,7 +113,7 @@ func TestThreadSafetySequentialSigning(t *testing.T) {
 	signatures := make([][]byte, numSignatures)
 	messages := make([][]byte, numSignatures)
 
-	for i := 0; i < numSignatures; i++ {
+	for i := range numSignatures {
 		messages[i] = []byte("message " + string(rune(i)))
 		sig, err := xmss.Sign(messages[i])
 		if err != nil {
@@ -129,7 +129,7 @@ func TestThreadSafetySequentialSigning(t *testing.T) {
 	}
 
 	// Verify all signatures
-	for i := 0; i < numSignatures; i++ {
+	for i := range numSignatures {
 		if !Verify(hashFunc, messages[i], signatures[i], pk) {
 			t.Errorf("Verification failed for message %d", i)
 		}
@@ -152,7 +152,7 @@ func TestThreadSafetyConcurrentVerifyDifferentSignatures(t *testing.T) {
 	}
 	pairs := make([]sigPair, numSignatures)
 
-	for i := 0; i < numSignatures; i++ {
+	for i := range numSignatures {
 		msg := []byte("message " + string(rune(i)))
 		sig, err := xmss.Sign(msg)
 		if err != nil {
@@ -165,8 +165,8 @@ func TestThreadSafetyConcurrentVerifyDifferentSignatures(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(numSignatures * 10) // Verify each signature 10 times concurrently
 
-	for i := 0; i < numSignatures; i++ {
-		for j := 0; j < 10; j++ {
+	for i := range numSignatures {
+		for range 10 {
 			go func(idx int) {
 				defer wg.Done()
 				if !Verify(hashFunc, pairs[idx].msg, pairs[idx].sig, pk) {
@@ -187,7 +187,7 @@ func TestThreadSafetyConcurrentTreeInit(t *testing.T) {
 
 	results := make(chan *XMSS, numGoroutines)
 
-	for i := 0; i < numGoroutines; i++ {
+	for i := range numGoroutines {
 		go func(idx int) {
 			defer wg.Done()
 			seed := make([]byte, 48)

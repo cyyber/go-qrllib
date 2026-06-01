@@ -177,7 +177,7 @@ func TestXMSS(t *testing.T) {
 		t.Errorf("Failed to Sign")
 	}
 
-	for i := 0; i < 1000; i++ {
+	for range 1000 {
 		if !Verify(message[:], signature, xmss.GetPK()) {
 			t.Errorf("Expected True")
 		}

@@ -19,7 +19,7 @@ func tHash(out, in []byte, inBlocks uint, ctx *SPXCtx, addr *[8]uint32) {
 	Shake256(bitmask, buf[:params.SPX_N+params.SPX_ADDR_BYTES])
 
 	// XOR input with bitmask and place it into buf
-	for i := 0; i < len(bitmask); i++ {
+	for i := range bitmask {
 		buf[params.SPX_N+params.SPX_ADDR_BYTES+i] = in[i] ^ bitmask[i]
 	}
 

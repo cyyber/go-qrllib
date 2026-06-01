@@ -95,7 +95,7 @@ func SetKeyAndMask(addr *[8]uint32, keyAndMask uint32) {
 // AddrToByte serializes an 8-element uint32 address to a 32-byte array.
 // Always uses Big Endian (network byte order) for cryptographic interoperability.
 func AddrToByte(out *[32]uint8, addr *[8]uint32) {
-	for i := 0; i < 8; i++ {
+	for i := range 8 {
 		ToByteBigEndian(out[i*4:i*4+4], addr[i], 4)
 	}
 }
@@ -104,7 +104,7 @@ func AddrToByte(out *[32]uint8, addr *[8]uint32) {
 // Little endian: LSB at lowest address (index 0).
 // Example: 0x12345678 → [0x78, 0x56, 0x34, 0x12]
 func ToByteLittleEndian(out []uint8, in uint32, bytes uint32) {
-	for i := uint32(0); i < bytes; i++ {
+	for i := range bytes {
 		out[i] = uint8(in & 0xff)
 		in = in >> 8
 	}

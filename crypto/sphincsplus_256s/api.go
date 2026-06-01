@@ -92,7 +92,7 @@ func cryptoSignSignature(sig []byte, m []byte, sk []byte, generateOptRand func([
 	forsSign(sig[sigOffset:], root, mHash, &ctx, &wotsAddr)
 	sigOffset += params.SPX_FORS_BYTES
 
-	for i := uint32(0); i < SPX_D; i++ {
+	for i := range uint32(SPX_D) {
 		setLayerAddr(&treeAddr, i)
 		setTreeAddr(&treeAddr, tree)
 

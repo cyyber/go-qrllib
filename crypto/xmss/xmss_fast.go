@@ -151,7 +151,7 @@ func xmssFastSignMessage(hashFunction HashFunction, params *XMSSParams, sk []uin
 	sigMsg[3] = uint8(idx & 0xff)
 
 	sigMsgLen += 4
-	for i := uint32(0); i < n; i++ {
+	for i := range n {
 		sigMsg[sigMsgLen+i] = R[i]
 	}
 
@@ -215,7 +215,7 @@ func treeHashSetup(hashFunction HashFunction, node []uint8, index uint32, bdsSta
 	stackOffset := uint32(0)
 	nodeH := uint32(0)
 
-	for i := uint32(0); i < bound; i++ {
+	for i := range bound {
 		bdsState.treeHash[i].h = i
 		bdsState.treeHash[i].completed = 1
 		bdsState.treeHash[i].stackUsage = 0
@@ -312,7 +312,7 @@ func wOTSPKGen(hashFunction HashFunction, pk, sk []uint8, wOTSParams *WOTSParams
 
 func expandSeed(hashFunction HashFunction, outSeeds, inSeeds []uint8, n, len uint32) {
 	var ctr [32]uint8
-	for i := uint32(0); i < len; i++ {
+	for i := range len {
 		misc.ToByteBigEndian(ctr[:], i, 32) // RFC 8391 requires big-endian encoding
 		prf(hashFunction, outSeeds[i*n:i*n+n], &ctr, inSeeds, n)
 	}
@@ -343,7 +343,7 @@ func hashF(hashFunction HashFunction, out, in, pubSeed []uint8, addr *[8]uint32,
 	misc.AddrToByte(&byteAddr, addr)
 	prf(hashFunction, bitMask, &byteAddr, pubSeed, n)
 
-	for i := uint32(0); i < n; i++ {
+	for i := range n {
 		buf[i] = in[i] ^ bitMask[i]
 	}
 	coreHash(hashFunction, out, 0, key, n, buf, n, n)
@@ -441,7 +441,7 @@ func bdsRound(hashFunction HashFunction, bdsState *BDSState, leafIdx uint32, skS
 	copy(nodeAddr[:3], addr[:3])
 	misc.SetType(&nodeAddr, 2)
 
-	for i := uint32(0); i < h; i++ {
+	for i := range h {
 		if (leafIdx>>i)&1 == 0 {
 			tau = i
 			break
@@ -480,7 +480,7 @@ func bdsRound(hashFunction HashFunction, bdsState *BDSState, leafIdx uint32, skS
 		}
 
 		compareValue := min(tau, h-k)
-		for i := uint32(0); i < compareValue; i++ {
+		for i := range compareValue {
 			startIdx := leafIdx + 1 + 3*(1<<i)
 			if startIdx < (1 << h) {
 				bdsState.treeHash[i].h = i
@@ -500,7 +500,7 @@ func bdsTreeHashUpdate(hashFunction HashFunction, bdsState *BDSState, updates ui
 	level := uint32(0)
 	low := uint32(0)
 
-	for j := uint32(0); j < updates; j++ {
+	for range updates {
 		lMin = h
 		level = h - k
 		for i := uint32(0); i < h-k; i++ {
@@ -686,7 +686,7 @@ func verifySig(hashFunction HashFunction, wotsParams *WOTSParams, msg, sigMsg, p
 	// Compute root
 	validateAuthPath(hashFunction, root, pkHash, idx, sigMsg[sigMsgOffset:], n, h, pubSeed, &nodeAddr)
 
-	for i := uint32(0); i < n; i++ {
+	for i := range n {
 		if root[i] != pk[i] {
 			return false
 		}
@@ -702,17 +702,17 @@ func validateAuthPath(hashFunc HashFunction, root, leaf []uint8, leafIdx uint32,
 	// If leafidx is odd (last bit = 1), current path element is a right child and authpath has to go to the left.
 	// Otherwise, it is the other way around
 	if leafIdx&1 == 1 {
-		for j := uint32(0); j < n; j++ {
+		for j := range n {
 			buffer[n+j] = leaf[j]
 		}
-		for j := uint32(0); j < n; j++ {
+		for j := range n {
 			buffer[j] = authpath[j]
 		}
 	} else {
-		for j := uint32(0); j < n; j++ {
+		for j := range n {
 			buffer[j] = leaf[j]
 		}
-		for j := uint32(0); j < n; j++ {
+		for j := range n {
 			buffer[n+j] = authpath[j]
 		}
 	}
@@ -724,12 +724,12 @@ func validateAuthPath(hashFunc HashFunction, root, leaf []uint8, leafIdx uint32,
 		misc.SetTreeIndex(addr, leafIdx)
 		if leafIdx&1 == 1 {
 			hashH(hashFunc, buffer[n:n+n], buffer, pub_seed, addr, n)
-			for j := uint32(0); j < n; j++ {
+			for j := range n {
 				buffer[j] = authpath[authPathOffset+j]
 			}
 		} else {
 			hashH(hashFunc, buffer[:n], buffer, pub_seed, addr, n)
-			for j := uint32(0); j < n; j++ {
+			for j := range n {
 				buffer[j+n] = authpath[authPathOffset+j]
 			}
 		}
@@ -756,7 +756,7 @@ func wotsPKFromSig(hashfunction HashFunction, pk, sig, msg []uint8, wotsParams *
 
 	calcBaseW(baseW, XMSSWOTSLEN1, msg, wotsParams)
 
-	for i := uint32(0); i < XMSSWOTSLEN1; i++ {
+	for i := range XMSSWOTSLEN1 {
 		cSum += XMSSWOTSW - 1 - uint32(baseW[i])
 	}
 
@@ -765,10 +765,10 @@ func wotsPKFromSig(hashfunction HashFunction, pk, sig, msg []uint8, wotsParams *
 	misc.ToByteBigEndian(cSumBytes, cSum, ((XMSSWOTSLEN2*XMSSWOTSLOGW)+7)/8) // RFC 8391 requires big-endian encoding
 	calcBaseW(cSumBaseW, XMSSWOTSLEN2, cSumBytes, wotsParams)
 
-	for i := uint32(0); i < XMSSWOTSLEN2; i++ {
+	for i := range XMSSWOTSLEN2 {
 		baseW[XMSSWOTSLEN1+i] = cSumBaseW[i]
 	}
-	for i := uint32(0); i < XMSSWOTSLEN; i++ {
+	for i := range XMSSWOTSLEN {
 		misc.SetChainAddr(addr, i)
 		offset := i * XMSSN
 		genChain(hashfunction, pk[offset:offset+XMSSN], sig[offset:offset+XMSSN], uint32(baseW[i]), XMSSWOTSW-1-uint32(baseW[i]), wotsParams, pubSeed, addr)
@@ -781,7 +781,7 @@ func calcBaseW(output []uint8, outputLen uint32, input []uint8, params *WOTSPara
 	total := uint32(0)
 	bits := uint32(0)
 
-	for consumed := uint32(0); consumed < outputLen; consumed++ {
+	for range outputLen {
 		if bits == 0 {
 			total = uint32(input[in])
 			in++

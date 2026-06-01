@@ -39,7 +39,7 @@ func WotsGenLeafX1(dest []byte, ctx *SPXCtx, leafIdx uint32, vInfo any) {
 	setKeypairAddr(leafAddr, leafIdx)
 	setKeypairAddr(pkAddr, leafIdx)
 
-	for i := 0; i < params.SPX_WOTS_LEN; i++ {
+	for i := range params.SPX_WOTS_LEN {
 		offset := i * params.SPX_N
 		buf := buffer[offset : offset+params.SPX_N]
 

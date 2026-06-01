@@ -31,7 +31,7 @@ func init() {
 // SPHINCS+ addresses are defined as 32-byte big-endian structures.
 func addrToBytes(addr *[8]uint32) [32]byte {
 	var out [32]byte
-	for i := 0; i < 8; i++ {
+	for i := range 8 {
 		binary.BigEndian.PutUint32(out[i*4:], addr[i])
 	}
 	return out
@@ -40,7 +40,7 @@ func addrToBytes(addr *[8]uint32) [32]byte {
 // bytesToAddr converts [32]byte to [8]uint32 using big-endian encoding.
 func bytesToAddr(b []byte) [8]uint32 {
 	var addr [8]uint32
-	for i := 0; i < 8; i++ {
+	for i := range 8 {
 		addr[i] = binary.BigEndian.Uint32(b[i*4:])
 	}
 	return addr

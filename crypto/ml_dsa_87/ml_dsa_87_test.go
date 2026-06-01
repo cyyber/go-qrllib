@@ -3,7 +3,6 @@ package ml_dsa_87
 import (
 	"bytes"
 	"encoding/hex"
-	"reflect"
 	"testing"
 )
 
@@ -129,7 +128,7 @@ func TestMLDSA87_GetPK(t *testing.T) {
 	pk := PKHStrToBin(PK)
 
 	d := newMLDSA87FromSeed(t, HexSeed)
-	if !reflect.DeepEqual(pk, d.GetPK()) {
+	if pk != d.GetPK() {
 		t.Errorf("PK mismatch\nExpected: %x\nFound: %x", pk, d.GetPK())
 	}
 }
@@ -138,7 +137,7 @@ func TestMLDSA87_GetSK(t *testing.T) {
 	sk := SKHStrToBin(SK)
 
 	d := newMLDSA87FromSeed(t, HexSeed)
-	if !reflect.DeepEqual(sk, d.GetSK()) {
+	if sk != d.GetSK() {
 		t.Errorf("SK mismatch\nExpected: %x\nFound: %x", sk, d.GetSK())
 	}
 }
@@ -155,7 +154,7 @@ func TestMLDSA87_GetSeed(t *testing.T) {
 		t.Error("failed to generate new ml-dsa-87 from seed", err.Error())
 	}
 
-	if !reflect.DeepEqual(binSeed, d.GetSeed()) {
+	if binSeed != d.GetSeed() {
 		t.Error("Seed Mismatch")
 	}
 }

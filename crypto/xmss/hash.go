@@ -43,11 +43,11 @@ func coreHash(hashFunction HashFunction, out []uint8, typeValue uint32, key []ui
 	buf := make([]uint8, inLen+n+keyLen)
 	misc.ToByteBigEndian(buf, typeValue, n) // RFC 8391 requires big-endian encoding
 
-	for i := uint32(0); i < keyLen; i++ {
+	for i := range keyLen {
 		buf[i+n] = key[i]
 	}
 
-	for i := uint32(0); i < inLen; i++ {
+	for i := range inLen {
 		buf[keyLen+n+i] = in[i]
 	}
 

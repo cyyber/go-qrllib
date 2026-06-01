@@ -36,7 +36,7 @@ func TestThreadSafetyConcurrentVerify(t *testing.T) {
 
 	errors := make(chan error, numGoroutines)
 
-	for i := 0; i < numGoroutines; i++ {
+	for range numGoroutines {
 		go func() {
 			defer wg.Done()
 			if !Verify(msg, sig, &pk) {
@@ -63,7 +63,7 @@ func TestThreadSafetySeparateInstances(t *testing.T) {
 
 	errors := make(chan string, numGoroutines)
 
-	for i := 0; i < numGoroutines; i++ {
+	for i := range numGoroutines {
 		go func(idx int) {
 			defer wg.Done()
 
@@ -120,7 +120,7 @@ func TestThreadSafetyConcurrentSignAttachedOpen(t *testing.T) {
 	const numOpens = 3
 	wg.Add(numOpens)
 
-	for i := 0; i < numOpens; i++ {
+	for range numOpens {
 		go func() {
 			defer wg.Done()
 			opened, err := Open(sealed, &pk)
@@ -153,7 +153,7 @@ func TestThreadSafetyConcurrentExtract(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(numGoroutines * 2)
 
-	for i := 0; i < numGoroutines; i++ {
+	for range numGoroutines {
 		go func() {
 			defer wg.Done()
 			sig := ExtractSignature(sealed)
@@ -187,7 +187,7 @@ func TestThreadSafetyConcurrentKeyGenFromSeed(t *testing.T) {
 
 	results := make(chan [params.SPX_PK_BYTES]uint8, numGoroutines)
 
-	for i := 0; i < numGoroutines; i++ {
+	for range numGoroutines {
 		go func() {
 			defer wg.Done()
 			spx, err := NewSphincsPlus256sFromSeed(seed)
@@ -232,7 +232,7 @@ func TestThreadSafetySameInstanceSign(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(numGoroutines)
 
-	for i := 0; i < numGoroutines; i++ {
+	for i := range numGoroutines {
 		go func(idx int) {
 			defer wg.Done()
 			msg := []byte("message")

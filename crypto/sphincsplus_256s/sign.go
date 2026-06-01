@@ -39,7 +39,7 @@ func cryptoSignVerify(sig, m, pk []byte) bool {
 	forsPKFromSig(root[:], sig, mHash[:], ctx, &wotsAddr)
 	sig = sig[params.SPX_FORS_BYTES:]
 
-	for i := uint32(0); i < SPX_D; i++ {
+	for i := range uint32(SPX_D) {
 		setLayerAddr(&treeAddr, i)
 		setTreeAddr(&treeAddr, tree)
 

@@ -119,7 +119,7 @@ func hashMessage(digest []byte, tree *uint64, leafIdx *uint32,
 // bytesToULL converts a big-endian byte slice to a uint64
 func bytesToULL(b []byte) uint64 {
 	var val uint64
-	for i := 0; i < len(b); i++ {
+	for i := range b {
 		val = (val << 8) | uint64(b[i])
 	}
 	return val
