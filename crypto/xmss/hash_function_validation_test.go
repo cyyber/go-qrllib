@@ -4,7 +4,7 @@
 // The underlying defect was that coreHash dispatched on the HashFunction
 // enum via a switch with no default case, so an unrecognised value left
 // the output buffer zero-initialised. This propagated through the Merkle
-// construction and produced an XMSS whose root was all-zero — and any
+// construction and produced a XMSS whose root was all-zero — and any
 // two such keys (from different seeds) cross-verified each other's
 // signatures because both shared the same zero-rooted public key.
 //
@@ -68,7 +68,7 @@ func TestInitializeTree_RejectsInvalidHashFunction(t *testing.T) {
 }
 
 // TestInitializeTree_AcceptsValidHashFunctions is the positive control
-// asserting that each valid HashFunction produces an XMSS with a
+// asserting that each valid HashFunction produces a XMSS with a
 // non-zero Merkle root and that signatures from different seeds do NOT
 // cross-verify (the property the defect violated).
 func TestInitializeTree_AcceptsValidHashFunctions(t *testing.T) {

@@ -19,7 +19,7 @@ type BDSState struct {
 	nextLeaf    uint32
 }
 
-// NewBDSState constructs the BDS traversal state for an XMSS tree of the
+// NewBDSState constructs the BDS traversal state for a XMSS tree of the
 // given height.
 //
 // Returns nil if height <= k. The callers inside this package already

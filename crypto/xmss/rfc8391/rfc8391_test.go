@@ -259,7 +259,7 @@ func TestRoundTrip_SignViaRFC8391_VerifyViaXMSS(t *testing.T) {
 			}
 
 			// Same signature, but verify through the rfc8391 wrapper
-			// (which takes an RFC-format public key).
+			// (which takes a RFC-format public key).
 			rfcPK, err := MarshalPublicKey(tree)
 			if err != nil {
 				t.Fatalf("MarshalPublicKey: %v", err)

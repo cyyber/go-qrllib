@@ -69,7 +69,7 @@ func NewWOTSParams(n, w uint32) *WOTSParams {
 	}
 }
 
-// NewXMSSParams constructs an XMSS parameter set from `(n, h, w, k)`.
+// NewXMSSParams constructs a XMSS parameter set from `(n, h, w, k)`.
 // The supported QRL tuple is `(WOTSParamN=32, h, WOTSParamW=16,
 // WOTSParamK=2)`; passing other values inherits the panic-tripwire
 // behaviour of [NewWOTSParams] for unsupported `w` (see its godoc and
