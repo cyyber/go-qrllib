@@ -18,6 +18,7 @@ func TestPKERoundTrip(t *testing.T) {
 
 	var got [32]byte
 	pkeDecrypt(&got, &dk, &ciphertext)
+
 	if got != m {
 		t.Fatalf("decrypted message = %x, want %x", got, m)
 	}
