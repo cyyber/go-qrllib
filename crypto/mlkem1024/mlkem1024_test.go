@@ -4,7 +4,8 @@ import (
 	"bytes"
 	"crypto/mlkem"
 	"crypto/rand"
-	"runtime"
+	"crypto/sha3"
+	"encoding/hex"
 	"testing"
 
 	"github.com/theQRL/go-qrllib/crypto/internal/mlkem1024"
@@ -120,6 +121,68 @@ func TestInvalidInputLengths(t *testing.T) {
 	}
 }
 
+// TestAccumulated accumulates 10k deterministic operations (or 100 in short
+// mode) and checks the hash of the result instead of checking in large vector
+// files.
+func TestAccumulated(t *testing.T) {
+	n := 10000
+	expected := "f1a3925c9cf8538bb104c56efb2f5ecb74cc3df25087460b73f6c873e96bcb6a"
+	if testing.Short() {
+		n = 100
+		expected = "800018fec3e2723f73f1d657fe239b4d5d8782efaade297e8cd448e54cc2ac00"
+	}
+
+	s := sha3.NewSHAKE128()
+	o := sha3.NewSHAKE128()
+	seed := make([]byte, SeedSize)
+	var m [SharedKeySize]byte
+	ct1 := make([]byte, CiphertextSize)
+
+	for range n {
+		_, _ = s.Read(seed)
+		dk, err := NewDecapsulationKey(seed)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ek := dk.EncapsulationKey()
+		ekBytes := ek.Bytes()
+		_, _ = o.Write(ekBytes)
+
+		_, _ = s.Read(m[:])
+		internalEK, err := mlkem1024.NewEncapsulationKey(ekBytes)
+		if err != nil {
+			t.Fatal(err)
+		}
+		k, ct := mlkem1024.EncapsulateInternal(internalEK, &m)
+		_, _ = o.Write(ct)
+		_, _ = o.Write(k)
+
+		kk, err := dk.Decapsulate(ct)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(kk, k) {
+			t.Fatalf("shared key = %x, want %x", kk, k)
+		}
+
+		_, _ = s.Read(ct1)
+		k1, err := dk.Decapsulate(ct1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, _ = o.Write(k1)
+	}
+
+	var digest [32]byte
+	_, _ = o.Read(digest[:])
+	got := hex.EncodeToString(digest[:])
+	if got != expected {
+		t.Errorf("got %s, expected %s", got, expected)
+	}
+}
+
+// sink keeps benchmark results observable so the compiler cannot eliminate the
+// work being measured.
 var sink byte
 
 func BenchmarkGenerateKey(b *testing.B) {
@@ -174,183 +237,6 @@ func BenchmarkDecapsulate(b *testing.B) {
 		sharedKey, _ := dk.Decapsulate(ciphertext)
 		sink ^= sharedKey[0]
 	}
-}
-
-func BenchmarkCompareGenerateKey1024(b *testing.B) {
-	b.Run("ours", func(b *testing.B) {
-		b.ReportAllocs()
-		for b.Loop() {
-			dk, err := GenerateKey()
-			if err != nil {
-				b.Fatal(err)
-			}
-			sink ^= dk.EncapsulationKey().Bytes()[0]
-		}
-	})
-	b.Run("stdlib", func(b *testing.B) {
-		b.ReportAllocs()
-		for b.Loop() {
-			dk, err := mlkem.GenerateKey1024()
-			if err != nil {
-				b.Fatal(err)
-			}
-			sink ^= dk.EncapsulationKey().Bytes()[0]
-		}
-	})
-}
-
-func BenchmarkCompareEncapsulate1024(b *testing.B) {
-	seed := make([]byte, SeedSize)
-	_, _ = rand.Read(seed)
-
-	oursDK, err := NewDecapsulationKey(seed)
-	if err != nil {
-		b.Fatal(err)
-	}
-	oursEKBytes := oursDK.EncapsulationKey().Bytes()
-
-	stdlibDK, err := mlkem.NewDecapsulationKey1024(seed)
-	if err != nil {
-		b.Fatal(err)
-	}
-	stdlibEKBytes := stdlibDK.EncapsulationKey().Bytes()
-
-	b.Run("ours", func(b *testing.B) {
-		b.ReportAllocs()
-		for b.Loop() {
-			ek, err := NewEncapsulationKey(oursEKBytes)
-			if err != nil {
-				b.Fatal(err)
-			}
-			sharedKey, ciphertext, err := ek.Encapsulate()
-			if err != nil {
-				b.Fatal(err)
-			}
-			sink ^= ciphertext[0] ^ sharedKey[0]
-		}
-	})
-	b.Run("stdlib", func(b *testing.B) {
-		b.ReportAllocs()
-		for b.Loop() {
-			ek, err := mlkem.NewEncapsulationKey1024(stdlibEKBytes)
-			if err != nil {
-				b.Fatal(err)
-			}
-			sharedKey, ciphertext := ek.Encapsulate()
-			sink ^= ciphertext[0] ^ sharedKey[0]
-		}
-	})
-}
-
-func BenchmarkCompareNewEncapsulationKey1024(b *testing.B) {
-	seed := make([]byte, SeedSize)
-	_, _ = rand.Read(seed)
-
-	oursDK, err := NewDecapsulationKey(seed)
-	if err != nil {
-		b.Fatal(err)
-	}
-	oursEKBytes := oursDK.EncapsulationKey().Bytes()
-
-	stdlibDK, err := mlkem.NewDecapsulationKey1024(seed)
-	if err != nil {
-		b.Fatal(err)
-	}
-	stdlibEKBytes := stdlibDK.EncapsulationKey().Bytes()
-
-	b.Run("ours", func(b *testing.B) {
-		b.ReportAllocs()
-		for b.Loop() {
-			ek, err := NewEncapsulationKey(oursEKBytes)
-			if err != nil {
-				b.Fatal(err)
-			}
-			runtime.KeepAlive(ek)
-		}
-	})
-	b.Run("stdlib", func(b *testing.B) {
-		b.ReportAllocs()
-		for b.Loop() {
-			ek, err := mlkem.NewEncapsulationKey1024(stdlibEKBytes)
-			if err != nil {
-				b.Fatal(err)
-			}
-			runtime.KeepAlive(ek)
-		}
-	})
-}
-
-func BenchmarkCompareEncapsulateParsed1024(b *testing.B) {
-	seed := make([]byte, SeedSize)
-	_, _ = rand.Read(seed)
-
-	oursDK, err := NewDecapsulationKey(seed)
-	if err != nil {
-		b.Fatal(err)
-	}
-	oursEK := oursDK.EncapsulationKey()
-
-	stdlibDK, err := mlkem.NewDecapsulationKey1024(seed)
-	if err != nil {
-		b.Fatal(err)
-	}
-	stdlibEK := stdlibDK.EncapsulationKey()
-
-	b.Run("ours", func(b *testing.B) {
-		b.ReportAllocs()
-		for b.Loop() {
-			sharedKey, ciphertext, err := oursEK.Encapsulate()
-			if err != nil {
-				b.Fatal(err)
-			}
-			sink ^= ciphertext[0] ^ sharedKey[0]
-		}
-	})
-	b.Run("stdlib", func(b *testing.B) {
-		b.ReportAllocs()
-		for b.Loop() {
-			sharedKey, ciphertext := stdlibEK.Encapsulate()
-			sink ^= ciphertext[0] ^ sharedKey[0]
-		}
-	})
-}
-
-func BenchmarkCompareDecapsulate1024(b *testing.B) {
-	oursDK, err := GenerateKey()
-	if err != nil {
-		b.Fatal(err)
-	}
-	_, oursCiphertext, err := oursDK.EncapsulationKey().Encapsulate()
-	if err != nil {
-		b.Fatal(err)
-	}
-
-	stdlibDK, err := mlkem.GenerateKey1024()
-	if err != nil {
-		b.Fatal(err)
-	}
-	_, stdlibCiphertext := stdlibDK.EncapsulationKey().Encapsulate()
-
-	b.Run("ours", func(b *testing.B) {
-		b.ReportAllocs()
-		for b.Loop() {
-			sharedKey, err := oursDK.Decapsulate(oursCiphertext)
-			if err != nil {
-				b.Fatal(err)
-			}
-			sink ^= sharedKey[0]
-		}
-	})
-	b.Run("stdlib", func(b *testing.B) {
-		b.ReportAllocs()
-		for b.Loop() {
-			sharedKey, err := stdlibDK.Decapsulate(stdlibCiphertext)
-			if err != nil {
-				b.Fatal(err)
-			}
-			sink ^= sharedKey[0]
-		}
-	})
 }
 
 func TestConstantSizes(t *testing.T) {
