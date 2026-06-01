@@ -121,16 +121,10 @@ func TestInvalidInputLengths(t *testing.T) {
 	}
 }
 
-// TestAccumulated accumulates 10k deterministic operations (or 100 in short
-// mode) and checks the hash of the result instead of checking in large vector
-// files.
+// TestAccumulated accumulates deterministic operations and checks the hash of
+// the result instead of checking in large vector files.
 func TestAccumulated(t *testing.T) {
-	n := 10000
-	expected := "f1a3925c9cf8538bb104c56efb2f5ecb74cc3df25087460b73f6c873e96bcb6a"
-	if testing.Short() {
-		n = 100
-		expected = "800018fec3e2723f73f1d657fe239b4d5d8782efaade297e8cd448e54cc2ac00"
-	}
+	const expected = "f1a3925c9cf8538bb104c56efb2f5ecb74cc3df25087460b73f6c873e96bcb6a"
 
 	s := sha3.NewSHAKE128()
 	o := sha3.NewSHAKE128()
@@ -138,7 +132,7 @@ func TestAccumulated(t *testing.T) {
 	var m [SharedKeySize]byte
 	ct1 := make([]byte, CiphertextSize)
 
-	for range n {
+	for range 10000 {
 		_, _ = s.Read(seed)
 		dk, err := NewDecapsulationKey(seed)
 		if err != nil {
@@ -210,12 +204,10 @@ func BenchmarkEncapsulate(b *testing.B) {
 		if err != nil {
 			b.Fatal(err)
 		}
-
 		sharedKey, ciphertext, err := ek.Encapsulate()
 		if err != nil {
 			b.Fatal(err)
 		}
-
 		sink ^= ciphertext[0] ^ sharedKey[0]
 	}
 
