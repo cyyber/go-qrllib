@@ -8,7 +8,7 @@ import (
 // shake256Pool provides pooled SHAKE256 hashers to reduce allocations
 // in high-frequency signing and verification operations.
 var shake256Pool = sync.Pool{
-	New: func() interface{} {
+	New: func() any {
 		return sha3.NewSHAKE256()
 	},
 }

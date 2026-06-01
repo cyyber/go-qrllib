@@ -479,10 +479,7 @@ func bdsRound(hashFunction HashFunction, bdsState *BDSState, leafIdx uint32, skS
 			}
 		}
 
-		compareValue := h - k
-		if tau < h-k {
-			compareValue = tau
-		}
+		compareValue := min(tau, h-k)
 		for i := uint32(0); i < compareValue; i++ {
 			startIdx := leafIdx + 1 + 3*(1<<i)
 			if startIdx < (1 << h) {
