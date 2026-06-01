@@ -8,11 +8,14 @@ import (
 )
 
 const (
-	// ML-KEM global constants.
+	// ML-KEM global parameters.
 	n = 256
 	q = 3329
 
-	// Byte lengths of ByteEncode_d(f) output (FIPS 203, Algorithm 5)
+	// ML-KEM-1024 parameter.
+	k = 4
+
+	// Byte lengths of ByteEncode_d(f) output (FIPS 203, Algorithm 5).
 	encodingSize1  = n * 1 / 8
 	encodingSize5  = n * 5 / 8
 	encodingSize11 = n * 11 / 8
@@ -24,9 +27,7 @@ const (
 	SharedKeySize = 32
 	SeedSize      = 32 + 32
 
-	// ML-KEM-1024 parameters.
-	k = 4
-
+	// ML-KEM-1024 encoded sizes.
 	CiphertextSize       = k*encodingSize11 + encodingSize5
 	EncapsulationKeySize = k*encodingSize12 + 32
 )
@@ -115,10 +116,8 @@ func NewEncapsulationKey(ekBytes []byte) (*EncapsulationKey, error) {
 	ek.h = sha3.Sum256(ekBytes)
 	copy(ek.encoded[:], ekBytes)
 
-	var err error
 	for i := range ek.t {
-		err = byteDecode12(&ek.t[i], (*[encodingSize12]byte)(ekBytes[:encodingSize12]))
-		if err != nil {
+		if err := byteDecode12(&ek.t[i], (*[encodingSize12]byte)(ekBytes[:encodingSize12])); err != nil {
 			return nil, err
 		}
 		ekBytes = ekBytes[encodingSize12:]
