@@ -230,14 +230,14 @@ func referenceRingDecodeAndDecompress(dst *ringElement, src []byte, d uint8) {
 
 func TestSamplePolyCBDMatchesReference(t *testing.T) {
 	for counter := byte(0); counter < 8; counter++ {
-		sigma := make([]byte, 32)
+		var sigma [32]byte
 		for i := range sigma {
 			sigma[i] = byte(17*i + 29*int(counter) + 3)
 		}
 
 		var got, want ringElement
-		samplePolyCBD(&got, sigma, counter)
-		referenceSamplePolyCBD(&want, sigma, counter)
+		samplePolyCBD(&got, &sigma, counter)
+		referenceSamplePolyCBD(&want, &sigma, counter)
 		if got != want {
 			t.Fatalf("samplePolyCBD mismatch for counter %d", counter)
 		}
@@ -272,9 +272,9 @@ func TestInverseNTTMatchesReference(t *testing.T) {
 	}
 }
 
-func referenceSamplePolyCBD(dst *ringElement, sigma []byte, counter byte) {
+func referenceSamplePolyCBD(dst *ringElement, sigma *[32]byte, counter byte) {
 	prf := sha3.NewSHAKE256()
-	_, _ = prf.Write(sigma)
+	_, _ = prf.Write(sigma[:])
 	_, _ = prf.Write([]byte{counter})
 	var B [128]byte
 	_, _ = prf.Read(B[:])
@@ -373,9 +373,11 @@ func TestSampleNTTKAT(t *testing.T) {
 }
 
 func TestSamplePolyCBDKAT(t *testing.T) {
-	sigma := katBytes(32, func(i int) byte { return byte(0xa0 + i) })
+	sigmaBytes := katBytes(32, func(i int) byte { return byte(0xa0 + i) })
+	var sigma [32]byte
+	copy(sigma[:], sigmaBytes)
 	var got ringElement
-	samplePolyCBD(&got, sigma, 7)
+	samplePolyCBD(&got, &sigma, 7)
 
 	wantPrefix := [...]fieldElement{3327, 2, 0, 0, 1, 3328, 0, 3328, 3328, 3327, 2, 1, 3328, 3328, 0, 0}
 	for i, want := range wantPrefix {

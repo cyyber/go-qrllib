@@ -10,7 +10,7 @@ func pkeKeyGen(dk *DecapsulationKey, d *[32]byte) {
 	copy(gInput[:32], d[:])
 	gInput[32] = k
 	G := sha3.Sum512(gInput[:])
-	rho, sigma := G[:32], G[32:]
+	rho, sigma := G[:32], (*[32]byte)(G[32:])
 	copy(dk.rho[:], rho)
 	copy(dk.encoded[k*encodingSize12:], rho)
 
@@ -54,7 +54,7 @@ func pkeEncrypt(dst *[CiphertextSize]byte, ek *encryptionKey, m, r *[32]byte) {
 	var counter byte
 	var y [k]ringElement
 	for i := range y {
-		samplePolyCBD(&y[i], r[:], counter)
+		samplePolyCBD(&y[i], r, counter)
 		ntt(&y[i])
 		counter++
 	}
@@ -73,7 +73,7 @@ func pkeEncrypt(dst *[CiphertextSize]byte, ek *encryptionKey, m, r *[32]byte) {
 		inverseNTT(&acc)
 
 		var e1 ringElement
-		samplePolyCBD(&e1, r[:], counter)
+		samplePolyCBD(&e1, r, counter)
 		counter++
 		polyAddAssign(&acc, &e1)
 
@@ -82,7 +82,7 @@ func pkeEncrypt(dst *[CiphertextSize]byte, ek *encryptionKey, m, r *[32]byte) {
 	}
 
 	var e2 ringElement
-	samplePolyCBD(&e2, r[:], counter)
+	samplePolyCBD(&e2, r, counter)
 
 	var mu ringElement
 	ringDecodeAndDecompress1(&mu, m)

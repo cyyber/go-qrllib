@@ -258,9 +258,9 @@ func sampleNTT(dst *ringElement, rho *[32]byte, jIndex, iIndex byte) {
 }
 
 // samplePolyCBD samples a noise polynomial with CBD_2 from SHAKE256(sigma || counter).
-func samplePolyCBD(dst *ringElement, sigma []byte, counter byte) {
+func samplePolyCBD(dst *ringElement, sigma *[32]byte, counter byte) {
 	prf := sha3.NewSHAKE256()
-	_, _ = prf.Write(sigma)
+	_, _ = prf.Write(sigma[:])
 	_, _ = prf.Write([]byte{counter})
 	var B [128]byte
 	_, _ = prf.Read(B[:])
