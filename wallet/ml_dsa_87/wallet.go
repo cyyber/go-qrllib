@@ -189,7 +189,7 @@ func (w *Wallet) GetChecksumAddressStr() string {
 	return common.ToChecksumAddress(w.GetAddress())
 }
 
-// Sign produces a ML-DSA-87 signature over message using the
+// Sign produces an ML-DSA-87 signature over message using the
 // descriptor-bound signing context. Signing is hedged by default as per
 // FIPS 204: each call mixes fresh `crypto/rand` randomness into the per-signature
 // `RND_BYTES`, so two calls over the same message produce distinct signatures,

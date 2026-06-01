@@ -34,8 +34,8 @@ XMSS maintains an internal index that **MUST** be incremented after each signatu
 1. **Never reuse an index** - Each signature MUST use a unique, never-before-used index
 2. **Persist state before use** - To prevent OTS key reuse, the updated index MUST be persisted to durable storage immediately after signing and BEFORE the signature is used or broadcast
 3. **No concurrent signing** - Never sign from the same XMSS instance concurrently
-4. **No state rollback** - Never restore a XMSS wallet from backup without extreme care
-5. **Index exhaustion** - A XMSS tree has limited signatures (2^height); plan for key rotation
+4. **No state rollback** - Never restore an XMSS wallet from backup without extreme care
+5. **Index exhaustion** - An XMSS tree has limited signatures (2^height); plan for key rotation
 
 ### Safe Pattern
 

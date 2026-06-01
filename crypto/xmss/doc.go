@@ -33,7 +33,7 @@
 //
 // XMSS in this library should only be used for:
 //   - Legacy QRL address compatibility (the primary purpose)
-//   - Interop testing against a RFC 8391 reference implementation
+//   - Interop testing against an RFC 8391 reference implementation
 //     where v1-compatible XMSS signatures are needed (via the
 //     [rfc8391] sub-package)
 //

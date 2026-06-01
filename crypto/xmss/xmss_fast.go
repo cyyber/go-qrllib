@@ -5,7 +5,7 @@ import (
 	"github.com/theQRL/go-qrllib/misc"
 )
 
-// XMSSFastGenKeyPair generates a XMSS keypair from a 48-byte
+// XMSSFastGenKeyPair generates an XMSS keypair from a 48-byte
 // caller-supplied seed, expanding it via SHAKE256 into the 3*n bytes
 // of randomness (SK_SEED || SK_PRF || PUB_SEED) the construction
 // requires. This is the QRL pre-standardisation seed-derivation
@@ -41,7 +41,7 @@ func XMSSFastGenKeyPair(hashFunction HashFunction, xmssParams *XMSSParams,
 	return xmssFastGenKeyPairCore(hashFunction, xmssParams, pk, sk, bdsState, &expanded)
 }
 
-// XMSSFastGenKeyPairFromExpandedSeed generates a XMSS keypair from
+// XMSSFastGenKeyPairFromExpandedSeed generates an XMSS keypair from
 // 96 bytes of already-expanded seed material (SK_SEED || SK_PRF ||
 // PUB_SEED). This matches the layout the RFC 8391 reference
 // implementation consumes directly and is what the

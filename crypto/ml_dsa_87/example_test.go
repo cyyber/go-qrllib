@@ -32,7 +32,7 @@ func Example() {
 	// Output: Signature valid: true
 }
 
-// ExampleNew demonstrates creating a ML-DSA-87 instance.
+// ExampleNew demonstrates creating an ML-DSA-87 instance.
 func ExampleNew() {
 	// Create with random seed
 	m, err := ml_dsa_87.New()

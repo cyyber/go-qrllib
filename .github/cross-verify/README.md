@@ -60,7 +60,7 @@ between go-qrllib's internal representation and the RFC byte layout.
 
 * `xmss_sign.go` (Go) generates a keypair via the QRL `xmss.InitializeTree`
   entry point, signs, writes pk + sig + msg to `/tmp/`.
-* `xmss_verify_ref.c` (C) reads the artefacts, prepends a RFC 8391
+* `xmss_verify_ref.c` (C) reads the artefacts, prepends an RFC 8391
   OID to the pk, calls `xmss_sign_open()`. **Already worked before this
   PR; signature byte layout matches at the wire level.**
 

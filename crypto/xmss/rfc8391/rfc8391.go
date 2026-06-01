@@ -27,7 +27,7 @@ const (
 // 4 (OID) + 32 (root) + 32 (pub_seed) = 68 bytes.
 const PublicKeySize = 4 + 32 + 32
 
-// ExpandedSeedSize is the size of the seed material a RFC 8391
+// ExpandedSeedSize is the size of the seed material an RFC 8391
 // reference implementation consumes directly: 96 bytes
 // (SK_SEED || SK_PRF || PUB_SEED, each n=32 bytes).
 const ExpandedSeedSize = 96
@@ -126,11 +126,11 @@ func inferParameterSet(hf xmss.HashFunction, h xmss.Height) (ParameterSet, error
 		ErrUnsupportedParameterSet, hf, uint8(h))
 }
 
-// NewKeyPair generates a XMSS keypair for parameter set p from 96
+// NewKeyPair generates an XMSS keypair for parameter set p from 96
 // bytes of pre-expanded seed material (SK_SEED || SK_PRF || PUB_SEED),
 // matching RFC 8391's keypair derivation.
 //
-// To construct a XMSS that round-trips with the reference
+// To construct an XMSS that round-trips with the reference
 // implementation: take the same 96-byte seed material both sides
 // consume, pass it here, and compare the resulting root + pub_seed
 // against the reference's output.
@@ -181,7 +181,7 @@ func MarshalPublicKey(x *xmss.XMSS) ([]byte, error) {
 	return out, nil
 }
 
-// UnmarshalPublicKey parses a RFC 8391 public-key byte string and
+// UnmarshalPublicKey parses an RFC 8391 public-key byte string and
 // returns the parameter set OID along with the 32-byte root and
 // 32-byte pub_seed. Returns [ErrInvalidPublicKeyLength] if the input
 // is the wrong size, or [ErrUnsupportedParameterSet] if the OID is
@@ -201,14 +201,14 @@ func UnmarshalPublicKey(rfcPK []byte) (p ParameterSet, root, pubSeed [32]byte, e
 	return
 }
 
-// Verify checks a RFC-format signature against a message and a
+// Verify checks an RFC-format signature against a message and an
 // RFC-format public key. It is a thin wrapper over [xmss.Verify] that
 // extracts the root and pub_seed from the RFC public-key bytes and
 // looks up the hash function from the OID.
 //
 // The signature byte layout is identical between RFC 8391 and QRL's
 // xmss package, so signatures produced by this package's [NewKeyPair]
-// or by a RFC reference implementation can be passed in unchanged.
+// or by an RFC reference implementation can be passed in unchanged.
 func Verify(message, signature, rfcPK []byte) (bool, error) {
 	p, root, pubSeed, err := UnmarshalPublicKey(rfcPK)
 	if err != nil {
