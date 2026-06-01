@@ -129,7 +129,7 @@ func TestAccumulated(t *testing.T) {
 	s := sha3.NewSHAKE128()
 	o := sha3.NewSHAKE128()
 	seed := make([]byte, SeedSize)
-	var m [SharedKeySize]byte
+	var m [32]byte
 	ct1 := make([]byte, CiphertextSize)
 
 	for range 10000 {

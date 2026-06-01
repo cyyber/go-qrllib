@@ -134,7 +134,7 @@ func NewEncapsulationKey(ekBytes []byte) (*EncapsulationKey, error) {
 }
 
 func (ek *EncapsulationKey) Encapsulate() (sharedKey, ciphertext []byte, err error) {
-	var m [messageSize]byte
+	var m [32]byte
 	_, _ = rand.Read(m[:])
 
 	var ct [CiphertextSize]byte
@@ -145,14 +145,14 @@ func (ek *EncapsulationKey) Encapsulate() (sharedKey, ciphertext []byte, err err
 
 // EncapsulateInternal is a derandomized version of Encapsulate, exclusively for
 // use in tests.
-func EncapsulateInternal(ek *EncapsulationKey, m *[messageSize]byte) (sharedKey, ciphertext []byte) {
+func EncapsulateInternal(ek *EncapsulationKey, m *[32]byte) (sharedKey, ciphertext []byte) {
 	var ct [CiphertextSize]byte
 	sharedKey = encapsulateTo(&ct, ek, m)
 
 	return sharedKey, ct[:]
 }
 
-func encapsulateTo(dst *[CiphertextSize]byte, ek *EncapsulationKey, m *[messageSize]byte) []byte {
+func encapsulateTo(dst *[CiphertextSize]byte, ek *EncapsulationKey, m *[32]byte) []byte {
 	var gInput [messageSize + 32]byte
 	copy(gInput[:messageSize], m[:])
 	copy(gInput[messageSize:], ek.h[:])
