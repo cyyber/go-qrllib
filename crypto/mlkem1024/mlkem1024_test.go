@@ -21,6 +21,12 @@ func TestRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if len(Ke) != SharedKeySize {
+		t.Fatalf("shared key length = %d, want %d", len(Ke), SharedKeySize)
+	}
+	if len(c) != CiphertextSize {
+		t.Fatalf("ciphertext length = %d, want %d", len(c), CiphertextSize)
+	}
 	Kd, err := dk.Decapsulate(c)
 	if err != nil {
 		t.Fatal(err)
@@ -80,6 +86,14 @@ func TestRoundTrip(t *testing.T) {
 	}
 }
 
+func testSeed() []byte {
+	seed := make([]byte, SeedSize)
+	for i := range seed {
+		seed[i] = byte(i)
+	}
+	return seed
+}
+
 func TestInvalidInputLengths(t *testing.T) {
 	if _, err := NewDecapsulationKey(make([]byte, SeedSize-1)); err == nil {
 		t.Fatal("NewDecapsulationKey accepted a short seed")
@@ -104,64 +118,6 @@ func TestInvalidInputLengths(t *testing.T) {
 	if _, err := dk.Decapsulate(make([]byte, CiphertextSize+1)); err == nil {
 		t.Fatal("Decapsulate accepted a long ciphertext")
 	}
-}
-
-func TestEncapsulationKeyBytesReturnsCopy(t *testing.T) {
-	dk, err := NewDecapsulationKey(testSeed())
-	if err != nil {
-		t.Fatalf("NewDecapsulationKey returned error: %v", err)
-	}
-
-	raw := dk.EncapsulationKey().Bytes()
-	ek, err := NewEncapsulationKey(raw)
-	if err != nil {
-		t.Fatalf("NewEncapsulationKey returned error: %v", err)
-	}
-
-	raw[0] ^= 0xff
-	if bytes.Equal(ek.Bytes(), raw) {
-		t.Fatal("NewEncapsulationKey retained caller-owned encapsulation key bytes")
-	}
-
-	encoded := ek.Bytes()
-	encoded[0] ^= 0xff
-	if bytes.Equal(ek.Bytes(), encoded) {
-		t.Fatal("EncapsulationKey.Bytes returned mutable internal storage")
-	}
-}
-
-func TestEncapsulateDecapsulateAgreement(t *testing.T) {
-	dk, err := GenerateKey()
-	if err != nil {
-		t.Fatalf("GenerateKey returned error: %v", err)
-	}
-
-	sharedKey, ciphertext, err := dk.EncapsulationKey().Encapsulate()
-	if err != nil {
-		t.Fatalf("Encapsulate returned error: %v", err)
-	}
-	if len(sharedKey) != SharedKeySize {
-		t.Fatalf("shared key length = %d, want %d", len(sharedKey), SharedKeySize)
-	}
-	if len(ciphertext) != CiphertextSize {
-		t.Fatalf("ciphertext length = %d, want %d", len(ciphertext), CiphertextSize)
-	}
-
-	decapsulated, err := dk.Decapsulate(ciphertext)
-	if err != nil {
-		t.Fatalf("Decapsulate returned error: %v", err)
-	}
-	if !bytes.Equal(decapsulated, sharedKey) {
-		t.Fatalf("decapsulated shared key = %x, want %x", decapsulated, sharedKey)
-	}
-}
-
-func testSeed() []byte {
-	seed := make([]byte, SeedSize)
-	for i := range seed {
-		seed[i] = byte(i)
-	}
-	return seed
 }
 
 var sink byte

@@ -90,6 +90,31 @@ func TestNewEncapsulationKeyExpandsMatrix(t *testing.T) {
 	}
 }
 
+func TestEncapsulationKeyBytesReturnsCopy(t *testing.T) {
+	seed := katSeed()
+	dk, err := NewDecapsulationKey(seed[:])
+	if err != nil {
+		t.Fatalf("NewDecapsulationKey returned error: %v", err)
+	}
+
+	raw := dk.EncapsulationKey().Bytes()
+	ek, err := NewEncapsulationKey(raw)
+	if err != nil {
+		t.Fatalf("NewEncapsulationKey returned error: %v", err)
+	}
+
+	raw[0] ^= 0xff
+	if bytes.Equal(ek.Bytes(), raw) {
+		t.Fatal("NewEncapsulationKey retained caller-owned encapsulation key bytes")
+	}
+
+	encoded := ek.Bytes()
+	encoded[0] ^= 0xff
+	if bytes.Equal(ek.Bytes(), encoded) {
+		t.Fatal("EncapsulationKey.Bytes returned mutable internal storage")
+	}
+}
+
 // These tests consume the official NIST ACVP sample JSON files for ML-KEM.
 // Source: https://github.com/usnistgov/ACVP-Server/tree/master/gen-val/json-files
 //
