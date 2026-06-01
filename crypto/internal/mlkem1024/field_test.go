@@ -116,7 +116,7 @@ func TestByteDecode12RejectsUnreducedCoefficient(t *testing.T) {
 	}
 }
 
-func TestNTTMulAdd4MatchesScalar(t *testing.T) {
+func TestNTTMulAdd4MatchesReference(t *testing.T) {
 	var a, b [4]ringElement
 	for j := range 4 {
 		for i := range n {
@@ -125,23 +125,23 @@ func TestNTTMulAdd4MatchesScalar(t *testing.T) {
 		}
 	}
 
-	var scalar, fused ringElement
+	var want, got ringElement
 	for i := range n {
-		scalar[i] = fieldElement((13*i + 5) % q)
-		fused[i] = scalar[i]
+		want[i] = fieldElement((13*i + 5) % q)
+		got[i] = want[i]
 	}
 
 	for i := range 4 {
-		nttMulAdd(&scalar, &a[i], &b[i])
+		addNTTProductReference(&want, &a[i], &b[i])
 	}
-	nttMulAdd4(&fused,
+	nttMulAdd4(&got,
 		&a[0], &b[0],
 		&a[1], &b[1],
 		&a[2], &b[2],
 		&a[3], &b[3],
 	)
 
-	if fused != scalar {
+	if got != want {
 		t.Fatal("nttMulAdd4 mismatch")
 	}
 }
@@ -322,6 +322,20 @@ func referenceInverseNTT(f *ringElement) {
 	}
 }
 
+func addNTTProductReference(acc, a, b *ringElement) {
+	for i := 0; i < n; i += 2 {
+		a0, a1 := a[i], a[i+1]
+		b0, b1 := b[i], b[i+1]
+
+		acc0 := uint32(acc[i])
+		acc0 += uint32(a0)*uint32(b0) + uint32(fieldMul(a1, b1))*uint32(gammas[i/2])
+		acc1 := uint32(acc[i+1])
+		acc1 += uint32(a0)*uint32(b1) + uint32(a1)*uint32(b0)
+
+		acc[i], acc[i+1] = fieldReduceWide(acc0), fieldReduceWide(acc1)
+	}
+}
+
 func TestByteEncode12KAT(t *testing.T) {
 	var got [encodingSize12]byte
 	f := katRingElementA()
@@ -385,18 +399,6 @@ func TestInverseNTTKAT(t *testing.T) {
 	inverseNTT(&got)
 
 	checkRingHash(t, "inverse NTT", got, "39c2ff68c3cd83c43d0683e377436f0e572077576a86bb96f6310025f26681bb")
-}
-
-func TestNTTMulAddKAT(t *testing.T) {
-	a := katRingElementA()
-	b := katRingElementB()
-	referenceNTT(&a)
-	referenceNTT(&b)
-
-	var got ringElement
-	nttMulAdd(&got, &a, &b)
-
-	checkRingHash(t, "MultiplyNTTs", got, "9ecfb906dc0f25c923d8709452bdc2cc4a1a15b2057b43fe5c1f6f584ada95b1")
 }
 
 func TestPolyAddKAT(t *testing.T) {

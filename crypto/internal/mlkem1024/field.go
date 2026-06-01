@@ -39,7 +39,7 @@ func fieldReduce(a uint32) fieldElement {
 
 // fieldReduceWide reduces lazy products and accumulators that do not fit the
 // 24-bit Barrett reducer. Current callers stay below about 8*q*q: the lazy NTT
-// can multiply zetas by coefficients below 8q, and nttMulAdd accumulates
+// can multiply zetas by coefficients below 8q, and nttMulAdd4 accumulates
 // several coefficient products before reducing.
 func fieldReduceWide(a uint32) fieldElement {
 	quotient := uint32((uint64(a) * barrettWideMultiplier) >> barrettWideShift)
@@ -232,7 +232,7 @@ func sampleNTT(dst *ringElement, rho *[32]byte, jIndex, iIndex byte) {
 
 	for {
 		if off >= len(buf) {
-			ctx.Read(buf[:])
+			_, _ = ctx.Read(buf[:])
 			off = 0
 		}
 
@@ -338,21 +338,7 @@ func inverseNTT(f *ringElement) {
 
 var gammas = [128]fieldElement{17, 3312, 2761, 568, 583, 2746, 2649, 680, 1637, 1692, 723, 2606, 2288, 1041, 1100, 2229, 1409, 1920, 2662, 667, 3281, 48, 233, 3096, 756, 2573, 2156, 1173, 3015, 314, 3050, 279, 1703, 1626, 1651, 1678, 2789, 540, 1789, 1540, 1847, 1482, 952, 2377, 1461, 1868, 2687, 642, 939, 2390, 2308, 1021, 2437, 892, 2388, 941, 733, 2596, 2337, 992, 268, 3061, 641, 2688, 1584, 1745, 2298, 1031, 2037, 1292, 3220, 109, 375, 2954, 2549, 780, 2090, 1239, 1645, 1684, 1063, 2266, 319, 3010, 2773, 556, 757, 2572, 2099, 1230, 561, 2768, 2466, 863, 2594, 735, 2804, 525, 1092, 2237, 403, 2926, 1026, 2303, 1143, 2186, 2150, 1179, 2775, 554, 886, 2443, 1722, 1607, 1212, 2117, 1874, 1455, 1029, 2300, 2110, 1219, 2935, 394, 885, 2444, 2154, 1175}
 
-func nttMulAdd(acc, a, b *ringElement) {
-	for i := 0; i < n; i += 2 {
-		a0, a1 := a[i], a[i+1]
-		b0, b1 := b[i], b[i+1]
-
-		acc0 := uint32(acc[i])
-		acc0 += uint32(a0)*uint32(b0) + uint32(fieldMul(a1, b1))*uint32(gammas[i/2])
-		acc1 := uint32(acc[i+1])
-		acc1 += uint32(a0)*uint32(b1) + uint32(a1)*uint32(b0)
-
-		acc[i], acc[i+1] = fieldReduceWide(acc0), fieldReduceWide(acc1)
-	}
-}
-
-// nttMulAdd4 fuses the four nttMulAdd terms in an ML-KEM-1024 dot product.
+// nttMulAdd4 fuses the four multiplication terms in an ML-KEM-1024 NTT dot product.
 // The repeated lane blocks are intentionally unrolled so each coefficient pair
 // loads acc and gamma once, accumulates all four products lazily, and reduces
 // only once per output coefficient.

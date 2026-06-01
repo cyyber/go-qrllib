@@ -307,13 +307,13 @@ func readACVPBytes(t *testing.T, path string) ([]byte, string) {
 	if err != nil {
 		t.Fatalf("read ACVP JSON %q: %v", path, err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	gz, err := gzip.NewReader(f)
 	if err != nil {
 		t.Fatalf("open compressed ACVP JSON %q: %v", gzPath, err)
 	}
-	defer gz.Close()
+	defer func() { _ = gz.Close() }()
 
 	b, err = io.ReadAll(gz)
 	if err != nil {
@@ -384,9 +384,7 @@ func newDecapsulationKeyFromExpandedACVPCheck(b []byte) (*DecapsulationKey, erro
 
 	dk := &DecapsulationKey{}
 	for i := range dk.s {
-		var err error
-		err = byteDecode12(&dk.s[i], (*[encodingSize12]byte)(b[:encodingSize12]))
-		if err != nil {
+		if err := byteDecode12(&dk.s[i], (*[encodingSize12]byte)(b[:encodingSize12])); err != nil {
 			return nil, err
 		}
 		b = b[encodingSize12:]
