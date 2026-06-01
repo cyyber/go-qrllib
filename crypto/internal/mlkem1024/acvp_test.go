@@ -192,15 +192,7 @@ type acvpTest struct {
 func readACVPFile(t *testing.T, suite, name string) acvpFile {
 	t.Helper()
 
-	base := os.Getenv("MLKEM_ACVP_JSON_DIR")
-	if base == "" {
-		base = filepath.Join("testdata", "acvp")
-	}
-	path := filepath.Join(base, suite, name)
-	if !fileExists(path) && !fileExists(path+".gz") {
-		path = filepath.Join(base, name)
-	}
-
+	path := filepath.Join("testdata", "acvp", suite, name)
 	b, path := readACVPBytes(t, path)
 
 	var f acvpFile
@@ -208,11 +200,6 @@ func readACVPFile(t *testing.T, suite, name string) acvpFile {
 		t.Fatalf("parse ACVP JSON %q: %v", path, err)
 	}
 	return f
-}
-
-func fileExists(path string) bool {
-	_, err := os.Stat(path)
-	return err == nil
 }
 
 func readACVPBytes(t *testing.T, path string) ([]byte, string) {
