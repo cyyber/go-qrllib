@@ -51,9 +51,8 @@ func pkeKeyGen(dk *DecapsulationKey, d *[32]byte) {
 }
 
 func pkeEncrypt(dst *[CiphertextSize]byte, ek *encryptionKey, m, r *[32]byte) {
-	var y [k]ringElement
-
 	var counter byte
+	var y [k]ringElement
 	for i := range y {
 		samplePolyCBD(&y[i], r[:], counter)
 		ntt(&y[i])
