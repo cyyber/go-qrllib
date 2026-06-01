@@ -70,7 +70,8 @@ func decapsulate(dk *DecapsulationKey, ct *[CiphertextSize]byte) (sharedKey []by
 	copy(gInput[:messageSize], m[:])
 	copy(gInput[messageSize:], dk.h[:])
 	G := sha3.Sum512(gInput[:])
-	K, r := G[:SharedKeySize], G[SharedKeySize:]
+	K := G[:SharedKeySize]
+	r := (*[32]byte)(G[SharedKeySize:])
 
 	J := sha3.NewSHAKE256()
 	_, _ = J.Write(dk.z[:])
@@ -157,7 +158,8 @@ func encapsulateTo(dst *[CiphertextSize]byte, ek *EncapsulationKey, m *[32]byte)
 	copy(gInput[:messageSize], m[:])
 	copy(gInput[messageSize:], ek.h[:])
 	G := sha3.Sum512(gInput[:])
-	K, r := G[:SharedKeySize], G[SharedKeySize:]
+	K := G[:SharedKeySize]
+	r := (*[32]byte)(G[SharedKeySize:])
 
 	pkeEncrypt(dst, &ek.encryptionKey, m, r)
 

@@ -14,7 +14,7 @@ func TestPKERoundTrip(t *testing.T) {
 	pkeKeyGen(&dk, &d)
 
 	var ciphertext [CiphertextSize]byte
-	pkeEncrypt(&ciphertext, &dk.encryptionKey, &m, r[:])
+	pkeEncrypt(&ciphertext, &dk.encryptionKey, &m, &r)
 
 	var got [32]byte
 	pkeDecrypt(&got, &dk, &ciphertext)

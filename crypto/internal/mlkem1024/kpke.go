@@ -50,12 +50,12 @@ func pkeKeyGen(dk *DecapsulationKey, d *[32]byte) {
 	}
 }
 
-func pkeEncrypt(dst *[CiphertextSize]byte, ek *encryptionKey, m *[32]byte, r []byte) {
+func pkeEncrypt(dst *[CiphertextSize]byte, ek *encryptionKey, m, r *[32]byte) {
 	var y [k]ringElement
 
 	var counter byte
 	for i := range y {
-		samplePolyCBD(&y[i], r, counter)
+		samplePolyCBD(&y[i], r[:], counter)
 		ntt(&y[i])
 		counter++
 	}
@@ -74,7 +74,7 @@ func pkeEncrypt(dst *[CiphertextSize]byte, ek *encryptionKey, m *[32]byte, r []b
 		inverseNTT(&acc)
 
 		var e1 ringElement
-		samplePolyCBD(&e1, r, counter)
+		samplePolyCBD(&e1, r[:], counter)
 		counter++
 		polyAddAssign(&acc, &e1)
 
@@ -83,7 +83,7 @@ func pkeEncrypt(dst *[CiphertextSize]byte, ek *encryptionKey, m *[32]byte, r []b
 	}
 
 	var e2 ringElement
-	samplePolyCBD(&e2, r, counter)
+	samplePolyCBD(&e2, r[:], counter)
 
 	var mu ringElement
 	ringDecodeAndDecompress1(&mu, m)
