@@ -2,7 +2,6 @@ package mlkem1024_test
 
 import (
 	"bytes"
-	"crypto/mlkem"
 	"crypto/rand"
 	"crypto/sha3"
 	"encoding/hex"
@@ -233,11 +232,11 @@ func BenchmarkDecapsulate(b *testing.B) {
 
 func TestConstantSizes(t *testing.T) {
 	if SharedKeySize != mlkem1024.SharedKeySize {
-		t.Errorf("SharedKeySize mismatch: got %d, want %d", SharedKeySize, mlkem.SharedKeySize)
+		t.Errorf("SharedKeySize mismatch: got %d, want %d", SharedKeySize, mlkem1024.SharedKeySize)
 	}
 
 	if SeedSize != mlkem1024.SeedSize {
-		t.Errorf("SeedSize mismatch: got %d, want %d", SeedSize, mlkem.SeedSize)
+		t.Errorf("SeedSize mismatch: got %d, want %d", SeedSize, mlkem1024.SeedSize)
 	}
 
 	if CiphertextSize != mlkem1024.CiphertextSize {
