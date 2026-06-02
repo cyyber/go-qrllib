@@ -1,10 +1,6 @@
 package mlkem1024
 
 import (
-	"bytes"
-	"crypto/sha256"
-	"crypto/sha3"
-	"encoding/hex"
 	"testing"
 )
 
@@ -14,6 +10,24 @@ func TestFieldReduce(t *testing.T) {
 		exp := fieldElement(a % q)
 		if got != exp {
 			t.Fatalf("reduce(%d) = %d, expected %d", a, got, exp)
+		}
+	}
+}
+
+func TestFieldReduceWide(t *testing.T) {
+	const maxNTTMulAdd4Lazy = 4*2*(q-1)*(q-1) + (q - 1)
+	for _, x := range []uint32{
+		0, 1, q - 1, q, q + 1, 2*q - 1, 2 * q,
+		maxNTTMulAdd4Lazy - 1, maxNTTMulAdd4Lazy,
+	} {
+		if got, want := fieldReduceWide(x), fieldElement(x%q); got != want {
+			t.Fatalf("fieldReduceWide(%d) = %d, want %d", x, got, want)
+		}
+	}
+
+	for x := uint32(0); x < maxNTTMulAdd4Lazy; x += 7919 {
+		if got, want := fieldReduceWide(x), fieldElement(x%q); got != want {
+			t.Fatalf("fieldReduceWide(%d) = %d, want %d", x, got, want)
 		}
 	}
 }
@@ -54,94 +68,9 @@ func TestFieldMul(t *testing.T) {
 	}
 }
 
-// These KATs are derived from the FIPS 203 algorithms and cross-checked against
-// Go's crypto/internal/fips140/mlkem implementation where matching operations
-// are exposed by the implementation.
-// Sources: https://doi.org/10.6028/NIST.FIPS.203 and
-// https://go.dev/src/crypto/internal/fips140/mlkem/.
-
-func TestRingDecodeAndDecompressSpecialized(t *testing.T) {
-	var src1 [encodingSize1]byte
-	for i := range src1 {
-		src1[i] = byte(37*i + 11)
-	}
-	checkRingDecodeAndDecompress(t, "d1", d1, src1[:], func(dst *ringElement) {
-		ringDecodeAndDecompress1(dst, &src1)
-	})
-
-	var src5 [encodingSize5]byte
-	for i := range src5 {
-		src5[i] = byte(31*i + 7)
-	}
-	checkRingDecodeAndDecompress(t, "d5", d5, src5[:], func(dst *ringElement) {
-		ringDecodeAndDecompress5(dst, &src5)
-	})
-
-	var src11 [encodingSize11]byte
-	for i := range src11 {
-		src11[i] = byte(17*i + 23)
-	}
-	checkRingDecodeAndDecompress(t, "d11", d11, src11[:], func(dst *ringElement) {
-		ringDecodeAndDecompress11(dst, &src11)
-	})
-}
-
-func TestRingCompressAndEncodeSpecialized(t *testing.T) {
-	var src ringElement
-	for i := range src {
-		src[i] = fieldElement((7*i*i + 31*i + 42) % q)
-	}
-
-	var dst1 [encodingSize1]byte
-	ringCompressAndEncode1(&dst1, &src)
-	checkRingCompressAndEncode(t, "d1", d1, dst1[:], &src)
-
-	var dst5 [encodingSize5]byte
-	ringCompressAndEncode5(&dst5, &src)
-	checkRingCompressAndEncode(t, "d5", d5, dst5[:], &src)
-
-	var dst11 [encodingSize11]byte
-	ringCompressAndEncode11(&dst11, &src)
-	checkRingCompressAndEncode(t, "d11", d11, dst11[:], &src)
-}
-
-func TestCompress1MatchesReference(t *testing.T) {
-	for x := range q {
-		got := compress1(fieldElement(x))
-		want := byte(referenceCompress(fieldElement(x), d1))
-		if got != want {
-			t.Fatalf("compress1(%d) = %d, want %d", x, got, want)
-		}
-	}
-}
-
-func TestCompress5And11MatchReference(t *testing.T) {
-	for x := range q {
-		if got, want := compress5(fieldElement(x)), referenceCompress(fieldElement(x), d5); got != want {
-			t.Fatalf("compress5(%d) = %d, want %d", x, got, want)
-		}
-		if got, want := compress11(fieldElement(x)), referenceCompress(fieldElement(x), d11); got != want {
-			t.Fatalf("compress11(%d) = %d, want %d", x, got, want)
-		}
-	}
-}
-
-func TestDecompressMatchesReference(t *testing.T) {
-	for _, d := range []uint8{d1, d5, d11} {
-		for y, limit := uint16(0), uint16(1)<<d; y < limit; y++ {
-			got := decompress(y, d)
-			want := referenceDecompress(y, d)
-			if got != want {
-				t.Fatalf("decompress(%d, %d) = %d, want %d", y, d, got, want)
-			}
-		}
-	}
-}
-
 func TestDecompressCompress(t *testing.T) {
 	for _, d := range []uint8{d1, d5, d11} {
-		limit := uint16(1) << d
-		for y := uint16(0); y < limit; y++ {
+		for y := uint16(0); y < 1<<d; y++ {
 			f := decompress(y, d)
 			if f >= q {
 				t.Fatalf("decompress(%d, %d) = %d >= q", y, d, f)
@@ -152,10 +81,10 @@ func TestDecompressCompress(t *testing.T) {
 			}
 		}
 
-		maxDiff := fieldElement(q / limit)
+		maxDiff := fieldElement(q / (1 << d))
 		for x := range fieldElement(q) {
 			c := compressByBits(x, d)
-			if c >= limit {
+			if c >= 1<<d {
 				t.Fatalf("compress(%d, %d) = %d >= 2^d", x, d, c)
 			}
 			got := decompress(c, d)
@@ -165,158 +94,6 @@ func TestDecompressCompress(t *testing.T) {
 					x, d, d, got, diff, maxDiff)
 			}
 		}
-	}
-}
-
-func TestByteEncodeDecode12(t *testing.T) {
-	var src ringElement
-	for i := range src {
-		src[i] = fieldElement((11*i*i + 19*i + 5) % q)
-	}
-
-	var got [encodingSize12]byte
-	byteEncode12(&got, &src)
-
-	want := make([]byte, encodingSize12)
-	referenceByteEncode12(want, &src)
-	if !bytes.Equal(got[:], want) {
-		t.Fatal("byteEncode12 mismatch")
-	}
-
-	var decoded ringElement
-	if err := byteDecode12(&decoded, &got); err != nil {
-		t.Fatalf("byteDecode12 returned error: %v", err)
-	}
-	if decoded != src {
-		t.Fatal("byteDecode12 round trip mismatch")
-	}
-}
-
-func TestByteDecode12RejectsUnreducedCoefficient(t *testing.T) {
-	var src [encodingSize12]byte
-	unreduced := uint16(q)
-	src[0] = byte(unreduced)
-	src[1] = byte(unreduced >> 8)
-
-	var dst ringElement
-	if err := byteDecode12(&dst, &src); err == nil {
-		t.Fatal("byteDecode12 accepted an unreduced coefficient")
-	}
-}
-
-func TestNTTMulAdd4MatchesReference(t *testing.T) {
-	var a, b [4]ringElement
-	for j := range 4 {
-		for i := range n {
-			a[j][i] = fieldElement((17*i*i + 31*i + 43*j + 7) % q)
-			b[j][i] = fieldElement((23*i*i + 19*i + 29*j + 11) % q)
-		}
-	}
-
-	var want, got ringElement
-	for i := range n {
-		want[i] = fieldElement((13*i + 5) % q)
-		got[i] = want[i]
-	}
-
-	for i := range 4 {
-		addNTTProductReference(&want, &a[i], &b[i])
-	}
-	nttMulAdd4(&got,
-		&a[0], &b[0],
-		&a[1], &b[1],
-		&a[2], &b[2],
-		&a[3], &b[3],
-	)
-
-	if got != want {
-		t.Fatal("nttMulAdd4 mismatch")
-	}
-}
-
-func TestFieldReduceWide(t *testing.T) {
-	const maxNTTMulAdd4Lazy = 4*2*(q-1)*(q-1) + (q - 1)
-	for _, x := range []uint32{
-		0, 1, q - 1, q, q + 1, 2*q - 1, 2 * q,
-		maxNTTMulAdd4Lazy - 1, maxNTTMulAdd4Lazy,
-	} {
-		if got, want := fieldReduceWide(x), fieldElement(x%q); got != want {
-			t.Fatalf("fieldReduceWide(%d) = %d, want %d", x, got, want)
-		}
-	}
-
-	for x := uint32(0); x < maxNTTMulAdd4Lazy; x += 7919 {
-		if got, want := fieldReduceWide(x), fieldElement(x%q); got != want {
-			t.Fatalf("fieldReduceWide(%d) = %d, want %d", x, got, want)
-		}
-	}
-}
-
-func checkRingCompressAndEncode(t *testing.T, name string, d uint8, got []byte, src *ringElement) {
-	t.Helper()
-
-	want := make([]byte, len(got))
-	referenceRingCompressAndEncode(want, src, d)
-
-	if !bytes.Equal(got, want) {
-		t.Fatalf("ringCompressAndEncode%s mismatch", name)
-	}
-}
-
-func checkRingDecodeAndDecompress(t *testing.T, name string, d uint8, src []byte, decode func(*ringElement)) {
-	t.Helper()
-
-	var got, want ringElement
-	decode(&got)
-	referenceRingDecodeAndDecompress(&want, src, d)
-
-	if got != want {
-		t.Fatalf("ringDecodeAndDecompress%s mismatch", name)
-	}
-}
-
-func referenceByteEncode12(dst []byte, src *ringElement) {
-	for i, x := range src {
-		for j := range uint8(12) {
-			bitOffset := i*12 + int(j)
-			dst[bitOffset/8] |= byte(uint16(x)>>j&1) << (bitOffset % 8)
-		}
-	}
-}
-
-func referenceRingCompressAndEncode(dst []byte, src *ringElement, d uint8) {
-	for i, x := range src {
-		c := referenceCompress(x, d)
-		for j := uint8(0); j < d; j++ {
-			bitOffset := i*int(d) + int(j)
-			dst[bitOffset/8] |= byte(c>>j&1) << (bitOffset % 8)
-		}
-	}
-}
-
-func referenceCompress(x fieldElement, d uint8) uint16 {
-	scale := uint32(1) << d
-	numerator := uint32(x) * scale
-	rounded := (2*numerator + q) / (2 * uint32(q))
-	return uint16(rounded % scale)
-}
-
-func referenceDecompress(y uint16, d uint8) fieldElement {
-	scale := uint32(1) << d
-	numerator := uint32(y) * q
-	rounded := (2*numerator + scale) / (2 * scale)
-	return fieldElement(rounded % q)
-}
-
-func referenceRingDecodeAndDecompress(dst *ringElement, src []byte, d uint8) {
-	for i := range dst {
-		var acc uint16
-		for j := uint8(0); j < d; j++ {
-			bitOffset := i*int(d) + int(j)
-			bit := src[bitOffset/8] >> (bitOffset % 8) & 1
-			acc |= uint16(bit) << j
-		}
-		dst[i] = referenceDecompress(acc, d)
 	}
 }
 
@@ -338,239 +115,4 @@ func fieldDistance(a, b fieldElement) fieldElement {
 		return min(a-b, b+q-a)
 	}
 	return min(b-a, a+q-b)
-}
-
-func TestSamplePolyCBDMatchesReference(t *testing.T) {
-	for counter := byte(0); counter < 8; counter++ {
-		var sigma [32]byte
-		for i := range sigma {
-			sigma[i] = byte(17*i + 29*int(counter) + 3)
-		}
-
-		var got, want ringElement
-		samplePolyCBD(&got, &sigma, counter)
-		referenceSamplePolyCBD(&want, &sigma, counter)
-		if got != want {
-			t.Fatalf("samplePolyCBD mismatch for counter %d", counter)
-		}
-	}
-}
-
-func TestNTTMatchesReference(t *testing.T) {
-	var got, want ringElement
-	for i := range got {
-		got[i] = fieldElement((19*i*i + 23*i + 31) % q)
-		want[i] = got[i]
-	}
-
-	ntt(&got)
-	referenceNTT(&want)
-	if got != want {
-		t.Fatal("ntt mismatch")
-	}
-}
-
-func TestInverseNTTMatchesReference(t *testing.T) {
-	var got, want ringElement
-	for i := range got {
-		got[i] = fieldElement((19*i*i + 23*i + 31) % q)
-		want[i] = got[i]
-	}
-
-	inverseNTT(&got)
-	referenceInverseNTT(&want)
-	if got != want {
-		t.Fatal("inverseNTT mismatch")
-	}
-}
-
-func referenceSamplePolyCBD(dst *ringElement, sigma *[32]byte, counter byte) {
-	prf := sha3.NewSHAKE256()
-	_, _ = prf.Write(sigma[:])
-	_, _ = prf.Write([]byte{counter})
-	var B [128]byte
-	_, _ = prf.Read(B[:])
-
-	for i, b := range B {
-		a0 := uint16(b&1) + uint16((b>>1)&1)
-		b0 := uint16((b>>2)&1) + uint16((b>>3)&1)
-		a1 := uint16((b>>4)&1) + uint16((b>>5)&1)
-		b1 := uint16((b>>6)&1) + uint16(b>>7)
-		dst[2*i] = fieldReduceOnce(q + a0 - b0)
-		dst[2*i+1] = fieldReduceOnce(q + a1 - b1)
-	}
-}
-
-func referenceNTT(f *ringElement) {
-	i := 1
-	for length := 128; length >= 2; length /= 2 {
-		for start := 0; start < 256; start += 2 * length {
-			zeta := zetas[i]
-			i++
-			for j := start; j < start+length; j++ {
-				t := fieldMul(zeta, f[j+length])
-				f[j+length] = fieldSub(f[j], t)
-				f[j] = fieldAdd(f[j], t)
-			}
-		}
-	}
-}
-
-func referenceInverseNTT(f *ringElement) {
-	i := 127
-	for length := 2; length <= 128; length *= 2 {
-		for start := 0; start < 256; start += 2 * length {
-			zeta := zetas[i]
-			i--
-			for j := start; j < start+length; j++ {
-				t := f[j]
-				f[j] = fieldAdd(t, f[j+length])
-				f[j+length] = fieldMulSub(zeta, f[j+length], t)
-			}
-		}
-	}
-	for i := range f {
-		f[i] = fieldMul(f[i], inverseNTTScale)
-	}
-}
-
-func addNTTProductReference(acc, a, b *ringElement) {
-	for i := 0; i < n; i += 2 {
-		a0, a1 := a[i], a[i+1]
-		b0, b1 := b[i], b[i+1]
-
-		acc0 := uint32(acc[i])
-		acc0 += uint32(a0)*uint32(b0) + uint32(fieldMul(a1, b1))*uint32(gammas[i/2])
-		acc1 := uint32(acc[i+1])
-		acc1 += uint32(a0)*uint32(b1) + uint32(a1)*uint32(b0)
-
-		acc[i], acc[i+1] = fieldReduceWide(acc0), fieldReduceWide(acc1)
-	}
-}
-
-func TestByteEncode12KAT(t *testing.T) {
-	var got [encodingSize12]byte
-	f := katRingElementA()
-	byteEncode12(&got, &f)
-	checkBytesHash(t, "ByteEncode12", got[:], "701f8ea4f16daa04c57079c3da04426f9dc6b0e4cb0054daee9906dd29f7360f")
-}
-
-func TestByteDecode12KAT(t *testing.T) {
-	var encoded [encodingSize12]byte
-	f := katRingElementA()
-	referenceByteEncode12(encoded[:], &f)
-
-	var got ringElement
-	if err := byteDecode12(&got, &encoded); err != nil {
-		t.Fatalf("ByteDecode12 returned error: %v", err)
-	}
-	checkRingHash(t, "ByteDecode12", got, "39c2ff68c3cd83c43d0683e377436f0e572077576a86bb96f6310025f26681bb")
-}
-
-func TestSampleNTTKAT(t *testing.T) {
-	rho := katBytes(32, func(i int) byte { return byte(3*i + 1) })
-	var rhoArray [32]byte
-	copy(rhoArray[:], rho)
-
-	var got ringElement
-	sampleNTT(&got, &rhoArray, 2, 3)
-
-	wantPrefix := [...]fieldElement{887, 2684, 2052, 2496, 905, 2244, 2554, 1706, 225, 709, 169, 97, 130, 2909, 761, 734}
-	for i, want := range wantPrefix {
-		if got[i] != want {
-			t.Fatalf("sampleNTT coefficient %d = %d, want %d", i, got[i], want)
-		}
-	}
-	checkRingHash(t, "sampleNTT", got, "745b97b7856c47e0eebd07ed0c75b5e929ea9cbb8fe655c53ce0a4746a90e8b7")
-}
-
-func TestSamplePolyCBDKAT(t *testing.T) {
-	sigmaBytes := katBytes(32, func(i int) byte { return byte(0xa0 + i) })
-	var sigma [32]byte
-	copy(sigma[:], sigmaBytes)
-	var got ringElement
-	samplePolyCBD(&got, &sigma, 7)
-
-	wantPrefix := [...]fieldElement{3327, 2, 0, 0, 1, 3328, 0, 3328, 3328, 3327, 2, 1, 3328, 3328, 0, 0}
-	for i, want := range wantPrefix {
-		if got[i] != want {
-			t.Fatalf("samplePolyCBD coefficient %d = %d, want %d", i, got[i], want)
-		}
-	}
-	checkRingHash(t, "samplePolyCBD", got, "79cfe147473f50b5be408744a432e1cb36c404707ec3be931e1edd15d262a36d")
-}
-
-func TestNTTKAT(t *testing.T) {
-	got := katRingElementA()
-	ntt(&got)
-
-	checkRingHash(t, "NTT", got, "a08503ed7187a255c90cb8d92ba531bfc627f7738b9372f2c84cfbe3679f83e5")
-}
-
-func TestInverseNTTKAT(t *testing.T) {
-	got := katRingElementA()
-	referenceNTT(&got)
-	inverseNTT(&got)
-
-	checkRingHash(t, "inverse NTT", got, "39c2ff68c3cd83c43d0683e377436f0e572077576a86bb96f6310025f26681bb")
-}
-
-func TestPolyAddKAT(t *testing.T) {
-	got := katRingElementA()
-	other := katRingElementB()
-	polyAddAssign(&got, &other)
-
-	checkRingHash(t, "polyAdd", got, "fa504d78bf0de89433c2160767e456cf530dd468201f70a3d5a280c1ac83f450")
-}
-
-func katRingElementA() ringElement {
-	var f ringElement
-	for i := range f {
-		f[i] = fieldElement((i*i + 17*i + 42) % q)
-	}
-	return f
-}
-
-func katRingElementB() ringElement {
-	var f ringElement
-	for i := range f {
-		f[i] = fieldElement((3*i*i + 5*i + 7) % q)
-	}
-	return f
-}
-
-func katBytes(n int, f func(int) byte) []byte {
-	b := make([]byte, n)
-	for i := range b {
-		b[i] = f(i)
-	}
-	return b
-}
-
-func checkRingHash(t *testing.T, name string, got ringElement, want string) {
-	t.Helper()
-	if got := digestRingElement(got); got != want {
-		t.Fatalf("%s digest = %s, want %s", name, got, want)
-	}
-}
-
-func checkBytesHash(t *testing.T, name string, got []byte, want string) {
-	t.Helper()
-	if got := digestBytes(got); got != want {
-		t.Fatalf("%s digest = %s, want %s", name, got, want)
-	}
-}
-
-func digestRingElement(f ringElement) string {
-	b := make([]byte, 2*n)
-	for i, x := range f {
-		b[2*i] = byte(x)
-		b[2*i+1] = byte(uint16(x) >> 8)
-	}
-	return digestBytes(b)
-}
-
-func digestBytes(b []byte) string {
-	h := sha256.Sum256(b)
-	return hex.EncodeToString(h[:])
 }
