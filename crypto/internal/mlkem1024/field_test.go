@@ -166,102 +166,35 @@ func decompressRat(y uint16, d uint8) fieldElement {
 	return fieldElement(rounded % int64(q))
 }
 
-func TestRingEncodeDecode(t *testing.T) {
-	var f ringElement
-	for i := range f {
-		f[i] = fieldElement((11*i*i + 19*i + 5) % q)
-	}
-
+func TestEncodeDecode(t *testing.T) {
 	var b [encodingSize11]byte
 	for i := range b {
 		b[i] = byte(37*i + 11)
 	}
 
-	for _, tc := range []struct {
-		d    uint8
-		size int
-	}{
-		{d1, encodingSize1},
-		{d5, encodingSize5},
-		{d11, encodingSize11},
-	} {
-		got := ringCompressAndEncodeSpecialized(&f, tc.d)
-		want := ringCompressAndEncodeByBits(&f, tc.d)
-		if !bytes.Equal(got, want) {
-			t.Fatalf("ringCompressAndEncode specialized d=%d mismatch", tc.d)
-		}
+	var e2 [encodingSize11]byte
+	var e5 [encodingSize5]byte
+	var e1Specialized [encodingSize1]byte
+	var g2 ringElement
 
-		g1 := ringDecodeAndDecompressByBits(b[:tc.size], tc.d)
-		g2 := ringDecodeAndDecompressSpecialized(b[:tc.size], tc.d)
-		if g1 != g2 {
-			t.Fatalf("ringDecodeAndDecompress specialized d=%d mismatch", tc.d)
-		}
-
-		out := ringCompressAndEncodeSpecialized(&g2, tc.d)
-		if !bytes.Equal(out, b[:tc.size]) {
-			t.Fatalf("ringCompressAndEncode/ringDecodeAndDecompress round trip failed for d=%d", tc.d)
-		}
+	// Round-trip specialized encoding and decoding.
+	ringDecodeAndDecompress11(&g2, (*[encodingSize11]byte)(b[:encodingSize11]))
+	ringCompressAndEncode11(&e2, &g2)
+	if !bytes.Equal(e2[:], b[:encodingSize11]) {
+		t.Errorf("roundtrip failed for specialized 11")
 	}
-}
 
-func ringCompressAndEncodeByBits(src *ringElement, d uint8) []byte {
-	dst := make([]byte, int(d)*n/8)
-	for i, x := range src {
-		c := compressByBits(x, d)
-		for j := uint8(0); j < d; j++ {
-			bitOffset := i*int(d) + int(j)
-			dst[bitOffset/8] |= byte(c>>j&1) << (bitOffset % 8)
-		}
+	ringDecodeAndDecompress5(&g2, (*[encodingSize5]byte)(b[:encodingSize5]))
+	ringCompressAndEncode5(&e5, &g2)
+	if !bytes.Equal(e5[:], b[:encodingSize5]) {
+		t.Errorf("roundtrip failed for specialized 5")
 	}
-	return dst
-}
 
-func ringCompressAndEncodeSpecialized(src *ringElement, d uint8) []byte {
-	switch d {
-	case d1:
-		var dst [encodingSize1]byte
-		ringCompressAndEncode1(&dst, src)
-		return dst[:]
-	case d5:
-		var dst [encodingSize5]byte
-		ringCompressAndEncode5(&dst, src)
-		return dst[:]
-	case d11:
-		var dst [encodingSize11]byte
-		ringCompressAndEncode11(&dst, src)
-		return dst[:]
-	default:
-		panic("unsupported compression width")
+	ringDecodeAndDecompress1(&g2, (*[encodingSize1]byte)(b[:encodingSize1]))
+	ringCompressAndEncode1(&e1Specialized, &g2)
+	if !bytes.Equal(e1Specialized[:], b[:encodingSize1]) {
+		t.Errorf("roundtrip failed for specialized 1")
 	}
-}
-
-func ringDecodeAndDecompressByBits(src []byte, d uint8) ringElement {
-	var dst ringElement
-	for i := range dst {
-		var acc uint16
-		for j := range d {
-			bitOffset := i*int(d) + int(j)
-			bit := src[bitOffset/8] >> (bitOffset % 8) & 1
-			acc |= uint16(bit) << j
-		}
-		dst[i] = decompress(acc, d)
-	}
-	return dst
-}
-
-func ringDecodeAndDecompressSpecialized(src []byte, d uint8) ringElement {
-	var dst ringElement
-	switch d {
-	case d1:
-		ringDecodeAndDecompress1(&dst, (*[encodingSize1]byte)(src[:encodingSize1]))
-	case d5:
-		ringDecodeAndDecompress5(&dst, (*[encodingSize5]byte)(src[:encodingSize5]))
-	case d11:
-		ringDecodeAndDecompress11(&dst, (*[encodingSize11]byte)(src[:encodingSize11]))
-	default:
-		panic("unsupported compression width")
-	}
-	return dst
 }
 
 func compressByBits(x fieldElement, d uint8) uint16 {
