@@ -263,11 +263,11 @@ func samplePolyCBD(dst *ringElement, sigma *[32]byte, counter byte) {
 	prf := sha3.NewSHAKE256()
 	_, _ = prf.Write(sigma[:])
 	_, _ = prf.Write([]byte{counter})
-	var B [128]byte
-	_, _ = prf.Read(B[:])
+	var buf [128]byte
+	_, _ = prf.Read(buf[:])
 
-	for i, j := 0, 0; i < len(B); i, j = i+4, j+8 {
-		t := binary.LittleEndian.Uint32(B[i:])
+	for i, j := 0, 0; i < len(buf); i, j = i+4, j+8 {
+		t := binary.LittleEndian.Uint32(buf[i:])
 		// Each two-bit field in d is the Hamming weight of one input bit
 		// pair; CBD_2 maps adjacent weights to one coefficient as a-b mod q.
 		d := (t & 0x55555555) + ((t >> 1) & 0x55555555)
@@ -313,7 +313,8 @@ func ntt(f *ringElement) {
 
 const inverseNTTScale = 3303
 
-// The final inverse NTT layer folds the upper-half scaling into its zeta.
+// The final inverse NTT layer multiplies lower-half outputs by inverseNTTScale
+// directly and folds the upper-half scaling into its zeta.
 const inverseNTTFinalZeta = 1652 // zetas[1] * inverseNTTScale mod q
 
 func inverseNTT(f *ringElement) {
