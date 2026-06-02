@@ -8,6 +8,52 @@ import (
 	"testing"
 )
 
+func TestFieldReduce(t *testing.T) {
+	for a := range uint32(2 * q * q) {
+		got := fieldReduce(a)
+		exp := fieldElement(a % q)
+		if got != exp {
+			t.Fatalf("reduce(%d) = %d, expected %d", a, got, exp)
+		}
+	}
+}
+
+func TestFieldAdd(t *testing.T) {
+	for a := range fieldElement(q) {
+		for b := range fieldElement(q) {
+			got := fieldAdd(a, b)
+			exp := (a + b) % q
+			if got != exp {
+				t.Fatalf("%d + %d = %d, expected %d", a, b, got, exp)
+			}
+		}
+	}
+}
+
+func TestFieldSub(t *testing.T) {
+	for a := range fieldElement(q) {
+		for b := range fieldElement(q) {
+			got := fieldSub(a, b)
+			exp := (a - b + q) % q
+			if got != exp {
+				t.Fatalf("%d - %d = %d, expected %d", a, b, got, exp)
+			}
+		}
+	}
+}
+
+func TestFieldMul(t *testing.T) {
+	for a := range fieldElement(q) {
+		for b := range fieldElement(q) {
+			got := fieldMul(a, b)
+			exp := fieldElement((uint32(a) * uint32(b)) % q)
+			if got != exp {
+				t.Fatalf("%d * %d = %d, expected %d", a, b, got, exp)
+			}
+		}
+	}
+}
+
 // These KATs are derived from the FIPS 203 algorithms and cross-checked against
 // Go's crypto/internal/fips140/mlkem implementation where matching operations
 // are exposed by the implementation.

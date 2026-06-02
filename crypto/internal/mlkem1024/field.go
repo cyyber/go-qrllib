@@ -106,6 +106,7 @@ const (
 	d11 = 11
 
 	halfQRoundedUp = (q + 1) / 2
+	shake128Rate   = 168
 )
 
 func ringDecodeAndDecompress1(dst *ringElement, src *[encodingSize1]byte) {
@@ -227,7 +228,7 @@ func sampleNTT(dst *ringElement, rho *[32]byte, jIndex, iIndex byte) {
 	_, _ = ctx.Write([]byte{jIndex, iIndex})
 
 	var j int
-	var buf [168]byte
+	var buf [shake128Rate]byte
 	off := len(buf)
 
 	for {
