@@ -1,6 +1,9 @@
 package mlkem1024
 
 import (
+	"bytes"
+	"math/big"
+	"strconv"
 	"testing"
 )
 
@@ -97,6 +100,170 @@ func TestDecompressCompress(t *testing.T) {
 	}
 }
 
+func fieldDistance(a, b fieldElement) fieldElement {
+	if a > b {
+		return min(a-b, b+q-a)
+	}
+	return min(b-a, a+q-b)
+}
+
+func TestCompressMatchesRat(t *testing.T) {
+	for _, d := range []uint8{d1, d5, d11} {
+		for x := range fieldElement(q) {
+			got := compressByBits(x, d)
+			want := compressRat(x, d)
+			if got != want {
+				t.Fatalf("compress(%d, %d) = %d, want %d", x, d, got, want)
+			}
+		}
+	}
+}
+
+func TestDecompressMatchesRat(t *testing.T) {
+	for _, d := range []uint8{d1, d5, d11} {
+		limit := uint16(1) << d
+		for y := range limit {
+			got := decompress(y, d)
+			want := decompressRat(y, d)
+			if got != want {
+				t.Fatalf("decompress(%d, %d) = %d, want %d", y, d, got, want)
+			}
+		}
+	}
+}
+
+func compressRat(x fieldElement, d uint8) uint16 {
+	if x >= q {
+		panic("x out of range")
+	}
+	if d == 0 || d >= 12 {
+		panic("d out of range")
+	}
+
+	scale := int64(1) << d
+	precise := big.NewRat(scale*int64(x), int64(q))
+	rounded, err := strconv.ParseInt(precise.FloatString(0), 10, 64)
+	if err != nil {
+		panic(err)
+	}
+	return uint16(rounded % scale)
+}
+
+func decompressRat(y uint16, d uint8) fieldElement {
+	if d == 0 || d >= 12 {
+		panic("d out of range")
+	}
+	scale := int64(1) << d
+	if int64(y) >= scale {
+		panic("y out of range")
+	}
+
+	precise := big.NewRat(int64(q)*int64(y), scale)
+	rounded, err := strconv.ParseInt(precise.FloatString(0), 10, 64)
+	if err != nil {
+		panic(err)
+	}
+	return fieldElement(rounded % int64(q))
+}
+
+func TestRingEncodeDecode(t *testing.T) {
+	var f ringElement
+	for i := range f {
+		f[i] = fieldElement((11*i*i + 19*i + 5) % q)
+	}
+
+	var b [encodingSize11]byte
+	for i := range b {
+		b[i] = byte(37*i + 11)
+	}
+
+	for _, tc := range []struct {
+		d    uint8
+		size int
+	}{
+		{d1, encodingSize1},
+		{d5, encodingSize5},
+		{d11, encodingSize11},
+	} {
+		got := ringCompressAndEncodeSpecialized(&f, tc.d)
+		want := ringCompressAndEncodeByBits(&f, tc.d)
+		if !bytes.Equal(got, want) {
+			t.Fatalf("ringCompressAndEncode specialized d=%d mismatch", tc.d)
+		}
+
+		g1 := ringDecodeAndDecompressByBits(b[:tc.size], tc.d)
+		g2 := ringDecodeAndDecompressSpecialized(b[:tc.size], tc.d)
+		if g1 != g2 {
+			t.Fatalf("ringDecodeAndDecompress specialized d=%d mismatch", tc.d)
+		}
+
+		out := ringCompressAndEncodeSpecialized(&g2, tc.d)
+		if !bytes.Equal(out, b[:tc.size]) {
+			t.Fatalf("ringCompressAndEncode/ringDecodeAndDecompress round trip failed for d=%d", tc.d)
+		}
+	}
+}
+
+func ringCompressAndEncodeByBits(src *ringElement, d uint8) []byte {
+	dst := make([]byte, int(d)*n/8)
+	for i, x := range src {
+		c := compressByBits(x, d)
+		for j := uint8(0); j < d; j++ {
+			bitOffset := i*int(d) + int(j)
+			dst[bitOffset/8] |= byte(c>>j&1) << (bitOffset % 8)
+		}
+	}
+	return dst
+}
+
+func ringCompressAndEncodeSpecialized(src *ringElement, d uint8) []byte {
+	switch d {
+	case d1:
+		var dst [encodingSize1]byte
+		ringCompressAndEncode1(&dst, src)
+		return dst[:]
+	case d5:
+		var dst [encodingSize5]byte
+		ringCompressAndEncode5(&dst, src)
+		return dst[:]
+	case d11:
+		var dst [encodingSize11]byte
+		ringCompressAndEncode11(&dst, src)
+		return dst[:]
+	default:
+		panic("unsupported compression width")
+	}
+}
+
+func ringDecodeAndDecompressByBits(src []byte, d uint8) ringElement {
+	var dst ringElement
+	for i := range dst {
+		var acc uint16
+		for j := range d {
+			bitOffset := i*int(d) + int(j)
+			bit := src[bitOffset/8] >> (bitOffset % 8) & 1
+			acc |= uint16(bit) << j
+		}
+		dst[i] = decompress(acc, d)
+	}
+	return dst
+}
+
+func ringDecodeAndDecompressSpecialized(src []byte, d uint8) ringElement {
+	var dst ringElement
+	switch d {
+	case d1:
+		ringDecodeAndDecompress1(&dst, (*[encodingSize1]byte)(src[:encodingSize1]))
+	case d5:
+		ringDecodeAndDecompress5(&dst, (*[encodingSize5]byte)(src[:encodingSize5]))
+	case d11:
+		ringDecodeAndDecompress11(&dst, (*[encodingSize11]byte)(src[:encodingSize11]))
+	default:
+		panic("unsupported compression width")
+	}
+	return dst
+}
+
 func compressByBits(x fieldElement, d uint8) uint16 {
 	switch d {
 	case d1:
@@ -108,11 +275,4 @@ func compressByBits(x fieldElement, d uint8) uint16 {
 	default:
 		panic("unsupported compression width")
 	}
-}
-
-func fieldDistance(a, b fieldElement) fieldElement {
-	if a > b {
-		return min(a-b, b+q-a)
-	}
-	return min(b-a, a+q-b)
 }
