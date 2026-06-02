@@ -105,7 +105,7 @@ func TestRingCompressAndEncodeSpecialized(t *testing.T) {
 	checkRingCompressAndEncode(t, "d11", d11, dst11[:], &src)
 }
 
-func TestCompress1MatchesGeneric(t *testing.T) {
+func TestCompress1MatchesReference(t *testing.T) {
 	for x := range q {
 		got := compress1(fieldElement(x))
 		want := byte(referenceCompress(fieldElement(x), d1))
@@ -115,13 +115,55 @@ func TestCompress1MatchesGeneric(t *testing.T) {
 	}
 }
 
-func TestCompress5And11MatchGeneric(t *testing.T) {
+func TestCompress5And11MatchReference(t *testing.T) {
 	for x := range q {
 		if got, want := compress5(fieldElement(x)), referenceCompress(fieldElement(x), d5); got != want {
 			t.Fatalf("compress5(%d) = %d, want %d", x, got, want)
 		}
 		if got, want := compress11(fieldElement(x)), referenceCompress(fieldElement(x), d11); got != want {
 			t.Fatalf("compress11(%d) = %d, want %d", x, got, want)
+		}
+	}
+}
+
+func TestDecompressMatchesReference(t *testing.T) {
+	for _, d := range []uint8{d1, d5, d11} {
+		for y, limit := uint16(0), uint16(1)<<d; y < limit; y++ {
+			got := decompress(y, d)
+			want := referenceDecompress(y, d)
+			if got != want {
+				t.Fatalf("decompress(%d, %d) = %d, want %d", y, d, got, want)
+			}
+		}
+	}
+}
+
+func TestDecompressCompress(t *testing.T) {
+	for _, d := range []uint8{d1, d5, d11} {
+		limit := uint16(1) << d
+		for y := uint16(0); y < limit; y++ {
+			f := decompress(y, d)
+			if f >= q {
+				t.Fatalf("decompress(%d, %d) = %d >= q", y, d, f)
+			}
+			got := compressByBits(f, d)
+			if got != y {
+				t.Fatalf("compress(decompress(%d, %d), %d) = %d", y, d, d, got)
+			}
+		}
+
+		maxDiff := fieldElement(q / limit)
+		for x := range fieldElement(q) {
+			c := compressByBits(x, d)
+			if c >= limit {
+				t.Fatalf("compress(%d, %d) = %d >= 2^d", x, d, c)
+			}
+			got := decompress(c, d)
+			diff := fieldDistance(x, got)
+			if diff > maxDiff {
+				t.Fatalf("decompress(compress(%d, %d), %d) = %d (diff %d, max diff %d)",
+					x, d, d, got, diff, maxDiff)
+			}
 		}
 	}
 }
@@ -253,13 +295,17 @@ func referenceRingCompressAndEncode(dst []byte, src *ringElement, d uint8) {
 }
 
 func referenceCompress(x fieldElement, d uint8) uint16 {
-	dividend := uint32(x) << d
-	quotient := uint32(uint64(dividend) * barrettMultiplier >> barrettShift)
-	remainder := dividend - quotient*q
-	quotient += (q/2 - remainder) >> 31 & 1
-	quotient += (q + q/2 - remainder) >> 31 & 1
-	var mask uint32 = (1 << d) - 1
-	return uint16(quotient & mask)
+	scale := uint32(1) << d
+	numerator := uint32(x) * scale
+	rounded := (2*numerator + q) / (2 * uint32(q))
+	return uint16(rounded % scale)
+}
+
+func referenceDecompress(y uint16, d uint8) fieldElement {
+	scale := uint32(1) << d
+	numerator := uint32(y) * q
+	rounded := (2*numerator + scale) / (2 * scale)
+	return fieldElement(rounded % q)
 }
 
 func referenceRingDecodeAndDecompress(dst *ringElement, src []byte, d uint8) {
@@ -270,8 +316,28 @@ func referenceRingDecodeAndDecompress(dst *ringElement, src []byte, d uint8) {
 			bit := src[bitOffset/8] >> (bitOffset % 8) & 1
 			acc |= uint16(bit) << j
 		}
-		dst[i] = decompress(acc, d)
+		dst[i] = referenceDecompress(acc, d)
 	}
+}
+
+func compressByBits(x fieldElement, d uint8) uint16 {
+	switch d {
+	case d1:
+		return uint16(compress1(x))
+	case d5:
+		return compress5(x)
+	case d11:
+		return compress11(x)
+	default:
+		panic("unsupported compression width")
+	}
+}
+
+func fieldDistance(a, b fieldElement) fieldElement {
+	if a > b {
+		return min(a-b, b+q-a)
+	}
+	return min(b-a, a+q-b)
 }
 
 func TestSamplePolyCBDMatchesReference(t *testing.T) {
