@@ -46,7 +46,7 @@ func (dk *DecapsulationKey) EncapsulationKey() *EncapsulationKey {
 	return &EncapsulationKey{dk.key.EncapsulationKey()}
 }
 
-// Bytes returns the encoded form of the decapsulation key.
+// Bytes returns the decapsulation key seed in d || z form.
 func (dk *DecapsulationKey) Bytes() []byte {
 	return dk.key.Bytes()
 }
