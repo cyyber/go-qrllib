@@ -659,7 +659,7 @@ func TestZintOneToPlain(t *testing.T) {
 
 func zintPrimeParams(primeIndex int) (p, p0i, r2 uint32) {
 	p = smallPrimes[primeIndex].p
-	p0i = modPNInv31(p)
-	r2 = modPR2(p, p0i)
+	p0i = smallPrimeDerivedValues[primeIndex].p0i
+	r2 = smallPrimeDerivedValues[primeIndex].r2
 	return p, p0i, r2
 }
