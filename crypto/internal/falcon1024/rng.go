@@ -15,19 +15,22 @@ type samplerPRNG struct {
 }
 
 func newSamplerPRNG(rng *sha3.SHAKE) *samplerPRNG {
+	p := &samplerPRNG{}
+	initSamplerPRNG(p, rng)
+	return p
+}
+
+func initSamplerPRNG(p *samplerPRNG, rng *sha3.SHAKE) {
 	// Falcon expands 56 bytes into a 384-bit ChaCha key/state and 64-bit counter.
 	var seed [56]byte
 	_, _ = rng.Read(seed[:])
 
-	p := &samplerPRNG{}
 	for i := range p.state {
 		p.state[i] = binary.LittleEndian.Uint32(seed[4*i:])
 	}
 	p.counter = binary.LittleEndian.Uint64(seed[48:])
 
 	p.refill()
-
-	return p
 }
 
 func (p *samplerPRNG) readByte() byte {

@@ -301,8 +301,9 @@ func sign(random io.Reader, signature []byte, priv *PrivateKey, message []byte) 
 
 func signTree(rng *sha3.SHAKE, priv *PrivateKey, c0 ringElement) smallPolynomial {
 	for {
-		prng := newSamplerPRNG(rng)
-		s2, ok := signTreeAttempt(prng, priv, c0)
+		var prng samplerPRNG
+		initSamplerPRNG(&prng, rng)
+		s2, ok := signTreeAttempt(&prng, priv, c0)
 		if ok {
 			return s2
 		}
