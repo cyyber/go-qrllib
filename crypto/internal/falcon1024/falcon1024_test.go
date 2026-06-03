@@ -623,7 +623,7 @@ func TestCompletePrivate(t *testing.T) {
 	}
 }
 
-func TestNewPrivateKey(t *testing.T) {
+func TestNewPrivateKeyFromEncoded(t *testing.T) {
 	// test_falcon.c publishes component private-key polynomials, not a
 	// serialized secret key. Use those reference polynomials to check that
 	// private-key reconstruction produces the reference public key.
@@ -637,7 +637,7 @@ func TestNewPrivateKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	priv, err := NewPrivateKey(sk)
+	priv, err := newPrivateKeyFromEncoded(sk)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -979,7 +979,7 @@ func testNISTKATDigest(t *testing.T) {
 			t.Fatalf("NewPrivateKeyFromSeed: %v", err)
 		}
 		pub := priv.PublicKey().Bytes()
-		sk := priv.Bytes()
+		sk := priv.encodedBytes()
 
 		var nonce [nonceSize]byte
 		drbg.read(nonce[:])

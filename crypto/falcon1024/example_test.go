@@ -6,7 +6,7 @@ import (
 	"github.com/theQRL/go-qrllib/crypto/falcon1024"
 )
 
-func Example_falcon1024() {
+func Example() {
 	pub, priv, err := falcon1024.GenerateKey(nil)
 	if err != nil {
 		log.Fatal(err)

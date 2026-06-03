@@ -17,18 +17,20 @@ const (
 	// PublicKeySize is the size, in bytes, of public keys as used in this package.
 	PublicKeySize = 1793
 
-	// PrivateKeySize is the size, in bytes, of private keys as used in this package.
-	PrivateKeySize = 2305
-
 	// SignatureSize is the size, in bytes, of signatures generated and verified by this package.
 	SignatureSize = 1280
 
 	// SeedSize is the size, in bytes, of private key seeds.
 	SeedSize = 48
+
+	// PrivateKeySize is the size, in bytes, of private key seeds as used in this package.
+	PrivateKeySize = SeedSize
 )
 
 // PublicKey is the type of Falcon-1024 public keys.
-type PublicKey struct{ key *falcon1024.PublicKey }
+type PublicKey struct {
+	key *falcon1024.PublicKey
+}
 
 // NewPublicKey parses an encoded Falcon-1024 public key.
 func NewPublicKey(publicKey []byte) (*PublicKey, error) {
@@ -55,11 +57,13 @@ func (pub *PublicKey) Equal(x crypto.PublicKey) bool {
 }
 
 // PrivateKey is the type of Falcon-1024 private keys.
-type PrivateKey struct{ key *falcon1024.PrivateKey }
+type PrivateKey struct {
+	key *falcon1024.PrivateKey
+}
 
-// NewPrivateKey parses an encoded Falcon-1024 private key.
-func NewPrivateKey(privateKey []byte) (*PrivateKey, error) {
-	key, err := falcon1024.NewPrivateKey(privateKey)
+// NewPrivateKey generates a Falcon-1024 private key from a PrivateKeySize-byte seed.
+func NewPrivateKey(seed []byte) (*PrivateKey, error) {
+	key, err := falcon1024.NewPrivateKey(seed)
 	if err != nil {
 		return nil, err
 	}
@@ -67,7 +71,7 @@ func NewPrivateKey(privateKey []byte) (*PrivateKey, error) {
 	return &PrivateKey{key}, nil
 }
 
-// Bytes returns the encoded form of priv.
+// Bytes returns the private key seed.
 func (priv *PrivateKey) Bytes() []byte {
 	return priv.key.Bytes()
 }
@@ -98,21 +102,16 @@ func GenerateKey(random io.Reader) (*PublicKey, *PrivateKey, error) {
 		random = rand.Reader
 	}
 
-	seed := make([]byte, SeedSize)
-	if _, err := io.ReadFull(random, seed); err != nil {
+	var seed [SeedSize]byte
+	if _, err := io.ReadFull(random, seed[:]); err != nil {
 		return nil, nil, err
 	}
 
-	return NewKeyFromSeed(seed)
-}
-
-// NewKeyFromSeed generates a public/private key pair from a SeedSize-byte seed.
-func NewKeyFromSeed(seed []byte) (*PublicKey, *PrivateKey, error) {
-	key, err := falcon1024.NewPrivateKeyFromSeed(seed)
+	priv, err := NewPrivateKey(seed[:])
 	if err != nil {
 		return nil, nil, err
 	}
-	return &PublicKey{key: key.PublicKey()}, &PrivateKey{key}, nil
+	return &PublicKey{key: priv.key.PublicKey()}, priv, nil
 }
 
 // Sign signs the message with privateKey and returns a signature.

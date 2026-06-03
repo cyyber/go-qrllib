@@ -16,6 +16,7 @@ const (
 )
 
 type PrivateKey struct {
+	seed               [seedSize]byte
 	raw                [privateKeySize]byte
 	pub                *PublicKey
 	b00, b01, b10, b11 fftPolynomial
@@ -27,6 +28,11 @@ func (priv *PrivateKey) Equal(x *PrivateKey) bool {
 }
 
 func (priv *PrivateKey) Bytes() []byte {
+	k := priv.seed
+	return k[:]
+}
+
+func (priv *PrivateKey) encodedBytes() []byte {
 	k := priv.raw
 	return k[:]
 }
@@ -58,6 +64,7 @@ func newPrivateKeyFromSeed(priv *PrivateKey, seed []byte) (*PrivateKey, error) {
 	if l := len(seed); l != seedSize {
 		return nil, errors.New("falcon-1024: invalid seed length: " + strconv.Itoa(l))
 	}
+	copy(priv.seed[:], seed)
 
 	rng := sha3.NewSHAKE256()
 	_, _ = rng.Write(seed)
@@ -175,12 +182,16 @@ func expandPrivateKey(priv *PrivateKey, f, g, ntruF, ntruG smallPolynomial) {
 	ffLDLBinaryNormalize(priv.tree[:], logN, logN)
 }
 
-func NewPrivateKey(priv []byte) (*PrivateKey, error) {
-	p := &PrivateKey{}
-	return newPrivateKey(p, priv)
+func NewPrivateKey(seed []byte) (*PrivateKey, error) {
+	return NewPrivateKeyFromSeed(seed)
 }
 
-func newPrivateKey(priv *PrivateKey, privBytes []byte) (*PrivateKey, error) {
+func newPrivateKeyFromEncoded(privBytes []byte) (*PrivateKey, error) {
+	p := &PrivateKey{}
+	return newPrivateKeyFromEncodedInto(p, privBytes)
+}
+
+func newPrivateKeyFromEncodedInto(priv *PrivateKey, privBytes []byte) (*PrivateKey, error) {
 	f, g, ntruF, err := skDecode(privBytes)
 	if err != nil {
 		return nil, err

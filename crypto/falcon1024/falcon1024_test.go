@@ -37,15 +37,16 @@ func TestGenerateKey(t *testing.T) {
 
 	seed := make([]byte, falcon1024.SeedSize)
 	_, _ = zero.Read(seed)
-	publicFromSeed, privateFromSeed, err := falcon1024.NewKeyFromSeed(seed)
+	privateFromSeed, err := falcon1024.NewPrivateKey(seed)
 	if err != nil {
 		t.Fatal(err)
 	}
+	publicFromSeed := privateFromSeed.Public().(*falcon1024.PublicKey)
 	if !bytes.Equal(publicFromSeed.Bytes(), public.Bytes()) {
-		t.Fatal("GenerateKey and NewKeyFromSeed returned different public keys")
+		t.Fatal("GenerateKey and NewPrivateKey returned different public keys")
 	}
 	if !bytes.Equal(privateFromSeed.Bytes(), private.Bytes()) {
-		t.Fatal("GenerateKey and NewKeyFromSeed returned different private keys")
+		t.Fatal("GenerateKey and NewPrivateKey returned different private keys")
 	}
 
 	_, k2, err := falcon1024.GenerateKey(nil)
@@ -64,7 +65,7 @@ func TestGenerateKey(t *testing.T) {
 		t.Errorf("GenerateKey returned the same private key twice")
 	}
 
-	// GenerateKey is documented to be the same as NewKeyFromSeed.
+	// GenerateKey reads a seed and expands it in the same way as NewPrivateKey.
 	seed = make([]byte, falcon1024.SeedSize)
 	if _, err := rand.Read(seed); err != nil {
 		t.Fatal(err)
@@ -73,7 +74,7 @@ func TestGenerateKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, k4n, err := falcon1024.NewKeyFromSeed(seed)
+	k4n, err := falcon1024.NewPrivateKey(seed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -128,35 +129,14 @@ func TestPrivateKeySign(t *testing.T) {
 	}
 }
 
-func TestNewKeyFromSeedInvalidSeed(t *testing.T) {
+func TestNewPrivateKeyInvalidSeed(t *testing.T) {
 	for _, seed := range [][]byte{
 		nil,
 		make([]byte, falcon1024.SeedSize-1),
 		make([]byte, falcon1024.SeedSize+1),
 	} {
-		if _, _, err := falcon1024.NewKeyFromSeed(seed); err == nil {
-			t.Fatalf("NewKeyFromSeed accepted seed with length %d", len(seed))
-		}
-	}
-}
-
-func TestNewPrivateKeyInvalidInputs(t *testing.T) {
-	var zero zeroReader
-	_, private, err := falcon1024.GenerateKey(zero)
-	if err != nil {
-		t.Fatal(err)
-	}
-	badHeaderPrivate := bytes.Clone(private.Bytes())
-	badHeaderPrivate[0] ^= 0xFF
-
-	for _, privateKey := range [][]byte{
-		nil,
-		make([]byte, falcon1024.PrivateKeySize-1),
-		make([]byte, falcon1024.PrivateKeySize+1),
-		badHeaderPrivate,
-	} {
-		if _, err := falcon1024.NewPrivateKey(privateKey); err == nil {
-			t.Fatalf("NewPrivateKey accepted invalid private key with length %d", len(privateKey))
+		if _, err := falcon1024.NewPrivateKey(seed); err == nil {
+			t.Fatalf("NewPrivateKey accepted seed with length %d", len(seed))
 		}
 	}
 }
@@ -269,7 +249,7 @@ func TestPublicAPIRegression(t *testing.T) {
 	}
 
 	checkSHA256(t, "public key", public.Bytes(), "e6002a1133c82aa79254740e864960db9724b3f042ea8798d14cabddb8ef56be")
-	checkSHA256(t, "private key", private.Bytes(), "8692afea3c1d5cfcbb76f9867b30cc11bc6eca980a1f21abd7f2935a607d986b")
+	checkSHA256(t, "private key", private.Bytes(), "17b0761f87b081d5cf10757ccc89f12be355c70e2e29df288b65b30710dcbcd1")
 	checkSHA256(t, "signature", signature, "31112e24ca1ed78a60fb2812591ce471dab85a77bda9d1b1af0fe7d52e92e35f")
 }
 
@@ -291,10 +271,10 @@ func BenchmarkKeyGeneration(b *testing.B) {
 	}
 }
 
-func BenchmarkNewKeyFromSeed(b *testing.B) {
+func BenchmarkNewPrivateKey(b *testing.B) {
 	seed := make([]byte, falcon1024.SeedSize)
 	for b.Loop() {
-		_, _, err := falcon1024.NewKeyFromSeed(seed)
+		_, err := falcon1024.NewPrivateKey(seed)
 		if err != nil {
 			b.Fatal(err)
 		}
