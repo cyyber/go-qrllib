@@ -21,7 +21,7 @@ func newSamplerPRNG(rng *sha3.SHAKE) *samplerPRNG {
 }
 
 func initSamplerPRNG(p *samplerPRNG, rng *sha3.SHAKE) {
-	// Falcon expands 56 bytes into a 384-bit ChaCha key/state and 64-bit counter.
+	// Falcon expands 56 bytes into 48 bytes of ChaCha state and an 8-byte counter.
 	var seed [56]byte
 	_, _ = rng.Read(seed[:])
 
