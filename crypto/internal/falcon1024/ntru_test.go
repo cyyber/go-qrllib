@@ -75,10 +75,10 @@ func TestSolveNTRU(t *testing.T) {
 				},
 			}
 
-			for _, tc := range testCases {
-				t.Run(tc.name, func(t *testing.T) {
+			for _, corrupt := range testCases {
+				t.Run(corrupt.name, func(t *testing.T) {
 					f, g, F, G := f, g, gotF, gotG
-					tc.mutate(&f, &g, &F, &G)
+					corrupt.mutate(&f, &g, &F, &G)
 
 					if checkNTRUEquation(f, g, F, G, scratch) {
 						t.Fatal("invalid NTRU equation accepted")
