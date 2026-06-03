@@ -4,7 +4,9 @@ type smallPrime struct {
 	p, g, s uint32
 }
 
-var primes = [...]smallPrime{
+// smallPrimes contains the Falcon reference small_primes table used by the
+// NTRU/CRT solver.
+var smallPrimes = [...]smallPrime{
 	{p: 2147473409, g: 383167813, s: 10239},
 	{p: 2147389441, g: 211808905, s: 471403745},
 	{p: 2147387393, g: 37672282, s: 1329335065},
@@ -530,7 +532,6 @@ var primes = [...]smallPrime{
 }
 
 // rev10 is the Falcon reference REV10 table for 10-bit bit reversal.
-// Source: https://falcon-sign.info/impl/keygen.c.html
 var rev10 = [...]uint16{
 	0, 512, 256, 768, 128, 640, 384, 896, 64, 576, 320, 832, 192, 704, 448, 960,
 	32, 544, 288, 800, 160, 672, 416, 928, 96, 608, 352, 864, 224, 736, 480, 992,

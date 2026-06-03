@@ -301,7 +301,7 @@ func TestZintRebuildCRT(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			xx := slices.Clone(tc.xx)
-			zintRebuildCRT(xx, 3, 3, tc.count, primes[:], tc.normalizeSigned, make([]uint32, 3))
+			zintRebuildCRT(xx, 3, 3, tc.count, smallPrimes[:], tc.normalizeSigned, make([]uint32, 3))
 			requireEqualWords(t, "zintRebuildCRT", xx, tc.want)
 		})
 	}
@@ -658,7 +658,7 @@ func TestZintOneToPlain(t *testing.T) {
 }
 
 func zintPrimeParams(primeIndex int) (p, p0i, r2 uint32) {
-	p = primes[primeIndex].p
+	p = smallPrimes[primeIndex].p
 	p0i = modPNInv31(p)
 	r2 = modPR2(p, p0i)
 	return p, p0i, r2

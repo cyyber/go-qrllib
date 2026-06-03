@@ -12,7 +12,7 @@ import (
 // Source: https://falcon-sign.info/impl/keygen.c.html
 
 func TestModPSet(t *testing.T) {
-	p := primes[0].p
+	p := smallPrimes[0].p
 	for _, tc := range []struct {
 		name string
 		x    int32
@@ -32,7 +32,7 @@ func TestModPSet(t *testing.T) {
 }
 
 func TestModPNorm(t *testing.T) {
-	p := primes[0].p
+	p := smallPrimes[0].p
 	for _, tc := range []struct {
 		name string
 		x    uint32
@@ -62,21 +62,21 @@ func TestModPAdd(t *testing.T) {
 	}{
 		{
 			name: "small prime 0",
-			p:    primes[0].p,
+			p:    smallPrimes[0].p,
 			a:    5,
 			b:    7,
 			want: 12,
 		},
 		{
 			name: "wrap prime 0",
-			p:    primes[0].p,
+			p:    smallPrimes[0].p,
 			a:    2147473407,
 			b:    5,
 			want: 3,
 		},
 		{
 			name: "max prime 1",
-			p:    primes[1].p,
+			p:    smallPrimes[1].p,
 			a:    2147389440,
 			b:    2147389440,
 			want: 2147389439,
@@ -100,21 +100,21 @@ func TestModPSub(t *testing.T) {
 	}{
 		{
 			name: "small prime 0",
-			p:    primes[0].p,
+			p:    smallPrimes[0].p,
 			a:    5,
 			b:    7,
 			want: 2147473407,
 		},
 		{
 			name: "wrap prime 0",
-			p:    primes[0].p,
+			p:    smallPrimes[0].p,
 			a:    2147473407,
 			b:    5,
 			want: 2147473402,
 		},
 		{
 			name: "max prime 1",
-			p:    primes[1].p,
+			p:    smallPrimes[1].p,
 			a:    2147389440,
 			b:    2147389440,
 			want: 0,
@@ -129,7 +129,7 @@ func TestModPSub(t *testing.T) {
 }
 
 func TestModPHalf(t *testing.T) {
-	p := primes[0].p
+	p := smallPrimes[0].p
 	for _, tc := range []struct {
 		name string
 		a    uint32
@@ -240,7 +240,7 @@ func TestModPMontgomeryHelpers(t *testing.T) {
 		},
 		{
 			name:       "last nonzero prime",
-			primeIndex: len(primes) - 2,
+			primeIndex: len(smallPrimes) - 2,
 			wantP0i:    2098206719,
 			wantR:      11528191,
 			wantR2:     39197941,
@@ -275,7 +275,7 @@ func TestModPMontgomeryHelpers(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			p := primes[tc.primeIndex].p
+			p := smallPrimes[tc.primeIndex].p
 			p0i := modPNInv31(p)
 			if p0i != tc.wantP0i {
 				t.Fatalf("modPNInv31 = %d, want %d", p0i, tc.wantP0i)
@@ -308,12 +308,12 @@ func TestModPMontgomeryHelpers(t *testing.T) {
 }
 
 func TestModPMkgm2(t *testing.T) {
-	p := primes[0].p
+	p := smallPrimes[0].p
 	p0i := modPNInv31(p)
 
 	gm := make([]uint32, 8)
 	igm := make([]uint32, 8)
-	modPMkgm2(gm, igm, 3, primes[0].g, p, p0i)
+	modPMkgm2(gm, igm, 3, smallPrimes[0].g, p, p0i)
 
 	requireEqualWords(t, "modPMkgm2 gm", gm, []uint32{
 		10239, 1211775442, 844192849, 380966363,
@@ -326,11 +326,11 @@ func TestModPMkgm2(t *testing.T) {
 }
 
 func TestModPNTT2(t *testing.T) {
-	p := primes[0].p
+	p := smallPrimes[0].p
 	p0i := modPNInv31(p)
 	gm := make([]uint32, 8)
 	igm := make([]uint32, 8)
-	modPMkgm2(gm, igm, 3, primes[0].g, p, p0i)
+	modPMkgm2(gm, igm, 3, smallPrimes[0].g, p, p0i)
 
 	for _, tc := range []struct {
 		name    string
@@ -360,11 +360,11 @@ func TestModPNTT2(t *testing.T) {
 }
 
 func TestModPNTT2Ext(t *testing.T) {
-	p := primes[0].p
+	p := smallPrimes[0].p
 	p0i := modPNInv31(p)
 	gm := make([]uint32, 8)
 	igm := make([]uint32, 8)
-	modPMkgm2(gm, igm, 3, primes[0].g, p, p0i)
+	modPMkgm2(gm, igm, 3, smallPrimes[0].g, p, p0i)
 
 	t.Run("strided", func(t *testing.T) {
 		const sentinel = uint32(0x5A5A5A5A)
@@ -406,21 +406,21 @@ func TestModPNTT2Ext(t *testing.T) {
 }
 
 func TestModPPolyRecRes(t *testing.T) {
-	p := primes[0].p
+	p := smallPrimes[0].p
 	p0i := modPNInv31(p)
 	r2 := modPR2(p, p0i)
 
 	f := []uint32{
 		3, 5,
 		7, 11,
-		primes[0].p - 2, primes[0].p - 3,
+		smallPrimes[0].p - 2, smallPrimes[0].p - 3,
 		123456789, 987654321,
 	}
 	modPPolyRecRes(f, 3, p, p0i, r2)
 
 	requireEqualWords(t, "modPPolyRecRes", f, []uint32{
 		15, 77, 6, 1478340685,
-		primes[0].p - 2, primes[0].p - 3,
+		smallPrimes[0].p - 2, smallPrimes[0].p - 3,
 		123456789, 987654321,
 	})
 }
