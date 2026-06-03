@@ -6,7 +6,7 @@ import "testing"
 // test_falcon.c ntru_f_1024, ntru_g_1024, ntru_F_1024, and ntru_G_1024
 // arrays.
 // Source: https://falcon-sign.info/impl/test_falcon.c.html
-var ntruReferenceKATs = []struct {
+var ntruReferenceVectors = []struct {
 	name string
 	f    string
 	g    string
@@ -23,7 +23,7 @@ var ntruReferenceKATs = []struct {
 }
 
 func TestSolveNTRU(t *testing.T) {
-	for _, tc := range ntruReferenceKATs {
+	for _, tc := range ntruReferenceVectors {
 		t.Run(tc.name, func(t *testing.T) {
 			f := mustDecodeSmallPolynomialHex(t, tc.f)
 			g := mustDecodeSmallPolynomialHex(t, tc.g)
@@ -50,25 +50,25 @@ func TestSolveNTRU(t *testing.T) {
 				mutate func(f, g, F, G *smallPolynomial)
 			}{
 				{
-					name: "corrupt-f",
+					name: "corrupt f",
 					mutate: func(f, g, F, G *smallPolynomial) {
 						f[0]++
 					},
 				},
 				{
-					name: "corrupt-g",
+					name: "corrupt g",
 					mutate: func(f, g, F, G *smallPolynomial) {
 						g[0]++
 					},
 				},
 				{
-					name: "corrupt-F",
+					name: "corrupt F",
 					mutate: func(f, g, F, G *smallPolynomial) {
 						F[0]++
 					},
 				},
 				{
-					name: "corrupt-G",
+					name: "corrupt G",
 					mutate: func(f, g, F, G *smallPolynomial) {
 						G[0]++
 					},

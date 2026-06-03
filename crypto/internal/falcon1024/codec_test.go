@@ -11,7 +11,7 @@ import (
 func TestPublicKeyCodec(t *testing.T) {
 	pub := mustDecodeHex(t, verifyRawKATPublicKeyHex)
 
-	t.Run("reference KAT", func(t *testing.T) {
+	t.Run("reference public key", func(t *testing.T) {
 		// Derived from the Falcon reference implementation test_falcon.c
 		// ntru_pkey_1024 array.
 		// Source: https://falcon-sign.info/impl/test_falcon.c.html
@@ -138,7 +138,7 @@ func TestSignatureCodec(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	t.Run("reference raw s2 KATs", func(t *testing.T) {
+	t.Run("reference raw s2 vectors", func(t *testing.T) {
 		// The s2 vectors are decoded from the Falcon reference implementation
 		// KAT_SIG_1024 raw verify vectors. Those raw vectors use a 32-byte hash
 		// seed, not the 40-byte nonce carried by padded Falcon signatures, so the
@@ -245,7 +245,7 @@ func TestSignatureCodec(t *testing.T) {
 }
 
 func TestCompressedCodec(t *testing.T) {
-	t.Run("reference raw s2 KATs", func(t *testing.T) {
+	t.Run("reference raw s2 vectors", func(t *testing.T) {
 		// The expected lengths and digests were derived from the Falcon reference
 		// implementation comp_encode applied to KAT_SIG_1024 s2 values.
 		// Source: https://falcon-sign.info/impl/test_falcon.c.html

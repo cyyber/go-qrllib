@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestHashToPointReferenceKATs(t *testing.T) {
+func TestHashToPointReferenceVectors(t *testing.T) {
 	// The expected digests were derived from the Falcon reference
 	// implementation hash_to_point_vartime applied to KAT_SIG_1024
 	// nonce/message pairs. Digests are over 1024 big-endian uint16 values.
