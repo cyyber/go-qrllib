@@ -1,8 +1,7 @@
-// Package falcon1024 implements Falcon-1024 key generation, signing, and
-// verification.
+// Package falcon1024 provides Falcon-1024 digital signature primitives.
 //
-// The package currently supports padded Falcon signatures: fixed-size
-// signatures with a compressed payload and zero padding.
+// The package currently only supports padded Falcon signatures, which are
+// fixed-size signatures containing a compressed payload padded with zeros.
 package falcon1024
 
 import (
@@ -14,16 +13,18 @@ import (
 )
 
 const (
-	// PublicKeySize is the size, in bytes, of public keys as used in this package.
+	// PublicKeySize is the size in bytes of an encoded Falcon-1024 public key.
 	PublicKeySize = 1793
 
-	// SignatureSize is the size, in bytes, of signatures generated and verified by this package.
+	// SignatureSize is the size in bytes of a padded Falcon-1024 signature.
 	SignatureSize = 1280
 
-	// SeedSize is the size, in bytes, of private key seeds.
+	// SeedSize is the size in bytes of the seed used to deterministically
+	// generate a Falcon-1024 private key.
 	SeedSize = 48
 
-	// PrivateKeySize is the size, in bytes, of private key seeds as used in this package.
+	// PrivateKeySize is the size in bytes of a Falcon-1024 private key in seed
+	// form.
 	PrivateKeySize = SeedSize
 )
 
@@ -32,7 +33,8 @@ type PublicKey struct {
 	key *falcon1024.PublicKey
 }
 
-// NewPublicKey parses an encoded Falcon-1024 public key.
+// NewPublicKey constructs a public key from its PublicKeySize-byte encoded
+// form.
 func NewPublicKey(publicKey []byte) (*PublicKey, error) {
 	key, err := falcon1024.NewPublicKey(publicKey)
 	if err != nil {
@@ -42,7 +44,7 @@ func NewPublicKey(publicKey []byte) (*PublicKey, error) {
 	return &PublicKey{key}, nil
 }
 
-// Bytes returns the encoded form of pub.
+// Bytes returns the PublicKeySize-byte encoded form of pub.
 func (pub *PublicKey) Bytes() []byte {
 	return pub.key.Bytes()
 }
@@ -61,7 +63,8 @@ type PrivateKey struct {
 	key *falcon1024.PrivateKey
 }
 
-// NewPrivateKey generates a Falcon-1024 private key from a PrivateKeySize-byte seed.
+// NewPrivateKey returns the private key deterministically generated from seed,
+// which must be a SeedSize-byte value.
 func NewPrivateKey(seed []byte) (*PrivateKey, error) {
 	key, err := falcon1024.NewPrivateKey(seed)
 	if err != nil {
@@ -71,14 +74,14 @@ func NewPrivateKey(seed []byte) (*PrivateKey, error) {
 	return &PrivateKey{key}, nil
 }
 
-// Bytes returns the private key seed.
+// Bytes returns the SeedSize-byte private key seed.
 func (priv *PrivateKey) Bytes() []byte {
 	return priv.key.Bytes()
 }
 
 // Public returns the [PublicKey] corresponding to priv.
 func (priv *PrivateKey) Public() crypto.PublicKey {
-	return &PublicKey{key: priv.key.PublicKey()}
+	return &PublicKey{priv.key.PublicKey()}
 }
 
 // Equal reports whether priv and x have the same value.
@@ -91,6 +94,7 @@ func (priv *PrivateKey) Equal(x crypto.PrivateKey) bool {
 }
 
 // Sign signs the message with priv and returns a signature.
+// If random is nil, Sign uses crypto/rand.Reader.
 func (priv *PrivateKey) Sign(random io.Reader, message []byte) (signature []byte, err error) {
 	return Sign(random, priv, message)
 }
@@ -111,43 +115,27 @@ func GenerateKey(random io.Reader) (*PublicKey, *PrivateKey, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	return &PublicKey{key: priv.key.PublicKey()}, priv, nil
+
+	return &PublicKey{priv.key.PublicKey()}, priv, nil
 }
 
 // Sign signs the message with privateKey and returns a signature.
 // If random is nil, Sign uses crypto/rand.Reader.
 //
-// It returns an error if privateKey is invalid or random fails.
+// It returns an error if random fails or signature generation fails.
 func Sign(random io.Reader, privateKey *PrivateKey, message []byte) ([]byte, error) {
 	if random == nil {
 		random = rand.Reader
 	}
 
-	signature := make([]byte, SignatureSize)
-	if err := sign(random, signature, privateKey, message); err != nil {
-		return nil, err
-	}
-	return signature, nil
-}
-
-func sign(random io.Reader, signature []byte, privateKey *PrivateKey, message []byte) error {
-	sig, err := falcon1024.Sign(random, privateKey.key, message)
-	if err != nil {
-		return err
-	}
-	copy(signature, sig)
-	return nil
+	return falcon1024.Sign(random, privateKey.key, message)
 }
 
 // Verify reports whether sig is a valid signature of message by publicKey.
 func Verify(publicKey *PublicKey, message, sig []byte) bool {
-	return verify(publicKey, message, sig) == nil
-}
-
-func verify(publicKey *PublicKey, message, sig []byte) error {
 	s, err := falcon1024.NewSignature(sig)
 	if err != nil {
-		return err
+		return false
 	}
-	return falcon1024.Verify(publicKey.key, message, s)
+	return falcon1024.Verify(publicKey.key, message, s) == nil
 }
