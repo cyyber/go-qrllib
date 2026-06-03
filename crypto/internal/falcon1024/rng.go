@@ -6,6 +6,7 @@ import (
 	"math/bits"
 )
 
+// samplerPRNG is the Falcon reference ChaCha-based sampler PRNG.
 type samplerPRNG struct {
 	buf     [512]byte
 	ptr     int
@@ -14,6 +15,7 @@ type samplerPRNG struct {
 }
 
 func newSamplerPRNG(rng *sha3.SHAKE) *samplerPRNG {
+	// Falcon expands 56 bytes into a 384-bit ChaCha key/state and 64-bit counter.
 	var seed [56]byte
 	_, _ = rng.Read(seed[:])
 
@@ -22,6 +24,7 @@ func newSamplerPRNG(rng *sha3.SHAKE) *samplerPRNG {
 		p.state[i] = binary.LittleEndian.Uint32(seed[4*i:])
 	}
 	p.counter = binary.LittleEndian.Uint64(seed[48:])
+
 	p.refill()
 
 	return p
@@ -37,26 +40,28 @@ func (p *samplerPRNG) readByte() byte {
 }
 
 func (p *samplerPRNG) readUint64() uint64 {
+	// Match Falcon's prng_get_u64 cutoff: it may discard tail bytes, but keeps
+	// extraction simple and avoids leaving an empty buffer.
 	if p.ptr >= len(p.buf)-9 {
 		p.refill()
 	}
-	v := binary.LittleEndian.Uint64(p.buf[p.ptr:])
+	v := binary.LittleEndian.Uint64(p.buf[p.ptr : p.ptr+8])
 	p.ptr += 8
 	return v
 }
 
 const (
-	cw0 uint32 = 0x61707865
-	cw1 uint32 = 0x3320646e
-	cw2 uint32 = 0x79622d32
-	cw3 uint32 = 0x6b206574
+	chachaConst0 uint32 = 0x61707865
+	chachaConst1 uint32 = 0x3320646e
+	chachaConst2 uint32 = 0x79622d32
+	chachaConst3 uint32 = 0x6b206574
 )
 
 func (p *samplerPRNG) refill() {
 	counter := p.counter
 	for block := range 8 {
 		state := [16]uint32{
-			cw0, cw1, cw2, cw3,
+			chachaConst0, chachaConst1, chachaConst2, chachaConst3,
 			p.state[0], p.state[1], p.state[2], p.state[3],
 			p.state[4], p.state[5], p.state[6], p.state[7],
 			p.state[8], p.state[9],
@@ -75,10 +80,10 @@ func (p *samplerPRNG) refill() {
 			chachaQuarterRound(&state, 3, 4, 9, 14)
 		}
 
-		state[0] += cw0
-		state[1] += cw1
-		state[2] += cw2
-		state[3] += cw3
+		state[0] += chachaConst0
+		state[1] += chachaConst1
+		state[2] += chachaConst2
+		state[3] += chachaConst3
 		for v := 4; v < 14; v++ {
 			state[v] += p.state[v-4]
 		}
@@ -86,6 +91,8 @@ func (p *samplerPRNG) refill() {
 		state[15] += p.state[11] ^ uint32(counter>>32)
 		counter++
 
+		// Store eight ChaCha blocks interleaved by word, matching the Falcon
+		// reference buffer layout.
 		for word := range state {
 			binary.LittleEndian.PutUint32(p.buf[(block<<2)+(word<<5):], state[word])
 		}
