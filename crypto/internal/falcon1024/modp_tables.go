@@ -4,6 +4,24 @@ type smallPrime struct {
 	p, g, s uint32
 }
 
+type smallPrimeDerived struct {
+	p0i, r2 uint32
+}
+
+// smallPrimeDerivedValues caches Montgomery constants derived from smallPrimes
+// while keeping the reference small_primes table unchanged.
+var smallPrimeDerivedValues = func() [len(smallPrimes)]smallPrimeDerived {
+	var values [len(smallPrimes)]smallPrimeDerived
+	for i, prime := range smallPrimes {
+		p0i := modPNInv31(prime.p)
+		values[i] = smallPrimeDerived{
+			p0i: p0i,
+			r2:  modPR2(prime.p, p0i),
+		}
+	}
+	return values
+}()
+
 // smallPrimes contains the Falcon reference small_primes table used by the
 // NTRU/CRT solver.
 var smallPrimes = [...]smallPrime{

@@ -80,8 +80,8 @@ func zintRebuildCRT(xx []uint32, xlen, xstride, count int, primes []smallPrime, 
 	for u := 1; u < xlen; u++ {
 		p := primes[u].p
 		s := primes[u].s
-		p0i := modPNInv31(p)
-		r2 := modPR2(p, p0i)
+		p0i := smallPrimeDerivedValues[u].p0i
+		r2 := smallPrimeDerivedValues[u].r2
 
 		for v := range count {
 			x := xx[v*xstride : v*xstride+xlen]

@@ -144,7 +144,7 @@ func (s *fprScratch) take(size int) []fpr {
 
 func checkNTRUEquation(f, g, ntruF, ntruG smallPolynomial, scratch []uint32) bool {
 	p := smallPrimes[0].p
-	p0i := modPNInv31(p)
+	p0i := smallPrimeDerivedValues[0].p0i
 	gm := scratch[:n]
 	igm := scratch[n : 2*n]
 	modPMkgm2(gm, igm, logN, smallPrimes[0].g, p, p0i)
@@ -192,7 +192,7 @@ func makeFG(data []uint32, f, g smallPolynomial, depth int, outNTT bool) {
 
 	if depth == 0 && outNTT {
 		p := smallPrimes[0].p
-		p0i := modPNInv31(p)
+		p0i := smallPrimeDerivedValues[0].p0i
 		gm := data[2*nn : 3*nn]
 		igm := data[3*nn : 4*nn]
 		modPMkgm2(gm, igm, logN, smallPrimes[0].g, p, p0i)
@@ -225,10 +225,12 @@ func makeFGStep(data []uint32, logn, depth int, inNTT, outNTT bool) {
 
 	copy(data[fsOff:gmOff], data[:2*nn*slen])
 	for u := range slen {
-		p := smallPrimes[u].p
-		p0i := modPNInv31(p)
-		r2 := modPR2(p, p0i)
-		modPMkgm2(gm, igm, logn, smallPrimes[u].g, p, p0i)
+		prime := smallPrimes[u]
+		derived := smallPrimeDerivedValues[u]
+		p := prime.p
+		p0i := derived.p0i
+		r2 := derived.r2
+		modPMkgm2(gm, igm, logn, prime.g, p, p0i)
 
 		for v, x := 0, u; v < nn; v, x = v+1, x+slen {
 			t1[v] = fs[x]
@@ -276,11 +278,13 @@ func makeFGStep(data []uint32, logn, depth int, inNTT, outNTT bool) {
 	zintRebuildCRT(gs, slen, slen, nn, smallPrimes[:], true, crtScratch)
 
 	for u := slen; u < tlen; u++ {
-		p := smallPrimes[u].p
-		p0i := modPNInv31(p)
-		r2 := modPR2(p, p0i)
+		prime := smallPrimes[u]
+		derived := smallPrimeDerivedValues[u]
+		p := prime.p
+		p0i := derived.p0i
+		r2 := derived.r2
 		rx := modPRx(slen, p, p0i, r2)
-		modPMkgm2(gm, igm, logn, smallPrimes[u].g, p, p0i)
+		modPMkgm2(gm, igm, logn, prime.g, p, p0i)
 
 		for v, x := 0, 0; v < nn; v, x = v+1, x+slen {
 			t1[v] = zintModSmallSigned(fs[x:x+slen], p, p0i, r2, rx)
@@ -396,11 +400,13 @@ func polySubScaledNTT(F []uint32, Flen, Fstride int, f []uint32, flen, fstride i
 	fk := tmp[2*nn : 2*nn+nn*tlen]
 	t1 := tmp[2*nn+nn*tlen : 3*nn+nn*tlen]
 	for u := range tlen {
-		p := smallPrimes[u].p
-		p0i := modPNInv31(p)
-		r2 := modPR2(p, p0i)
+		prime := smallPrimes[u]
+		derived := smallPrimeDerivedValues[u]
+		p := prime.p
+		p0i := derived.p0i
+		r2 := derived.r2
 		rx := modPRx(flen, p, p0i, r2)
-		modPMkgm2(gm, igm, logn, smallPrimes[u].g, p, p0i)
+		modPMkgm2(gm, igm, logn, prime.g, p, p0i)
 		for v := range nn {
 			t1[v] = modPSet(k[v], p)
 		}
@@ -481,9 +487,10 @@ func liftNTRUSolution(wk *ntruWorkspace, Ft, Gt, Fd, Gd, ft, gt []uint32, logn, 
 	crtScratch := u32s.take(max(llen, slen))
 
 	for u := range llen {
+		derived := smallPrimeDerivedValues[u]
 		p := smallPrimes[u].p
-		p0i := modPNInv31(p)
-		r2 := modPR2(p, p0i)
+		p0i := derived.p0i
+		r2 := derived.r2
 		rx := modPRx(dlen, p, p0i, r2)
 		for v := range hn {
 			Ft[v*llen+u] = zintModSmallSigned(Fd[v*dlen:v*dlen+dlen], p, p0i, r2, rx)
@@ -492,16 +499,18 @@ func liftNTRUSolution(wk *ntruWorkspace, Ft, Gt, Fd, Gd, ft, gt []uint32, logn, 
 	}
 
 	for u := range llen {
-		p := smallPrimes[u].p
-		p0i := modPNInv31(p)
-		r2 := modPR2(p, p0i)
+		prime := smallPrimes[u]
+		derived := smallPrimeDerivedValues[u]
+		p := prime.p
+		p0i := derived.p0i
+		r2 := derived.r2
 
 		if u == slen {
 			zintRebuildCRT(ft, slen, slen, n, smallPrimes[:], true, crtScratch[:slen])
 			zintRebuildCRT(gt, slen, slen, n, smallPrimes[:], true, crtScratch[:slen])
 		}
 
-		modPMkgm2(gm, igm, logn, smallPrimes[u].g, p, p0i)
+		modPMkgm2(gm, igm, logn, prime.g, p, p0i)
 
 		if u < slen {
 			for v := range n {
@@ -659,8 +668,8 @@ func solveNTRUBinaryDepth0(f, g smallPolynomial, wk *ntruWorkspace) {
 	hn := nn >> 1
 
 	p := smallPrimes[0].p
-	p0i := modPNInv31(p)
-	r2 := modPR2(p, p0i)
+	p0i := smallPrimeDerivedValues[0].p0i
+	r2 := smallPrimeDerivedValues[0].r2
 
 	tmp := wk.state
 	u32s := newUint32Scratch(wk.scratch)
@@ -813,9 +822,10 @@ func solveNTRUBinaryDepth1(f, g smallPolynomial, wk *ntruWorkspace) bool {
 	crtScratch := u32s.take(max(llen, slen))
 
 	for u := range llen {
+		derived := smallPrimeDerivedValues[u]
 		p := smallPrimes[u].p
-		p0i := modPNInv31(p)
-		r2 := modPR2(p, p0i)
+		p0i := derived.p0i
+		r2 := derived.r2
 		rx := modPRx(dlen, p, p0i, r2)
 		for v := range hn {
 			Ft[v*llen+u] = zintModSmallSigned(Fd[v*dlen:v*dlen+dlen], p, p0i, r2, rx)
@@ -824,11 +834,13 @@ func solveNTRUBinaryDepth1(f, g smallPolynomial, wk *ntruWorkspace) bool {
 	}
 
 	for u := range llen {
-		p := smallPrimes[u].p
-		p0i := modPNInv31(p)
-		r2 := modPR2(p, p0i)
+		prime := smallPrimes[u]
+		derived := smallPrimeDerivedValues[u]
+		p := prime.p
+		p0i := derived.p0i
+		r2 := derived.r2
 
-		modPMkgm2(gmFull, igmFull, logN, smallPrimes[u].g, p, p0i)
+		modPMkgm2(gmFull, igmFull, logN, prime.g, p, p0i)
 
 		for v := range n {
 			fx[v] = modPSet(f[v], p)
