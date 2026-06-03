@@ -153,7 +153,7 @@ const (
 )
 
 func skEncode(dst []byte, f, g, ntruF smallPolynomial) error {
-	if len(dst) != privateKeySize {
+	if len(dst) != encodedPrivateKeySize {
 		return errors.New("falcon-1024: invalid private key length")
 	}
 
@@ -178,7 +178,7 @@ func skEncode(dst []byte, f, g, ntruF smallPolynomial) error {
 	}
 	offset += written
 
-	if offset != privateKeySize {
+	if offset != encodedPrivateKeySize {
 		return errors.New("falcon-1024: invalid private key encoding")
 	}
 
@@ -186,7 +186,7 @@ func skEncode(dst []byte, f, g, ntruF smallPolynomial) error {
 }
 
 func skDecode(src []byte) (f, g, ntruF smallPolynomial, err error) {
-	if len(src) != privateKeySize {
+	if len(src) != encodedPrivateKeySize {
 		return smallPolynomial{}, smallPolynomial{}, smallPolynomial{},
 			errors.New("falcon-1024: invalid private key length")
 	}
@@ -216,7 +216,7 @@ func skDecode(src []byte) (f, g, ntruF smallPolynomial, err error) {
 	}
 	offset += consumed
 
-	if offset != privateKeySize {
+	if offset != encodedPrivateKeySize {
 		return smallPolynomial{}, smallPolynomial{}, smallPolynomial{},
 			errors.New("falcon-1024: invalid private key")
 	}
@@ -227,7 +227,7 @@ func skDecode(src []byte) (f, g, ntruF smallPolynomial, err error) {
 const publicKeyHeader byte = 0x00 + logN
 
 func pkEncode(dst []byte, h ringElement) error {
-	if len(dst) != publicKeySize {
+	if len(dst) != PublicKeySize {
 		return errors.New("falcon-1024: invalid public key length")
 	}
 
@@ -238,7 +238,7 @@ func pkEncode(dst []byte, h ringElement) error {
 }
 
 func pkDecode(src []byte) (h ringElement, err error) {
-	if len(src) != publicKeySize {
+	if len(src) != PublicKeySize {
 		return ringElement{}, errors.New("falcon-1024: invalid public key length")
 	}
 	if src[0] != publicKeyHeader {
@@ -254,7 +254,7 @@ const (
 )
 
 func sigEncode(dst []byte, nonce [nonceSize]byte, s2 smallPolynomial) error {
-	if len(dst) != signatureSize {
+	if len(dst) != SignatureSize {
 		return errors.New("falcon-1024: invalid signature length")
 	}
 
@@ -271,7 +271,7 @@ func sigEncode(dst []byte, nonce [nonceSize]byte, s2 smallPolynomial) error {
 }
 
 func sigDecode(src []byte) (nonce [nonceSize]byte, s2 smallPolynomial, err error) {
-	if len(src) != signatureSize {
+	if len(src) != SignatureSize {
 		return nonce, smallPolynomial{}, errors.New("falcon-1024: invalid signature length")
 	}
 	if src[0] != signatureHeader {

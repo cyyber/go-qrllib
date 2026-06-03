@@ -15,8 +15,8 @@ func TestPublicKeyCodec(t *testing.T) {
 		// Derived from the Falcon reference implementation test_falcon.c
 		// ntru_pkey_1024 array.
 		// Source: https://falcon-sign.info/impl/test_falcon.c.html
-		if len(pub) != publicKeySize {
-			t.Fatalf("reference public key length = %d, want %d", len(pub), publicKeySize)
+		if len(pub) != PublicKeySize {
+			t.Fatalf("reference public key length = %d, want %d", len(pub), PublicKeySize)
 		}
 		if pub[0] != publicKeyHeader {
 			t.Fatalf("reference public key header = %#x, want %#x", pub[0], publicKeyHeader)
@@ -27,7 +27,7 @@ func TestPublicKeyCodec(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		got := make([]byte, publicKeySize)
+		got := make([]byte, PublicKeySize)
 		if err := pkEncode(got, h); err != nil {
 			t.Fatal(err)
 		}
@@ -43,7 +43,7 @@ func TestPublicKeyCodec(t *testing.T) {
 		}{
 			{
 				name: "short",
-				in:   pub[:publicKeySize-1],
+				in:   pub[:PublicKeySize-1],
 			},
 			{
 				name: "long",
@@ -74,7 +74,7 @@ func TestPrivateKeyCodec(t *testing.T) {
 	g := mustDecodeSmallPolynomialHex(t, ntruSmallG1024Hex)
 	ntruF := mustDecodeSmallPolynomialHex(t, ntruF1024Hex)
 
-	sk := make([]byte, privateKeySize)
+	sk := make([]byte, encodedPrivateKeySize)
 	if err := skEncode(sk, f, g, ntruF); err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +100,7 @@ func TestPrivateKeyCodec(t *testing.T) {
 		}{
 			{
 				name: "short",
-				in:   sk[:privateKeySize-1],
+				in:   sk[:encodedPrivateKeySize-1],
 			},
 			{
 				name: "long",
@@ -133,7 +133,7 @@ func TestSignatureCodec(t *testing.T) {
 	copy(nonce[:], nonceBytes)
 	s2 := decodeVerifyRawKATSignature(t, mustDecodeHex(t, tc.signatureHex))
 
-	sig := make([]byte, signatureSize)
+	sig := make([]byte, SignatureSize)
 	if err := sigEncode(sig, nonce, s2); err != nil {
 		t.Fatal(err)
 	}
@@ -152,7 +152,7 @@ func TestSignatureCodec(t *testing.T) {
 
 				wantS2 := decodeVerifyRawKATSignature(t, mustDecodeHex(t, tc.signatureHex))
 
-				sig := make([]byte, signatureSize)
+				sig := make([]byte, SignatureSize)
 				if err := sigEncode(sig, nonce, wantS2); err != nil {
 					t.Fatal(err)
 				}
@@ -178,7 +178,7 @@ func TestSignatureCodec(t *testing.T) {
 		}{
 			{
 				name: "short",
-				in:   sig[:signatureSize-1],
+				in:   sig[:SignatureSize-1],
 			},
 			{
 				name: "long",
@@ -210,11 +210,11 @@ func TestSignatureCodec(t *testing.T) {
 		}{
 			{
 				name: "short",
-				out:  make([]byte, signatureSize-1),
+				out:  make([]byte, SignatureSize-1),
 			},
 			{
 				name: "long",
-				out:  make([]byte, signatureSize+1),
+				out:  make([]byte, SignatureSize+1),
 			},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
@@ -226,14 +226,14 @@ func TestSignatureCodec(t *testing.T) {
 	})
 
 	t.Run("rejects non-zero padding", func(t *testing.T) {
-		sig := make([]byte, signatureSize)
+		sig := make([]byte, SignatureSize)
 		sig[0] = signatureHeader
 		copy(sig[headerSize:signaturePrefixSize], nonce[:])
 		written, err := compressedEncode(sig[signaturePrefixSize:], s2)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if written >= signatureSize-signaturePrefixSize {
+		if written >= SignatureSize-signaturePrefixSize {
 			t.Fatal("reference signature unexpectedly leaves no padding byte to corrupt")
 		}
 
@@ -272,7 +272,7 @@ func TestCompressedCodec(t *testing.T) {
 		for i, tc := range verifyRawKATs {
 			t.Run(tc.message, func(t *testing.T) {
 				s2 := decodeVerifyRawKATSignature(t, mustDecodeHex(t, tc.signatureHex))
-				dst := make([]byte, signatureSize-signaturePrefixSize)
+				dst := make([]byte, SignatureSize-signaturePrefixSize)
 
 				written, err := compressedEncode(dst, s2)
 				if err != nil {
@@ -303,7 +303,7 @@ func TestCompressedCodec(t *testing.T) {
 			{
 				name: "out of range coefficient",
 				s2:   outOfRange,
-				dst:  make([]byte, signatureSize-signaturePrefixSize),
+				dst:  make([]byte, SignatureSize-signaturePrefixSize),
 				err:  errCompressedCoefficientOutOfRange,
 			},
 			{
@@ -327,7 +327,7 @@ func TestCompressedCodec(t *testing.T) {
 		var s2 smallPolynomial
 		s2[0] = 128
 
-		buf := make([]byte, signatureSize-signaturePrefixSize)
+		buf := make([]byte, SignatureSize-signaturePrefixSize)
 		written, err := compressedEncode(buf, s2)
 		if err != nil {
 			t.Fatal(err)

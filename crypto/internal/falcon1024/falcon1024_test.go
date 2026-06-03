@@ -596,7 +596,7 @@ func TestComputePublic(t *testing.T) {
 		t.Fatal("computePublic returned unexpected public key polynomial")
 	}
 
-	gotBytes := make([]byte, publicKeySize)
+	gotBytes := make([]byte, PublicKeySize)
 	if err := pkEncode(gotBytes, gotH); err != nil {
 		t.Fatal(err)
 	}
@@ -632,7 +632,7 @@ func TestNewPrivateKeyFromEncoded(t *testing.T) {
 	g := mustDecodeSmallPolynomialHex(t, ntruSmallG1024Hex)
 	ntruF := mustDecodeSmallPolynomialHex(t, ntruF1024Hex)
 
-	sk := make([]byte, privateKeySize)
+	sk := make([]byte, encodedPrivateKeySize)
 	if err := skEncode(sk, f, g, ntruF); err != nil {
 		t.Fatal(err)
 	}
@@ -773,14 +773,14 @@ func TestSignTreeNISTKATVectors(t *testing.T) {
 func nistKATSignTreeInput(t *testing.T, count int) (*PrivateKey, ringElement, *sha3.SHAKE) {
 	t.Helper()
 
-	var entropy [seedSize]byte
+	var entropy [SeedSize]byte
 	for i := range entropy {
 		entropy[i] = byte(i)
 	}
 
 	drbg := newNISTDRBG(entropy[:])
 	for i := range count + 1 {
-		var seed [seedSize]byte
+		var seed [SeedSize]byte
 		drbg.read(seed[:])
 
 		msg := make([]byte, 33*(i+1))
@@ -789,7 +789,7 @@ func nistKATSignTreeInput(t *testing.T, count int) (*PrivateKey, ringElement, *s
 		state := drbg.save()
 		drbg = newNISTDRBG(seed[:])
 
-		var keySeed [seedSize]byte
+		var keySeed [SeedSize]byte
 		drbg.read(keySeed[:])
 
 		priv, err := NewPrivateKeyFromSeed(keySeed[:])
@@ -806,7 +806,7 @@ func nistKATSignTreeInput(t *testing.T, count int) (*PrivateKey, ringElement, *s
 
 		c0 := hashToPoint(hashData)
 
-		var signSeed [seedSize]byte
+		var signSeed [SeedSize]byte
 		drbg.read(signSeed[:])
 		rng := sha3.NewSHAKE256()
 		_, _ = rng.Write(signSeed[:])
@@ -833,7 +833,7 @@ func TestNewSignature(t *testing.T) {
 			copy(nonce[:], nonceBytes)
 			wantS2 := decodeVerifyRawKATSignature(t, mustDecodeHex(t, tc.signatureHex))
 
-			sigBytes := make([]byte, signatureSize)
+			sigBytes := make([]byte, SignatureSize)
 			if err := sigEncode(sigBytes, nonce, wantS2); err != nil {
 				t.Fatal(err)
 			}
@@ -948,7 +948,7 @@ func TestGolden(t *testing.T) {
 }
 
 func testNISTKATDigest(t *testing.T) {
-	var entropy [seedSize]byte
+	var entropy [SeedSize]byte
 	for i := range entropy {
 		entropy[i] = byte(i)
 	}
@@ -962,7 +962,7 @@ func testNISTKATDigest(t *testing.T) {
 	for count := range 100 {
 		t.Logf("NIST KAT count %d", count)
 
-		var seed [seedSize]byte
+		var seed [SeedSize]byte
 		drbg.read(seed[:])
 
 		msg := make([]byte, 33*(count+1))
@@ -971,7 +971,7 @@ func testNISTKATDigest(t *testing.T) {
 		state := drbg.save()
 		drbg = newNISTDRBG(seed[:])
 
-		var keySeed [seedSize]byte
+		var keySeed [SeedSize]byte
 		drbg.read(keySeed[:])
 
 		priv, err := NewPrivateKeyFromSeed(keySeed[:])
@@ -990,7 +990,7 @@ func testNISTKATDigest(t *testing.T) {
 
 		c0 := hashToPoint(hashData)
 
-		var signSeed [seedSize]byte
+		var signSeed [SeedSize]byte
 		drbg.read(signSeed[:])
 		signRNG := sha3.NewSHAKE256()
 		_, _ = signRNG.Write(signSeed[:])

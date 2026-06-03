@@ -9,15 +9,15 @@ import (
 )
 
 const (
-	seedSize       = 48
-	publicKeySize  = 1793
-	privateKeySize = 2305
-	signatureSize  = 1280
+	SeedSize              = 48
+	PublicKeySize         = 1793
+	encodedPrivateKeySize = 2305
+	SignatureSize         = 1280
 )
 
 type PrivateKey struct {
-	seed               [seedSize]byte
-	raw                [privateKeySize]byte
+	seed               [SeedSize]byte
+	raw                [encodedPrivateKeySize]byte
 	pub                *PublicKey
 	b00, b01, b10, b11 fftPolynomial
 	tree               fprTree
@@ -42,7 +42,7 @@ func (priv *PrivateKey) PublicKey() *PublicKey {
 }
 
 type PublicKey struct {
-	raw  [publicKeySize]byte
+	raw  [PublicKeySize]byte
 	hNTT ringElement
 }
 
@@ -61,7 +61,7 @@ func NewPrivateKeyFromSeed(seed []byte) (*PrivateKey, error) {
 }
 
 func newPrivateKeyFromSeed(priv *PrivateKey, seed []byte) (*PrivateKey, error) {
-	if l := len(seed); l != seedSize {
+	if l := len(seed); l != SeedSize {
 		return nil, errors.New("falcon-1024: invalid seed length: " + strconv.Itoa(l))
 	}
 	copy(priv.seed[:], seed)
@@ -262,12 +262,12 @@ func newPublicKey(pub *PublicKey, pubBytes []byte) (*PublicKey, error) {
 }
 
 func Sign(random io.Reader, priv *PrivateKey, message []byte) ([]byte, error) {
-	signature := make([]byte, signatureSize)
+	signature := make([]byte, SignatureSize)
 	return sign(random, signature, priv, message)
 }
 
 func sign(random io.Reader, signature []byte, priv *PrivateKey, message []byte) ([]byte, error) {
-	var seed [seedSize]byte
+	var seed [SeedSize]byte
 	if _, err := io.ReadFull(random, seed[:]); err != nil {
 		return nil, err
 	}
