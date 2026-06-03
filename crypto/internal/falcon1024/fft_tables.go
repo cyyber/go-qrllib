@@ -1,7 +1,7 @@
 package falcon1024
 
-// falconGMTabBits contains Falcon reference fpr_gm_tab entries as float64 bit patterns.
-var falconGMTabBits = [2 * n]uint64{
+// fprGMTabBits contains Falcon reference fpr_gm_tab entries as float64 bit patterns.
+var fprGMTabBits = [2 * n]uint64{
 	0x0000000000000000, 0x0000000000000000, 0x8000000000000000, 0x3ff0000000000000,
 	0x3fe6a09e667f3bcd, 0x3fe6a09e667f3bcd, 0xbfe6a09e667f3bcd, 0x3fe6a09e667f3bcd,
 	0x3fed906bcf328d46, 0x3fd87de2a6aea963, 0xbfd87de2a6aea963, 0x3fed906bcf328d46,

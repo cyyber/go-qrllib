@@ -104,8 +104,8 @@ var (
 func initFFTGM() ([n]fpr, [n]fpr) {
 	var re, im [n]fpr
 	for j := range n {
-		re[j] = fpr(math.Float64frombits(falconGMTabBits[j<<1]))
-		im[j] = fpr(math.Float64frombits(falconGMTabBits[(j<<1)+1]))
+		re[j] = fpr(math.Float64frombits(fprGMTabBits[j<<1]))
+		im[j] = fpr(math.Float64frombits(fprGMTabBits[(j<<1)+1]))
 	}
 	return re, im
 }
