@@ -56,6 +56,40 @@ func TestSplitMergeFFTRoundTrip(t *testing.T) {
 	}
 }
 
+func TestFFTMul(t *testing.T) {
+	const testLogN = 4
+	const testN = 1 << testLogN
+
+	var a, b, want [testN]fpr
+	for i := range testN {
+		a[i] = fpr((i % 7) - 3)
+		b[i] = fpr((i % 5) - 2)
+	}
+
+	for i := range testN {
+		for j := range testN {
+			k := i + j
+			v := a[i] * b[j]
+			if k >= testN {
+				want[k-testN] -= v
+			} else {
+				want[k] += v
+			}
+		}
+	}
+
+	fft(a[:], testLogN)
+	fft(b[:], testLogN)
+	fftMul(a[:], b[:], testLogN)
+	inverseFFT(a[:], testLogN)
+
+	for i := range testN {
+		if !fprAlmostEqual(a[i], want[i]) {
+			t.Fatalf("fftMul mismatch at %d: got %v, want %v", i, a[i], want[i])
+		}
+	}
+}
+
 func fprAlmostEqual(a, b fpr) bool {
 	const tolerance = 1e-9
 	return math.Abs(float64(a-b)) <= tolerance

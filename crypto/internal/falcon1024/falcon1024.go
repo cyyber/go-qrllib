@@ -161,8 +161,8 @@ func expandPrivateKey(priv *PrivateKey, f, g, ntruF, ntruG smallPolynomial) {
 	fftFromSmall(priv.b11[:], ntruF)
 	fftFromSmall(priv.b10[:], ntruG)
 
-	polyNeg(priv.b01[:], logN)
-	polyNeg(priv.b11[:], logN)
+	fftNeg(priv.b01[:], logN)
+	fftNeg(priv.b11[:], logN)
 
 	var g00, g01, g11, tmp fftPolynomial
 

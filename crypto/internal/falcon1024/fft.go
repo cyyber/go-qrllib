@@ -27,7 +27,7 @@ type u72 struct {
 
 var (
 	fftGMRe, fftGMIm = initFFTGM()
-	falconInvSigma   = [...]fpr{
+	invSigma         = [...]fpr{
 		0,
 		0.00690547932959408896,
 		0.00681022677671779767,
@@ -40,6 +40,7 @@ var (
 		0.00603366966815772378,
 		0.00593864530953311636,
 	}
+	// 72-bit CDT bounds for Falcon's half-Gaussian sampler.
 	gaussian0CDF = [...]u72{
 		{hi: 0x00, lo: 0x0000000000000000},
 		{hi: 0x00, lo: 0x00000000000000c5},
@@ -72,6 +73,8 @@ func initFFTGM() ([n]fpr, [n]fpr) {
 	return re, im
 }
 
+// gaussian0Sample implements the Falcon reference gaussian0_sampler over the
+// 72-bit half-Gaussian CDT.
 func gaussian0Sample(prng *samplerPRNG) int {
 	lo := prng.readUint64()
 	hi := uint64(prng.readByte())
@@ -87,6 +90,7 @@ func gaussian0Sample(prng *samplerPRNG) int {
 	return z - 1
 }
 
+// berExp implements the Falcon reference BerExp rejection step.
 func berExp(prng *samplerPRNG, x, ccs fpr) bool {
 	s := int(fprTrunc(x * invLog2))
 	r := x - fpr(s)*log2
@@ -109,6 +113,8 @@ func berExp(prng *samplerPRNG, x, ccs fpr) bool {
 	return w>>31 != 0
 }
 
+// sampleFFTPoint samples one Falcon FFT coordinate using the discrete Gaussian
+// sampler.
 func sampleFFTPoint(prng *samplerPRNG, mu, isigma fpr) fpr {
 	s := math.Floor(float64(mu))
 	r := mu - fpr(s)
@@ -202,7 +208,7 @@ func fftLDLMV(d11, l10, g00, g01, g11 []fpr, logn int) {
 func ffLDLBinaryNormalize(tree []fpr, origLogn, logn int) {
 	nn := 1 << logn
 	if nn == 1 {
-		tree[0] = fpr(math.Sqrt(float64(tree[0]))) * falconInvSigma[origLogn]
+		tree[0] = fpr(math.Sqrt(float64(tree[0]))) * invSigma[origLogn]
 		return
 	}
 
@@ -263,6 +269,8 @@ func mergeFFT(f, f0, f1 []fpr, logn int) {
 	}
 }
 
+// ffSamplingFFTRecursive mirrors the Falcon reference base cases; the
+// hand-unrolled logn == 2 path avoids another split/merge recursion.
 func ffSamplingFFTRecursive(prng *samplerPRNG, z0, z1, tree, t0, t1, tmp []fpr, logn int) {
 	if logn == 2 {
 		tree0 := tree[4:]
@@ -544,7 +552,7 @@ func fftSelfAdj(dst, src []fpr, logn int) {
 	}
 }
 
-func polyNeg(a []fpr, logn int) {
+func fftNeg(a []fpr, logn int) {
 	for i := range 1 << logn {
 		a[i] = -a[i]
 	}
