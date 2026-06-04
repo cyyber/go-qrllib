@@ -5,34 +5,10 @@ import (
 	"math/bits"
 )
 
-const fprInverseOfQ fpr = 1.0 / q
-
-type fpr float64
-
-func fprRint(x fpr) int64 {
-	const twoTo52 = 4503599627370496.0
-
-	v := float64(x)
-	sx := int64(v - 1.0)
-	tx := int64(v)
-	rp := int64(v+twoTo52) - twoTo52
-	rn := int64(v-twoTo52) + twoTo52
-
-	m := sx >> 63
-	rn &= m
-	rp &= ^m
-
-	ub := uint32(uint64(tx) >> 52)
-	m = -int64(((((ub + 1) & 0xFFF) - 2) >> 31))
-	rp &= m
-	rn &= m
-	tx &= ^m
-
-	return tx | rn | rp
-}
-
 type fprTree [(logN + 1) * n]fpr
 
+// FFT values store N/2 complex coefficients as split real/imaginary halves:
+// f[0:N/2] are real parts and f[N/2:N] are imaginary parts.
 type fftPolynomial [n]fpr
 
 // fftFromSmall converts a small polynomial to floating-point in place at dst,
@@ -43,20 +19,6 @@ func fftFromSmall(dst []fpr, src smallPolynomial) {
 	}
 	fft(dst, logN)
 }
-
-const (
-	falconSigmaMin1024  fpr = 1.2982803343442918539708792538826807
-	falconInv2SqrSigma0 fpr = 0.150865048875372721532312163019
-	falconInvSqrt2      fpr = 0.707106781186547524400844362105
-	falconInvSqrt8      fpr = 0.353553390593273762200422181052
-	falconLog2          fpr = 0.693147180559945309417232121458176568
-	falconInvLog2       fpr = 1.44269504088896340735992468100189214
-	falconPtwo63        fpr = 9223372036854775808
-	falconPtwo31m1      fpr = 2147483647
-	falconMtwo31m1      fpr = -2147483647
-	falconPtwo63m1      fpr = 9223372036854775807
-	falconMtwo63m1      fpr = -9223372036854775807
-)
 
 type u72 struct {
 	hi byte
@@ -126,8 +88,8 @@ func gaussian0Sample(prng *samplerPRNG) int {
 }
 
 func berExp(prng *samplerPRNG, x, ccs fpr) bool {
-	s := int(fprTrunc(x * falconInvLog2))
-	r := x - fpr(s)*falconLog2
+	s := int(fprTrunc(x * invLog2))
+	r := x - fpr(s)*log2
 
 	sw := uint32(s)
 	sw ^= (sw ^ 63) & -((63 - sw) >> 31)
@@ -147,44 +109,11 @@ func berExp(prng *samplerPRNG, x, ccs fpr) bool {
 	return w>>31 != 0
 }
 
-func fprTrunc(x fpr) int64 {
-	return int64(math.Trunc(float64(x)))
-}
-
-func fprExpmP63(x, ccs fpr) uint64 {
-	c := [...]uint64{
-		0x00000004741183A3,
-		0x00000036548CFC06,
-		0x0000024FDCBF140A,
-		0x0000171D939DE045,
-		0x0000D00CF58F6F84,
-		0x000680681CF796E3,
-		0x002D82D8305B0FEA,
-		0x011111110E066FD0,
-		0x0555555555070F00,
-		0x155555555581FF00,
-		0x400000000002B400,
-		0x7FFFFFFFFFFF4800,
-		0x8000000000000000,
-	}
-
-	y := c[0]
-	z := uint64(fprTrunc(x*falconPtwo63)) << 1
-	for _, ci := range c[1:] {
-		hi, _ := bits.Mul64(z, y)
-		y = ci - hi
-	}
-
-	z = uint64(fprTrunc(ccs*falconPtwo63)) << 1
-	hi, _ := bits.Mul64(z, y)
-	return hi
-}
-
 func sampleFFTPoint(prng *samplerPRNG, mu, isigma fpr) fpr {
 	s := math.Floor(float64(mu))
 	r := mu - fpr(s)
 	dss := 0.5 * isigma * isigma
-	ccs := falconSigmaMin1024 * isigma
+	ccs := sigmaMin1024 * isigma
 
 	for {
 		z0 := gaussian0Sample(prng)
@@ -192,7 +121,7 @@ func sampleFFTPoint(prng *samplerPRNG, mu, isigma fpr) fpr {
 		z := b + ((b<<1)-1)*z0
 
 		x := fpr(z) - r
-		x = x*x*dss - fpr(z0*z0)*falconInv2SqrSigma0
+		x = x*x*dss - fpr(z0*z0)*inv2SqrSigma0
 		if berExp(prng, x, ccs) {
 			return fpr(s + float64(z))
 		}
@@ -351,8 +280,8 @@ func ffSamplingFFTRecursive(prng *samplerPRNG, z0, z1, tree, t0, t1, tmp []fpr, 
 
 		cRe = aRe - bRe
 		cIm = aIm - bIm
-		w2 := (cRe + cIm) * falconInvSqrt8
-		w3 := (cIm - cRe) * falconInvSqrt8
+		w2 := (cRe + cIm) * invSqrt8
+		w3 := (cIm - cRe) * invSqrt8
 
 		x0 := w2
 		x1 := w3
@@ -375,8 +304,8 @@ func ffSamplingFFTRecursive(prng *samplerPRNG, z0, z1, tree, t0, t1, tmp []fpr, 
 		aIm = w1
 		bRe = w2
 		bIm = w3
-		cRe = (bRe - bIm) * falconInvSqrt2
-		cIm = (bRe + bIm) * falconInvSqrt2
+		cRe = (bRe - bIm) * invSqrt2
+		cIm = (bRe + bIm) * invSqrt2
 		z1[0] = aRe + cRe
 		z1[2] = aIm + cIm
 		z1[1] = aRe - cRe
@@ -418,8 +347,8 @@ func ffSamplingFFTRecursive(prng *samplerPRNG, z0, z1, tree, t0, t1, tmp []fpr, 
 
 		cRe = aRe - bRe
 		cIm = aIm - bIm
-		w2 = (cRe + cIm) * falconInvSqrt8
-		w3 = (cIm - cRe) * falconInvSqrt8
+		w2 = (cRe + cIm) * invSqrt8
+		w3 = (cIm - cRe) * invSqrt8
 
 		x0 = w2
 		x1 = w3
@@ -442,8 +371,8 @@ func ffSamplingFFTRecursive(prng *samplerPRNG, z0, z1, tree, t0, t1, tmp []fpr, 
 		aIm = w1
 		bRe = w2
 		bIm = w3
-		cRe = (bRe - bIm) * falconInvSqrt2
-		cIm = (bRe + bIm) * falconInvSqrt2
+		cRe = (bRe - bIm) * invSqrt2
+		cIm = (bRe + bIm) * invSqrt2
 		z0[0] = aRe + cRe
 		z0[2] = aIm + cIm
 		z0[1] = aRe - cRe

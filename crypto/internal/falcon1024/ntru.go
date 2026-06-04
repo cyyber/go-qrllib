@@ -610,7 +610,7 @@ func reduceNTRUSolution(wk *ntruWorkspace, Ft, Gt, ft, gt []uint32, depth, logn,
 			x := rt2[i] * pdc
 			// Bounds written with !(<) on both sides to also reject NaN
 			// (NaN comparisons all return false; the negation captures them).
-			if !(falconMtwo31m1 < x) || !(x < falconPtwo31m1) {
+			if !(negTwoTo31Minus1 < x) || !(x < twoTo31Minus1) {
 				return false
 			}
 			k[i] = int32(fprRint(x))
@@ -919,7 +919,7 @@ func solveNTRUBinaryDepth1(f, g smallPolynomial, wk *ntruWorkspace) bool {
 		z := rt5[i]
 		// Bounds written with !(<) on both sides to also reject NaN
 		// (NaN comparisons all return false; the negation captures them).
-		if !(z < falconPtwo63m1) || !(falconMtwo63m1 < z) {
+		if !(z < twoTo63Minus1) || !(negTwoTo63Minus1 < z) {
 			return false
 		}
 		rt5[i] = fpr(fprRint(z))
