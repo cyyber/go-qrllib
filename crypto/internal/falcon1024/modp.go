@@ -15,6 +15,19 @@ func modPNorm(x, p uint32) int32 {
 	return int32(w)
 }
 
+func modPNInv31(p uint32) uint32 {
+	y := uint32(2 - p)
+	y *= 2 - p*y
+	y *= 2 - p*y
+	y *= 2 - p*y
+	y *= 2 - p*y
+	return mask31 & -y
+}
+
+func modPR(p uint32) uint32 {
+	return (uint32(1) << 31) - p
+}
+
 func modPAdd(a, b, p uint32) uint32 {
 	d := a + b - p
 	d += p & -(d >> 31)
@@ -34,19 +47,6 @@ func modPMontyMul(a, b, p, p0i uint32) uint32 {
 	d := uint32(z) - p
 	d += p & -(d >> 31)
 	return d
-}
-
-func modPNInv31(p uint32) uint32 {
-	y := uint32(2 - p)
-	y *= 2 - p*y
-	y *= 2 - p*y
-	y *= 2 - p*y
-	y *= 2 - p*y
-	return mask31 & -y
-}
-
-func modPR(p uint32) uint32 {
-	return (uint32(1) << 31) - p
 }
 
 func modPR2(p, p0i uint32) uint32 {
@@ -93,9 +93,10 @@ func modPMkgm2(gm, igm []uint32, logn int, primitiveRoot, p, p0i uint32) {
 		g = modPMontyMul(g, g, p, p0i)
 	}
 
-	ig := modPDiv(r2, g, p, p0i, modPR(p))
-	x1 := modPR(p)
-	x2 := modPR(p)
+	r := modPR(p)
+	ig := modPDiv(r2, g, p, p0i, r)
+	x1 := r
+	x2 := r
 	k := 10 - logn
 	for i := range nn {
 		j := int(rev10[i]) >> k
@@ -104,10 +105,6 @@ func modPMkgm2(gm, igm []uint32, logn int, primitiveRoot, p, p0i uint32) {
 		x1 = modPMontyMul(x1, g, p, p0i)
 		x2 = modPMontyMul(x2, ig, p, p0i)
 	}
-}
-
-func modPNTT2(a, gm []uint32, logn int, p, p0i uint32) {
-	modPNTT2Ext(a, 1, gm, logn, p, p0i)
 }
 
 func modPNTT2Ext(a []uint32, stride int, gm []uint32, logn int, p, p0i uint32) {
@@ -134,10 +131,6 @@ func modPNTT2Ext(a []uint32, stride int, gm []uint32, logn int, p, p0i uint32) {
 		}
 		t = ht
 	}
-}
-
-func modPINTT2(a, igm []uint32, logn int, p, p0i uint32) {
-	modPINTT2Ext(a, 1, igm, logn, p, p0i)
 }
 
 func modPINTT2Ext(a []uint32, stride int, igm []uint32, logn int, p, p0i uint32) {
@@ -170,6 +163,14 @@ func modPINTT2Ext(a []uint32, stride int, igm []uint32, logn int, p, p0i uint32)
 	for k, r := 0, 0; k < nn; k, r = k+1, r+stride {
 		a[r] = modPMontyMul(a[r], ni, p, p0i)
 	}
+}
+
+func modPNTT2(a, gm []uint32, logn int, p, p0i uint32) {
+	modPNTT2Ext(a, 1, gm, logn, p, p0i)
+}
+
+func modPINTT2(a, igm []uint32, logn int, p, p0i uint32) {
+	modPINTT2Ext(a, 1, igm, logn, p, p0i)
 }
 
 func modPPolyRecRes(f []uint32, logn int, p, p0i, r2 uint32) {
