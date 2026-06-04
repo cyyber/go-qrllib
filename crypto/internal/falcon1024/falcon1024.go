@@ -24,6 +24,7 @@ type PrivateKey struct {
 }
 
 func (priv *PrivateKey) Equal(x *PrivateKey) bool {
+	// use seed ? check mldsa stdlib
 	return subtle.ConstantTimeCompare(priv.raw[:], x.raw[:]) == 1
 }
 
