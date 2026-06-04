@@ -5,6 +5,7 @@ import (
 	"math/bits"
 )
 
+// Falcon's fpr layer uses native float64, matching the reference FPNATIVE path.
 const (
 	fprInverseOfQ    fpr = 1.0 / q
 	sigmaMin1024     fpr = 1.2982803343442918539708792538826807
