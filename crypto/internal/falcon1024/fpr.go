@@ -5,7 +5,6 @@ import (
 	"math/bits"
 )
 
-// Falcon's fpr layer uses native float64, matching the reference FPNATIVE path.
 const (
 	fprInverseOfQ    fpr = 1.0 / q
 	sigmaMin1024     fpr = 1.2982803343442918539708792538826807
@@ -22,6 +21,7 @@ const (
 	negTwoTo63Minus1 fpr = -9223372036854775807
 )
 
+// Falcon's fpr layer uses native float64, matching the reference FPNATIVE path.
 type fpr float64
 
 func fprRint(x fpr) int64 {
