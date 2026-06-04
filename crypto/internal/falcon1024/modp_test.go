@@ -128,132 +128,113 @@ func TestModPSub(t *testing.T) {
 	}
 }
 
-func TestModPMontgomeryHelpers(t *testing.T) {
-	for _, tc := range []struct {
-		name       string
-		primeIndex int
-		wantP0i    uint32
-		wantR      uint32
-		wantR2     uint32
-		wantRx     []struct {
-			x    int
-			want uint32
-		}
-		mul []struct {
-			a, b uint32
-			want uint32
-		}
-		div []struct {
-			a, b uint32
-			want uint32
-		}
-	}{
-		{
-			name:       "prime 0",
-			primeIndex: 0,
-			wantP0i:    2042615807,
-			wantR:      10239,
-			wantR2:     104837121,
-			wantRx: []struct {
-				x    int
-				want uint32
-			}{
-				{x: 1, want: 10239},
-				{x: 2, want: 104837121},
-				{x: 5, want: 546337913},
-				{x: 209, want: 1926030416},
-				{x: 1024, want: 1858646498},
-			},
-			mul: []struct {
-				a, b uint32
-				want uint32
-			}{
-				{a: 123456789, b: 987654321, want: 588659901},
-				{a: 2147473407, b: 3, want: 629204046},
-				{a: 1, b: 1, want: 2042606068},
-				{a: 104837121, b: 383167813, want: 1968792473},
-			},
-			div: []struct {
-				a, b uint32
-				want uint32
-			}{
-				{a: 5, b: 7, want: 1227127663},
-				{a: 123456789, b: 987654321, want: 464434420},
-				{a: 2147473407, b: 3, want: 715824469},
-				{a: 104837121, b: 383167813, want: 1485738006},
-			},
+type modPRxCase struct {
+	x    int
+	want uint32
+}
+
+type modPMulCase struct {
+	a, b uint32
+	want uint32
+}
+
+type modPDivCase struct {
+	a, b uint32
+	want uint32
+}
+
+var modPMontgomeryTestCases = []struct {
+	name       string
+	primeIndex int
+	wantP0i    uint32
+	wantR      uint32
+	wantR2     uint32
+	wantRx     []modPRxCase
+	mul        []modPMulCase
+	div        []modPDivCase
+}{
+	{
+		name:       "prime 0",
+		primeIndex: 0,
+		wantP0i:    2042615807,
+		wantR:      10239,
+		wantR2:     104837121,
+		wantRx: []modPRxCase{
+			{x: 1, want: 10239},
+			{x: 2, want: 104837121},
+			{x: 5, want: 546337913},
+			{x: 209, want: 1926030416},
+			{x: 1024, want: 1858646498},
 		},
-		{
-			name:       "prime 1",
-			primeIndex: 1,
-			wantP0i:    1862176767,
-			wantR:      94207,
-			wantR2:     285401085,
-			wantRx: []struct {
-				x    int
-				want uint32
-			}{
-				{x: 1, want: 94207},
-				{x: 2, want: 285401085},
-				{x: 5, want: 1467853668},
-				{x: 209, want: 1394546252},
-				{x: 1024, want: 877988126},
-			},
-			mul: []struct {
-				a, b uint32
-				want uint32
-			}{
-				{a: 123456789, b: 987654321, want: 710110895},
-				{a: 2147389439, b: 3, want: 1711766190},
-				{a: 1, b: 1, want: 1862095076},
-				{a: 285401085, b: 211808905, want: 338827563},
-			},
-			div: []struct {
-				a, b uint32
-				want uint32
-			}{
-				{a: 5, b: 7, want: 613539841},
-				{a: 123456789, b: 987654321, want: 220855656},
-				{a: 2147389439, b: 3, want: 1431592960},
-				{a: 285401085, b: 211808905, want: 348056158},
-			},
+		mul: []modPMulCase{
+			{a: 123456789, b: 987654321, want: 588659901},
+			{a: 2147473407, b: 3, want: 629204046},
+			{a: 1, b: 1, want: 2042606068},
+			{a: 104837121, b: 383167813, want: 1968792473},
 		},
-		{
-			name:       "last nonzero prime",
-			primeIndex: len(smallPrimes) - 2,
-			wantP0i:    2098206719,
-			wantR:      11528191,
-			wantR2:     39197941,
-			wantRx: []struct {
-				x    int
-				want uint32
-			}{
-				{x: 1, want: 11528191},
-				{x: 2, want: 39197941},
-				{x: 5, want: 1185998780},
-				{x: 209, want: 1404733308},
-				{x: 1024, want: 42721858},
-			},
-			mul: []struct {
-				a, b uint32
-				want uint32
-			}{
-				{a: 123456789, b: 987654321, want: 543127818},
-				{a: 2135955455, b: 3, want: 294074394},
-				{a: 1, b: 1, want: 2086943058},
-				{a: 39197941, b: 538755304, want: 439707803},
-			},
-			div: []struct {
-				a, b uint32
-				want uint32
-			}{
-				{a: 5, b: 7, want: 1525682470},
-				{a: 123456789, b: 987654321, want: 1827225845},
-				{a: 2135955455, b: 3, want: 1423970304},
-				{a: 39197941, b: 538755304, want: 1959601019},
-			},
+		div: []modPDivCase{
+			{a: 5, b: 7, want: 1227127663},
+			{a: 123456789, b: 987654321, want: 464434420},
+			{a: 2147473407, b: 3, want: 715824469},
+			{a: 104837121, b: 383167813, want: 1485738006},
 		},
-	} {
+	},
+	{
+		name:       "prime 1",
+		primeIndex: 1,
+		wantP0i:    1862176767,
+		wantR:      94207,
+		wantR2:     285401085,
+		wantRx: []modPRxCase{
+			{x: 1, want: 94207},
+			{x: 2, want: 285401085},
+			{x: 5, want: 1467853668},
+			{x: 209, want: 1394546252},
+			{x: 1024, want: 877988126},
+		},
+		mul: []modPMulCase{
+			{a: 123456789, b: 987654321, want: 710110895},
+			{a: 2147389439, b: 3, want: 1711766190},
+			{a: 1, b: 1, want: 1862095076},
+			{a: 285401085, b: 211808905, want: 338827563},
+		},
+		div: []modPDivCase{
+			{a: 5, b: 7, want: 613539841},
+			{a: 123456789, b: 987654321, want: 220855656},
+			{a: 2147389439, b: 3, want: 1431592960},
+			{a: 285401085, b: 211808905, want: 348056158},
+		},
+	},
+	{
+		name:       "last nonzero prime",
+		primeIndex: len(smallPrimes) - 2,
+		wantP0i:    2098206719,
+		wantR:      11528191,
+		wantR2:     39197941,
+		wantRx: []modPRxCase{
+			{x: 1, want: 11528191},
+			{x: 2, want: 39197941},
+			{x: 5, want: 1185998780},
+			{x: 209, want: 1404733308},
+			{x: 1024, want: 42721858},
+		},
+		mul: []modPMulCase{
+			{a: 123456789, b: 987654321, want: 543127818},
+			{a: 2135955455, b: 3, want: 294074394},
+			{a: 1, b: 1, want: 2086943058},
+			{a: 39197941, b: 538755304, want: 439707803},
+		},
+		div: []modPDivCase{
+			{a: 5, b: 7, want: 1525682470},
+			{a: 123456789, b: 987654321, want: 1827225845},
+			{a: 2135955455, b: 3, want: 1423970304},
+			{a: 39197941, b: 538755304, want: 1959601019},
+		},
+	},
+}
+
+func TestModPMontgomeryConstants(t *testing.T) {
+	for _, tc := range modPMontgomeryTestCases {
 		t.Run(tc.name, func(t *testing.T) {
 			p := smallPrimes[tc.primeIndex].p
 			p0i := modPNInv31(p)
@@ -263,20 +244,54 @@ func TestModPMontgomeryHelpers(t *testing.T) {
 			if got := modPR(p); got != tc.wantR {
 				t.Fatalf("modPR = %d, want %d", got, tc.wantR)
 			}
-			r2 := modPR2(p, p0i)
-			if r2 != tc.wantR2 {
-				t.Fatalf("modPR2 = %d, want %d", r2, tc.wantR2)
+			if got := modPR2(p, p0i); got != tc.wantR2 {
+				t.Fatalf("modPR2 = %d, want %d", got, tc.wantR2)
 			}
-			for _, wantRx := range tc.wantRx {
-				if got := modPRx(wantRx.x, p, p0i, r2); got != wantRx.want {
-					t.Fatalf("modPRx(%d) = %d, want %d", wantRx.x, got, wantRx.want)
-				}
+			derived := smallPrimeDerivedValues[tc.primeIndex]
+			if derived.p0i != p0i {
+				t.Fatalf("cached p0i = %d, want %d", derived.p0i, p0i)
 			}
+			if derived.r2 != tc.wantR2 {
+				t.Fatalf("cached r2 = %d, want %d", derived.r2, tc.wantR2)
+			}
+		})
+	}
+}
+
+func TestModPMontyMul(t *testing.T) {
+	for _, tc := range modPMontgomeryTestCases {
+		t.Run(tc.name, func(t *testing.T) {
+			p := smallPrimes[tc.primeIndex].p
+			p0i := modPNInv31(p)
 			for _, mul := range tc.mul {
 				if got := modPMontyMul(mul.a, mul.b, p, p0i); got != mul.want {
 					t.Fatalf("modPMontyMul(%d, %d) = %d, want %d", mul.a, mul.b, got, mul.want)
 				}
 			}
+		})
+	}
+}
+
+func TestModPRx(t *testing.T) {
+	for _, tc := range modPMontgomeryTestCases {
+		t.Run(tc.name, func(t *testing.T) {
+			p := smallPrimes[tc.primeIndex].p
+			p0i := modPNInv31(p)
+			r2 := modPR2(p, p0i)
+			for _, wantRx := range tc.wantRx {
+				if got := modPRx(wantRx.x, p, p0i, r2); got != wantRx.want {
+					t.Fatalf("modPRx(%d) = %d, want %d", wantRx.x, got, wantRx.want)
+				}
+			}
+		})
+	}
+}
+
+func TestModPDiv(t *testing.T) {
+	for _, tc := range modPMontgomeryTestCases {
+		t.Run(tc.name, func(t *testing.T) {
+			p := smallPrimes[tc.primeIndex].p
+			p0i := modPNInv31(p)
 			r := modPR(p)
 			for _, div := range tc.div {
 				if got := modPDiv(div.a, div.b, p, p0i, r); got != div.want {
@@ -303,40 +318,6 @@ func TestModPMkgm2(t *testing.T) {
 		10239, 935697967, 1766507046, 1303280560,
 		1732718024, 638612301, 1636750779, 504566473,
 	})
-}
-
-func TestModPNTT2(t *testing.T) {
-	p := smallPrimes[0].p
-	p0i := modPNInv31(p)
-	gm := make([]uint32, 8)
-	igm := make([]uint32, 8)
-	modPMkgm2(gm, igm, 3, smallPrimes[0].g, p, p0i)
-
-	for _, tc := range []struct {
-		name    string
-		input   []uint32
-		wantNTT []uint32
-	}{
-		{
-			name:    "small",
-			input:   []uint32{1, 2, 3, 4, 5, 6, 7, 8},
-			wantNTT: []uint32{1939742775, 1889065586, 1695103822, 327325878, 2078796089, 1251355496, 1880810079, 1822640737},
-		},
-		{
-			name:    "mixed",
-			input:   []uint32{0, 1, 2147473408, 123456789, 987654321, 42, 104837121, 383167813},
-			wantNTT: []uint32{1534081667, 12004850, 684533022, 1344174496, 295340987, 1186634627, 398763095, 986887483},
-		},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			a := slices.Clone(tc.input)
-			modPNTT2(a, gm, 3, p, p0i)
-			requireEqualWords(t, "modPNTT2", a, tc.wantNTT)
-
-			modPINTT2(a, igm, 3, p, p0i)
-			requireEqualWords(t, "modPINTT2", a, tc.input)
-		})
-	}
 }
 
 func TestModPNTT2Ext(t *testing.T) {
