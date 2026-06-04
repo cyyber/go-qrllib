@@ -24,6 +24,20 @@ const (
 // Falcon's fpr layer uses native float64, matching the reference FPNATIVE path.
 type fpr float64
 
+var fprP2Tab = [...]fpr{
+	2.0,
+	1.0,
+	0.5,
+	0.25,
+	0.125,
+	0.0625,
+	0.03125,
+	0.015625,
+	0.0078125,
+	0.00390625,
+	0.001953125,
+}
+
 func fprRint(x fpr) int64 {
 	v := float64(x)
 	sx := int64(v - 1.0)

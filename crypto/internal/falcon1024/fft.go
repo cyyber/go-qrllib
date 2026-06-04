@@ -495,8 +495,7 @@ func inverseFFT(f []fpr, logn int) {
 		m = hm
 	}
 
-	denom := 1 << (logn - 1)
-	scale := fpr(1.0 / float64(denom))
+	scale := fprP2Tab[logn]
 	for i := range 1 << logn {
 		f[i] *= scale
 	}
