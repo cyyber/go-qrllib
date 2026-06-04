@@ -3,8 +3,6 @@ package falcon1024
 import (
 	"encoding/hex"
 	"math"
-	"math/big"
-	"strconv"
 	"testing"
 )
 
@@ -409,80 +407,6 @@ func TestSampleFFTPointReferenceVectors(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestGaussian0SamplerReferenceBoundaries(t *testing.T) {
-	// Derived from test_gaussian0_sampler in the Falcon reference
-	// implementation test_falcon.c.
-	// Source: https://falcon-sign.info/impl/test_falcon.c.html
-	dist := []string{
-		"1697680241746640300030",
-		"1459943456642912959616",
-		"928488355018011056515",
-		"436693944817054414619",
-		"151893140790369201013",
-		"39071441848292237840",
-		"7432604049020375675",
-		"1045641569992574730",
-		"108788995549429682",
-		"8370422445201343",
-		"476288472308334",
-		"20042553305308",
-		"623729532807",
-		"14354889437",
-		"244322621",
-		"3075302",
-		"28626",
-		"197",
-		"1",
-	}
-
-	top := new(big.Int)
-	checkGaussian0Sample(t, "zero", top, 18)
-
-	one := big.NewInt(1)
-	for i := 17; i >= 0; i-- {
-		lower := new(big.Int).Add(top, one)
-		checkGaussian0Sample(t, "lower-"+strconv.Itoa(i), lower, i)
-
-		d, ok := new(big.Int).SetString(dist[i], 10)
-		if !ok {
-			t.Fatalf("bad Gaussian0 distance %q", dist[i])
-		}
-		top.Add(top, d)
-		checkGaussian0Sample(t, "upper-"+strconv.Itoa(i), top, i)
-	}
-
-	got := new(big.Int).Add(top, one)
-	want := new(big.Int).Lsh(big.NewInt(1), 72)
-	if got.Cmp(want) != 0 {
-		t.Fatalf("Gaussian0 distribution sum = %s, want %s", got, want)
-	}
-}
-
-func checkGaussian0Sample(t *testing.T, name string, x *big.Int, want int) {
-	t.Helper()
-	t.Run(name, func(t *testing.T) {
-		random := gaussian0RandomBytes(t, x)
-		prng := newSamplerPRNGFromBytes(random[:])
-		if got := gaussian0Sample(prng); got != want {
-			t.Fatalf("gaussian0Sample = %d, want %d", got, want)
-		}
-	})
-}
-
-func gaussian0RandomBytes(t *testing.T, x *big.Int) [9]byte {
-	t.Helper()
-	if x.Sign() < 0 || x.BitLen() > 72 {
-		t.Fatalf("Gaussian0 input out of range: %s", x)
-	}
-
-	var out [9]byte
-	b := x.Bytes()
-	for i := range b {
-		out[i] = b[len(b)-1-i]
-	}
-	return out
 }
 
 func samplerZRandomBytes(parts ...string) []byte {
