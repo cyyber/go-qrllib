@@ -27,10 +27,6 @@ func modPSub(a, b, p uint32) uint32 {
 	return d
 }
 
-func modPHalf(a, p uint32) uint32 {
-	return (a + (p & -(a & 1))) >> 1
-}
-
 func modPMontyMul(a, b, p, p0i uint32) uint32 {
 	z := uint64(a) * uint64(b)
 	w := (uint32(z) * p0i) & mask31
@@ -61,7 +57,7 @@ func modPR2(p, p0i uint32) uint32 {
 	z = modPMontyMul(z, z, p, p0i)
 	z = modPMontyMul(z, z, p, p0i)
 	z = modPMontyMul(z, z, p, p0i)
-	return modPHalf(z, p)
+	return (z + (p & -(z & 1))) >> 1
 }
 
 func modPRx(x int, p, p0i, r2 uint32) uint32 {

@@ -128,26 +128,6 @@ func TestModPSub(t *testing.T) {
 	}
 }
 
-func TestModPHalf(t *testing.T) {
-	p := smallPrimes[0].p
-	for _, tc := range []struct {
-		name string
-		a    uint32
-		want uint32
-	}{
-		{name: "zero", a: 0, want: 0},
-		{name: "one", a: 1, want: 1073736705},
-		{name: "two", a: 2, want: 1},
-		{name: "minus one", a: p - 1, want: 1073736704},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			if got := modPHalf(tc.a, p); got != tc.want {
-				t.Fatalf("modPHalf = %d, want %d", got, tc.want)
-			}
-		})
-	}
-}
-
 func TestModPMontgomeryHelpers(t *testing.T) {
 	for _, tc := range []struct {
 		name       string
