@@ -129,12 +129,12 @@ func TestPrivateKeyCodec(t *testing.T) {
 func TestSignatureCodec(t *testing.T) {
 	tc := verifyRawKATs[0]
 	nonceBytes := mustDecodeHex(t, tc.nonceHex)
-	var nonce [nonceSize]byte
-	copy(nonce[:], nonceBytes)
+	var referenceNonce [nonceSize]byte
+	copy(referenceNonce[:], nonceBytes)
 	s2 := decodeVerifyRawKATSignature(t, mustDecodeHex(t, tc.signatureHex))
 
-	sig := make([]byte, SignatureSize)
-	if err := sigEncode(sig, nonce, s2); err != nil {
+	referenceSig := make([]byte, SignatureSize)
+	if err := sigEncode(referenceSig, referenceNonce, s2); err != nil {
 		t.Fatal(err)
 	}
 
@@ -178,16 +178,16 @@ func TestSignatureCodec(t *testing.T) {
 		}{
 			{
 				name: "short",
-				in:   sig[:SignatureSize-1],
+				in:   referenceSig[:SignatureSize-1],
 			},
 			{
 				name: "long",
-				in:   append(bytes.Clone(sig), 0),
+				in:   append(bytes.Clone(referenceSig), 0),
 			},
 			{
 				name: "invalid header",
 				in: func() []byte {
-					in := bytes.Clone(sig)
+					in := bytes.Clone(referenceSig)
 					in[0] ^= 0xff
 					return in
 				}(),
@@ -218,7 +218,7 @@ func TestSignatureCodec(t *testing.T) {
 			},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
-				if err := sigEncode(tc.out, nonce, s2); err == nil {
+				if err := sigEncode(tc.out, referenceNonce, s2); err == nil {
 					t.Fatal("sigEncode accepted invalid signature buffer")
 				}
 			})
@@ -228,7 +228,7 @@ func TestSignatureCodec(t *testing.T) {
 	t.Run("rejects non-zero padding", func(t *testing.T) {
 		sig := make([]byte, SignatureSize)
 		sig[0] = signatureHeader
-		copy(sig[headerSize:signaturePrefixSize], nonce[:])
+		copy(sig[headerSize:signaturePrefixSize], referenceNonce[:])
 		written, err := compressedEncode(sig[signaturePrefixSize:], s2)
 		if err != nil {
 			t.Fatal(err)
