@@ -20,7 +20,7 @@ func fftFromSmall(dst []fpr, src smallPolynomial) {
 	fft(dst, logN)
 }
 
-type u72 struct {
+type uint72 struct {
 	hi byte
 	lo uint64
 }
@@ -41,7 +41,7 @@ var (
 		0.00593864530953311636,
 	}
 	// 72-bit CDT bounds for Falcon's half-Gaussian sampler.
-	gaussian0CDF = [...]u72{
+	gaussian0CDF = [...]uint72{
 		{hi: 0x00, lo: 0x0000000000000000},
 		{hi: 0x00, lo: 0x00000000000000c5},
 		{hi: 0x00, lo: 0x0000000000007097},
