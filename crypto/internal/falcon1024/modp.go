@@ -1,8 +1,8 @@
 package falcon1024
 
 // modP helpers implement arithmetic over Falcon's auxiliary 31-bit primes used
-// by the NTRU/CRT solver. They are intentionally separate from the field
-// helpers, which operate modulo the fixed Falcon field modulus q.
+// by the NTRU/CRT solver. They are intentionally separate from the q-modular
+// helpers, which operate modulo Falcon's fixed modulus q = 12289.
 
 func modPSet(x int32, p uint32) uint32 {
 	w := uint32(x)
