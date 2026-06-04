@@ -1,20 +1,14 @@
 package falcon1024
 
 import (
-	"bytes"
 	"encoding/hex"
-	"io"
 	"math"
 	"math/big"
 	"strconv"
 	"testing"
 )
 
-func newSamplerPRNGFromReader(r io.Reader) *samplerPRNG {
-	b, err := io.ReadAll(r)
-	if err != nil {
-		panic(err)
-	}
+func newSamplerPRNGFromBytes(b []byte) *samplerPRNG {
 	var p samplerPRNG
 	copy(p.buf[:], b)
 	return &p
@@ -95,7 +89,7 @@ func fprAlmostEqual(a, b fpr) bool {
 	return math.Abs(float64(a-b)) <= tolerance
 }
 
-func TestSampleFFTPoint(t *testing.T) {
+func TestSampleFFTPointReferenceVectors(t *testing.T) {
 	// Derived from Supporting_Documentation/additional/
 	// test-vector-sampler-falcon1024.txt in the Falcon submission package.
 	// Source archive: https://falcon-sign.info/falcon-round3.zip
@@ -409,7 +403,7 @@ func TestSampleFFTPoint(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			prng := newSamplerPRNGFromReader(bytes.NewReader(tc.random))
+			prng := newSamplerPRNGFromBytes(tc.random)
 			if got := sampleFFTPoint(prng, tc.mu, tc.isigma); got != tc.want {
 				t.Fatalf("sampleFFTPoint = %v, want %v", got, tc.want)
 			}
@@ -470,7 +464,7 @@ func checkGaussian0Sample(t *testing.T, name string, x *big.Int, want int) {
 	t.Helper()
 	t.Run(name, func(t *testing.T) {
 		random := gaussian0RandomBytes(t, x)
-		prng := newSamplerPRNGFromReader(bytes.NewReader(random[:]))
+		prng := newSamplerPRNGFromBytes(random[:])
 		if got := gaussian0Sample(prng); got != want {
 			t.Fatalf("gaussian0Sample = %d, want %d", got, want)
 		}
