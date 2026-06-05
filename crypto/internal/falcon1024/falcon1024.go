@@ -31,6 +31,8 @@ func (priv *PrivateKey) Bytes() []byte {
 }
 
 func (priv *PrivateKey) PublicKey() *PublicKey {
+	// Returning a pointer to the embedded public key can keep the whole
+	// PrivateKey reachable for as long as the PublicKey is retained.
 	return &priv.pub
 }
 
@@ -51,11 +53,11 @@ func (pub *PublicKey) Bytes() []byte {
 var errInvalidSeedLength = errors.New("falcon-1024: invalid seed length")
 
 func NewPrivateKey(seed []byte) (*PrivateKey, error) {
-	priv := &PrivateKey{}
-
 	if len(seed) != SeedSize {
 		return nil, errInvalidSeedLength
 	}
+
+	priv := &PrivateKey{}
 	copy(priv.seed[:], seed)
 
 	rng := sha3.NewSHAKE256()
