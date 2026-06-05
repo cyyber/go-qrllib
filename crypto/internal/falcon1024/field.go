@@ -147,22 +147,8 @@ func polyByteDecode[T ~[n]fieldElement](b []byte) (T, error) {
 	return p, nil
 }
 
-// hashToPoint maps a SHAKE stream to a uniform ringElement via rejection
-// sampling, matching the Falcon reference's hash_to_point_vartime. Each 16-bit
-// draw is rejected with probability (2^16 - 5q)/2^16 ≈ 6.2%, so the number of
-// SHAKE bytes consumed — and therefore the wall-time — depends on the SHAKE
-// output, i.e. on (nonce, message).
-//
-// This variable-time behaviour is intentional. Both call sites (signing and
-// verifying) treat the nonce and message as public: the nonce is transmitted
-// in the signature, and Falcon's threat model assumes the attacker already
-// knows the message being signed. The leak therefore reveals only data the
-// attacker already has.
-//
-// If a future caller ever needs to sign secret messages, this must be replaced
-// with the reference's constant-time hash_to_point_ct (fixed-length sample
-// buffer + sorting network) — rejection sampling cannot be made constant-time
-// without that structural change.
+// hashToPoint maps a SHAKE stream to a uniform ringElement, matching the Falcon
+// reference hash_to_point_vartime.
 func hashToPoint(h *sha3.SHAKE) ringElement {
 	var p ringElement
 	var buf [2]byte

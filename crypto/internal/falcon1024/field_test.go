@@ -13,7 +13,9 @@ func TestHashToPointReferenceVectors(t *testing.T) {
 
 	// The expected digests were derived from the Falcon reference
 	// implementation hash_to_point_vartime applied to KAT_SIG_1024
-	// nonce/message pairs. Digests are over 1024 big-endian uint16 values.
+	// nonce/message pairs. These are Falcon submission/reference vectors, not
+	// official NIST/FIPS validation vectors. Digests are over 1024 big-endian
+	// uint16 values.
 	// Source: https://falcon-sign.info/impl/test_falcon.c.html
 	expected := []string{
 		"e8332e46eeaa30a54945a14a405fcad8ef8078a87657e50e18248076bab9ecb7",
@@ -92,6 +94,37 @@ func TestFieldArithmetic(t *testing.T) {
 	}
 	if got := fieldCenteredMod(q/2 + 1); got != -6144 {
 		t.Fatalf("fieldCenteredMod = %d, want -6144", got)
+	}
+
+	for _, x := range []fieldElement{1, 2, 3, 1234, q - 1} {
+		invMont := fieldInvMontgomery(x)
+		if got := fieldMontgomeryMul(x, invMont); got != 1 {
+			t.Fatalf("x * fieldInvMontgomery(%d) = %d, want 1", x, got)
+		}
+	}
+
+	var numerator, denominator, want ringElement
+	for i := range numerator {
+		numerator[i] = fieldElement((7*i + 5) % q)
+		denominator[i] = fieldElement((11*i+3)%(q-1) + 1)
+	}
+	want = numerator
+
+	for i := range want {
+		invMont := fieldInvMontgomery(denominator[i])
+		want[i] = fieldMontgomeryMul(want[i], invMont)
+	}
+
+	if !divideNTTByBatchedInverse(numerator[:], denominator[:]) {
+		t.Fatal("divideNTTByBatchedInverse rejected nonzero denominator")
+	}
+	if numerator != want {
+		t.Fatal("divideNTTByBatchedInverse returned unexpected quotient")
+	}
+
+	denominator[17] = 0
+	if divideNTTByBatchedInverse(numerator[:], denominator[:]) {
+		t.Fatal("divideNTTByBatchedInverse accepted zero denominator")
 	}
 }
 
