@@ -96,12 +96,12 @@ func generateKeyComponents(rng *sha3.SHAKE) (f, g, ntruF, ntruG smallPolynomial,
 		}
 
 		var ok bool
-		ntruF, ntruG, ok = solveNTRU(f, g)
+		h, ok = computePublic(f, g)
 		if !ok {
 			continue
 		}
 
-		h, ok = computePublic(f, g)
+		ntruF, ntruG, ok = solveNTRU(f, g)
 		if !ok {
 			continue
 		}
