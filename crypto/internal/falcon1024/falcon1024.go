@@ -325,28 +325,19 @@ func signTreeAttempt(prng *samplerPRNG, priv *PrivateKey, c0 ringElement) (small
 
 const nonceSize = 40
 
-type Signature struct {
-	nonce [nonceSize]byte
-	s2    smallPolynomial
-}
-
-func NewSignature(sig []byte) (*Signature, error) {
+func Verify(pub *PublicKey, message, sig []byte) error {
 	nonce, s2, err := sigDecode(sig)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return &Signature{nonce: nonce, s2: s2}, nil
-}
-
-func Verify(pub *PublicKey, message []byte, sig *Signature) error {
 	h := sha3.NewSHAKE256()
-	_, _ = h.Write(sig.nonce[:])
+	_, _ = h.Write(nonce[:])
 	_, _ = h.Write(message)
 
 	c0 := hashToPoint(h)
 
-	if !verifyRaw(c0, sig.s2, pub.hNTT) {
+	if !verifyRaw(c0, s2, pub.hNTT) {
 		return errors.New("falcon-1024: invalid signature")
 	}
 

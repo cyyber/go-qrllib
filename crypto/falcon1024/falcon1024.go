@@ -133,9 +133,5 @@ func Sign(random io.Reader, privateKey *PrivateKey, message []byte) ([]byte, err
 
 // Verify reports whether sig is a valid signature of message by publicKey.
 func Verify(publicKey *PublicKey, message, sig []byte) bool {
-	s, err := falcon1024.NewSignature(sig)
-	if err != nil {
-		return false
-	}
-	return falcon1024.Verify(publicKey.key, message, s) == nil
+	return falcon1024.Verify(publicKey.key, message, sig) == nil
 }

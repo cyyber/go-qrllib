@@ -797,35 +797,6 @@ func nistKATSignTreeInput(t *testing.T, count int) (*PrivateKey, ringElement, *s
 	panic("unreachable")
 }
 
-func TestNewSignature(t *testing.T) {
-	// The s2 vectors are decoded from the Falcon reference implementation
-	// KAT_SIG_1024 raw verify vectors. Those raw vectors use a 32-byte hash
-	// seed, not the 40-byte nonce carried by padded Falcon signatures, so the
-	// seed is zero-extended only to exercise NewSignature.
-	// Source: https://falcon-sign.info/impl/test_falcon.c.html
-	for _, tc := range verifyRawKATs {
-		t.Run(tc.message, func(t *testing.T) {
-			nonceBytes := mustDecodeHex(t, tc.nonceHex)
-			var nonce [nonceSize]byte
-			copy(nonce[:], nonceBytes)
-			wantS2 := decodeVerifyRawKATSignature(t, mustDecodeHex(t, tc.signatureHex))
-
-			sigBytes := make([]byte, SignatureSize)
-			if err := sigEncode(sigBytes, nonce, wantS2); err != nil {
-				t.Fatal(err)
-			}
-
-			sig, err := NewSignature(sigBytes)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if sig.nonce != nonce || sig.s2 != wantS2 {
-				t.Fatal("NewSignature returned unexpected parsed signature")
-			}
-		})
-	}
-}
-
 func decodeVerifyRawKATSignature(t *testing.T, sig []byte) smallPolynomial {
 	t.Helper()
 	if len(sig) != 1+2*n {
