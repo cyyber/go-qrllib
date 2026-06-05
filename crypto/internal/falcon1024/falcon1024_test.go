@@ -2,15 +2,12 @@ package falcon1024
 
 import (
 	"bytes"
-	"compress/gzip"
 	"crypto/aes"
 	"crypto/sha1"
 	"crypto/sha256"
 	"crypto/sha3"
 	"encoding/hex"
-	"encoding/json"
 	"hash"
-	"os"
 	"strconv"
 	"testing"
 )
@@ -207,83 +204,6 @@ func TestSignTreeNISTKATVectors(t *testing.T) {
 	})
 }
 
-type signTreeNISTKATVector struct {
-	Count            int    `json:"count"`
-	CompressedLength int    `json:"compressedLength"`
-	CompressedSHA256 string `json:"compressedSHA256"`
-}
-
-func readSignTreeNISTKATVectors(t *testing.T) []signTreeNISTKATVector {
-	t.Helper()
-
-	var vectors []signTreeNISTKATVector
-	readGzipJSON(t, "sign_tree_nist_kat.json.gz", &vectors)
-	if len(vectors) != 100 {
-		t.Fatalf("sign tree NIST KAT vector count = %d, want 100", len(vectors))
-	}
-
-	return vectors
-}
-
-type verifyRawKATFixture struct {
-	PublicKeyHex string               `json:"publicKeyHex"`
-	Tests        []verifyRawKATVector `json:"tests"`
-}
-
-type verifyRawKATVector struct {
-	NonceHex     string `json:"nonceHex"`
-	Message      string `json:"message"`
-	SignatureHex string `json:"signatureHex"`
-}
-
-func readVerifyRawKATVectors(t *testing.T) verifyRawKATFixture {
-	t.Helper()
-
-	var vectors verifyRawKATFixture
-	readGzipJSON(t, "verify_raw_kat.json.gz", &vectors)
-	if vectors.PublicKeyHex == "" {
-		t.Fatal("verify_raw KAT public key is empty")
-	}
-	if len(vectors.Tests) != 10 {
-		t.Fatalf("verify_raw KAT vector count = %d, want 10", len(vectors.Tests))
-	}
-
-	return vectors
-}
-
-func referencePublicKeyBytes(t *testing.T) []byte {
-	t.Helper()
-	return mustDecodeHex(t, readVerifyRawKATVectors(t).PublicKeyHex)
-}
-
-func readGzipJSON(t *testing.T, name string, out any) {
-	t.Helper()
-
-	f, err := os.Open("testdata/" + name)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		if err := f.Close(); err != nil {
-			t.Errorf("closing %s: %v", name, err)
-		}
-	}()
-
-	gz, err := gzip.NewReader(f)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		if err := gz.Close(); err != nil {
-			t.Errorf("closing %s reader: %v", name, err)
-		}
-	}()
-
-	if err := json.NewDecoder(gz).Decode(out); err != nil {
-		t.Fatal(err)
-	}
-}
-
 func forEachNISTKATSignTreeInput(t *testing.T, count int, f func(int, *PrivateKey, ringElement, *sha3.SHAKE)) {
 	t.Helper()
 
@@ -328,23 +248,6 @@ func forEachNISTKATSignTreeInput(t *testing.T, count int, f func(int, *PrivateKe
 		f(i, priv, c0, rng)
 		drbg.restore(state)
 	}
-}
-
-func decodeVerifyRawKATSignature(t *testing.T, sig []byte) smallPolynomial {
-	t.Helper()
-	if len(sig) != 1+2*n {
-		t.Fatalf("bad KAT signature length: got %d", len(sig))
-	}
-	if sig[0] != logN {
-		t.Fatalf("bad KAT signature header: got %#x", sig[0])
-	}
-
-	var s2 smallPolynomial
-	for i := range s2 {
-		j := 1 + 2*i
-		s2[i] = int32(int16(uint16(sig[j])<<8 | uint16(sig[j+1])))
-	}
-	return s2
 }
 
 const (
