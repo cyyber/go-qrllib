@@ -91,8 +91,6 @@ func fieldCenteredMod(x fieldElement) int32 {
 	return v
 }
 
-const hashToPointRejectThreshold = 5 * q // 61445
-
 type ringElement [n]fieldElement // modulo-q polynomial
 
 func polyByteEncode[T ~[n]fieldElement](dst []byte, p T) {
@@ -146,6 +144,8 @@ func polyByteDecode[T ~[n]fieldElement](b []byte) (T, error) {
 
 	return p, nil
 }
+
+const hashToPointRejectThreshold = 5 * q // 61445
 
 // hashToPoint maps a SHAKE stream to a uniform ringElement, matching the Falcon
 // reference hash_to_point_vartime.
