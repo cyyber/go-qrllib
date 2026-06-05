@@ -7,16 +7,9 @@ import (
 )
 
 const (
-	// n is the Falcon-1024 polynomial degree.
-	n = 1024
-	// logN is log2(n), the Falcon degree parameter.
-	logN = 10
-	// q is the Falcon field modulus.
-	q                  = 12289
-	qNegInv            = 12287
-	r2                 = 10952
-	nInverseMontgomery = 64
-	mask16             = 0xFFFF
+	n    = 1024  // polynomial degree
+	logN = 10    // log2(n)
+	q    = 12289 // field modulus
 )
 
 type fieldElement uint32
@@ -42,6 +35,8 @@ func fieldSub(a, b fieldElement) fieldElement {
 	x := uint32(a - b + q)
 	return fieldReduceOnce(x)
 }
+
+const r2 = 10952
 
 // fieldInvMontgomery returns 1/x in Montgomery representation.
 func fieldInvMontgomery(x fieldElement) fieldElement {
@@ -74,6 +69,9 @@ func fieldMontgomeryMul(a, b fieldElement) fieldElement {
 	x := uint32(a) * uint32(b)
 	return fieldMontgomeryReduce(x)
 }
+
+const qNegInv = 12287
+const mask16 = 0xFFFF
 
 func fieldMontgomeryReduce(x uint32) fieldElement {
 	w := ((x * qNegInv) & mask16) * q
@@ -186,6 +184,8 @@ func ntt(f []fieldElement) {
 	}
 }
 
+const nInverseMontgomery = 64
+
 func inverseNTT(f []fieldElement) {
 	t := 1
 	m := n
@@ -251,8 +251,6 @@ func divideNTTByBatchedInverse(hNTT, fNTT []fieldElement) bool {
 	hNTT[0] = fieldMontgomeryMul(hNTT[0], invRunMont)
 	return true
 }
-
-const signatureNormBound uint64 = 70_265_242
 
 type smallPolynomial [n]int32
 
@@ -361,6 +359,8 @@ func orthogonalizedNormExceedsBound(f, g smallPolynomial, bound float64) bool {
 
 	return norm >= bound
 }
+
+const signatureNormBound uint64 = 70_265_242
 
 func signatureNormExceedsPartialBound(sqn uint32, s2 smallPolynomial) bool {
 	norm := uint64(sqn)
