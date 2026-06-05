@@ -3,7 +3,9 @@ package testutil
 import (
 	"compress/gzip"
 	"encoding/json"
+	"errors"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,7 +16,7 @@ import (
 func ReadJSON[T any](t testing.TB, rootDir, name string) T {
 	t.Helper()
 
-	b, path := ReadFile(t, rootDir, name)
+	b, path := readFile(t, rootDir, name)
 	var out T
 	if err := json.Unmarshal(b, &out); err != nil {
 		t.Fatalf("parse JSON %q: %v", path, err)
@@ -22,8 +24,7 @@ func ReadJSON[T any](t testing.TB, rootDir, name string) T {
 	return out
 }
 
-// ReadFile reads a test fixture from rootDir/name, falling back to name+".gz".
-func ReadFile(t testing.TB, rootDir, name string) ([]byte, string) {
+func readFile(t testing.TB, rootDir, name string) ([]byte, string) {
 	t.Helper()
 
 	root, err := os.OpenRoot(rootDir)
@@ -34,8 +35,12 @@ func ReadFile(t testing.TB, rootDir, name string) ([]byte, string) {
 
 	gzName := name
 	if !strings.HasSuffix(gzName, ".gz") {
-		if b, err := root.ReadFile(name); err == nil {
+		b, err := root.ReadFile(name)
+		if err == nil {
 			return b, filepath.Join(rootDir, name)
+		}
+		if !errors.Is(err, fs.ErrNotExist) {
+			t.Fatalf("read test fixture %q: %v", filepath.Join(rootDir, name), err)
 		}
 		gzName += ".gz"
 	}
