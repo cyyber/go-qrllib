@@ -325,6 +325,8 @@ func signTreeAttempt(prng *samplerPRNG, priv *PrivateKey, c0 ringElement) (small
 	return s2, true
 }
 
+var errInvalidSignature = errors.New("falcon-1024: invalid signature")
+
 func Verify(pub *PublicKey, message, sig []byte) error {
 	nonce, s2, err := sigDecode(sig)
 	if err != nil {
@@ -338,7 +340,7 @@ func Verify(pub *PublicKey, message, sig []byte) error {
 	c0 := hashToPoint(h)
 
 	if !verifyRaw(c0, s2, pub.hNTT) {
-		return errors.New("falcon-1024: invalid signature")
+		return errInvalidSignature
 	}
 
 	return nil
