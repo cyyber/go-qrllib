@@ -35,7 +35,8 @@ func readFile(t testing.TB, rootDir, name string) ([]byte, string) {
 
 	gzName := name
 	if !strings.HasSuffix(gzName, ".gz") {
-		b, err := root.ReadFile(name)
+		var b []byte
+		b, err = root.ReadFile(name)
 		if err == nil {
 			return b, filepath.Join(rootDir, name)
 		}
