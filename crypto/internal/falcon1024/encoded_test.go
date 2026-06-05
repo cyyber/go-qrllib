@@ -6,6 +6,10 @@ import (
 )
 
 func TestTestingOnlyNewPrivateKeyFromEncoded(t *testing.T) {
+	if _, err := TestingOnlyNewPrivateKeyFromEncoded(make([]byte, encodedPrivateKeySize)); err == nil {
+		t.Fatal("TestingOnlyNewPrivateKeyFromEncoded accepted malformed key")
+	}
+
 	// test_falcon.c publishes component private-key polynomials, not a
 	// serialized secret key. Use those reference polynomials to check that
 	// private-key reconstruction produces the reference public key.

@@ -5,6 +5,8 @@ import (
 	"errors"
 )
 
+var errInvalidPrivateKey = errors.New("falcon-1024: invalid private key")
+
 // TestingOnlyNewPrivateKeyFromEncoded creates a private key from the Falcon
 // encoded private-key form, for testing purposes.
 //
@@ -18,12 +20,12 @@ func TestingOnlyNewPrivateKeyFromEncoded(privBytes []byte) (*PrivateKey, error) 
 
 	ntruG, ok := completePrivate(f, g, ntruF)
 	if !ok {
-		return nil, errors.New("falcon-1024: invalid private key")
+		return nil, errInvalidPrivateKey
 	}
 
 	h, ok := computePublic(f, g)
 	if !ok {
-		return nil, errors.New("falcon-1024: invalid private key")
+		return nil, errInvalidPrivateKey
 	}
 
 	priv := &PrivateKey{}
