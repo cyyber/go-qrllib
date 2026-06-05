@@ -167,15 +167,16 @@ func TestSignTree(t *testing.T) {
 	}
 }
 
-func TestSignTreeNISTKATVectors(t *testing.T) {
-	// These vectors are derived from the Falcon-1024 NIST KAT signing flow.
-	// TestNISTKATDigest checks the full 100-case transcript against the
+func TestSignTreeRound3KATVectors(t *testing.T) {
+	// These vectors are derived from Falcon Round 3 submission KATs, not
+	// official NIST/FIPS validation vectors.
+	// TestFalconRound3KATDigest checks the full 100-case transcript against the
 	// Falcon reference digest; this test pins the internal signTree output
 	// for every KAT case.
 	// Source: https://falcon-sign.info/falcon-round3.zip
-	testCases := readSignTreeNISTKATVectors(t)
+	testCases := readSignTreeRound3KATVectors(t)
 
-	forEachNISTKATSignTreeInput(t, len(testCases), func(count int, priv *PrivateKey, c0 ringElement, rng *sha3.SHAKE) {
+	forEachRound3KATSignTreeInput(t, len(testCases), func(count int, priv *PrivateKey, c0 ringElement, rng *sha3.SHAKE) {
 		tc := testCases[count]
 		t.Run("count-"+strconv.Itoa(tc.Count), func(t *testing.T) {
 			if tc.Count != count {
@@ -188,7 +189,7 @@ func TestSignTreeNISTKATVectors(t *testing.T) {
 				t.Fatal("signTree output failed verifyRaw")
 			}
 
-			comp := make([]byte, nistKATCompressedCapacity)
+			comp := make([]byte, round3KATCompressedCapacity)
 			written, err := compressedEncode(comp, s2)
 			if err != nil {
 				t.Fatal(err)
@@ -204,7 +205,7 @@ func TestSignTreeNISTKATVectors(t *testing.T) {
 	})
 }
 
-func forEachNISTKATSignTreeInput(t *testing.T, count int, f func(int, *PrivateKey, ringElement, *sha3.SHAKE)) {
+func forEachRound3KATSignTreeInput(t *testing.T, count int, f func(int, *PrivateKey, ringElement, *sha3.SHAKE)) {
 	t.Helper()
 
 	var entropy [SeedSize]byte
@@ -251,12 +252,12 @@ func forEachNISTKATSignTreeInput(t *testing.T, count int, f func(int, *PrivateKe
 }
 
 const (
-	nistKATSignatureSize         = 1330
-	nistKATSignatureLengthSize   = 2
-	nistKATMessageOffset         = nistKATSignatureLengthSize + nonceSize
-	nistKATSignatureHeaderSize   = 1
-	nistKATCompressedCapacity    = nistKATSignatureSize - nistKATMessageOffset - nistKATSignatureHeaderSize
-	nistKATCompressedSignatureID = 0x20 + logN
+	round3KATSignatureSize         = 1330
+	round3KATSignatureLengthSize   = 2
+	round3KATMessageOffset         = round3KATSignatureLengthSize + nonceSize
+	round3KATSignatureHeaderSize   = 1
+	round3KATCompressedCapacity    = round3KATSignatureSize - round3KATMessageOffset - round3KATSignatureHeaderSize
+	round3KATCompressedSignatureID = 0x20 + logN
 )
 
 type nistDRBG struct {
@@ -334,7 +335,9 @@ func (d *nistDRBG) restore(state nistDRBGState) {
 	d.v = state.v
 }
 
-func TestNISTKATDigest(t *testing.T) {
+func TestFalconRound3KATDigest(t *testing.T) {
+	// Reproduce the Falcon Round 3 submission KAT transcript compactly by
+	// checking its SHA-1 digest.
 	var entropy [SeedSize]byte
 	for i := range entropy {
 		entropy[i] = byte(i)
@@ -347,8 +350,6 @@ func TestNISTKATDigest(t *testing.T) {
 	katDigestWriteLine(h, "")
 
 	for count := range 100 {
-		t.Logf("NIST KAT count %d", count)
-
 		var seed [SeedSize]byte
 		drbg.read(seed[:])
 
@@ -383,23 +384,23 @@ func TestNISTKATDigest(t *testing.T) {
 
 		s2 := signTree(signRNG, priv, c0)
 
-		comp := make([]byte, nistKATCompressedCapacity)
+		comp := make([]byte, round3KATCompressedCapacity)
 		written, err := compressedEncode(comp, s2)
 		if err != nil {
 			t.Fatalf("compressedEncode: %v", err)
 		}
 
-		sigLen := nistKATSignatureHeaderSize + written
-		smLen := nistKATMessageOffset + len(msg) + sigLen
+		sigLen := round3KATSignatureHeaderSize + written
+		smLen := round3KATMessageOffset + len(msg) + sigLen
 		sm := make([]byte, smLen)
 		sm[0] = byte(sigLen >> 8)
 		sm[1] = byte(sigLen)
-		copy(sm[nistKATSignatureLengthSize:], nonce[:])
-		copy(sm[nistKATMessageOffset:], msg)
+		copy(sm[round3KATSignatureLengthSize:], nonce[:])
+		copy(sm[round3KATMessageOffset:], msg)
 
-		sigOffset := nistKATMessageOffset + len(msg)
-		sm[sigOffset] = nistKATCompressedSignatureID
-		copy(sm[sigOffset+nistKATSignatureHeaderSize:], comp[:written])
+		sigOffset := round3KATMessageOffset + len(msg)
+		sm[sigOffset] = round3KATCompressedSignatureID
+		copy(sm[sigOffset+round3KATSignatureHeaderSize:], comp[:written])
 
 		drbg.restore(state)
 
@@ -415,7 +416,7 @@ func TestNISTKATDigest(t *testing.T) {
 	}
 
 	if got := h.Sum(nil); hex.EncodeToString(got) != "affdeb3aa83bf9a2039fa9c17d65fd3e3b9828e2" {
-		t.Fatalf("NIST KAT digest mismatch: %x", got)
+		t.Fatalf("Round 3 KAT digest mismatch: %x", got)
 	}
 }
 
