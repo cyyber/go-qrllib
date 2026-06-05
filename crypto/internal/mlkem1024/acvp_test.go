@@ -213,8 +213,8 @@ type acvpExpectedTest struct {
 func readACVPFile[T any](t *testing.T, suite, name string) T {
 	t.Helper()
 
-	path := filepath.Join("testdata", "acvp", suite, name)
-	return testutil.ReadJSON[T](t, path)
+	rootDir := filepath.Join("testdata", "acvp", suite)
+	return testutil.ReadJSON[T](t, rootDir, name)
 }
 
 func (f acvpExpectedFile) group(t *testing.T, tgID int) acvpExpectedGroup {

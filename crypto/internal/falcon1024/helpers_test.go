@@ -46,7 +46,7 @@ type signTreeNISTKATVector struct {
 func readSignTreeNISTKATVectors(t *testing.T) []signTreeNISTKATVector {
 	t.Helper()
 
-	vectors := testutil.ReadJSON[[]signTreeNISTKATVector](t, "testdata/sign_tree_nist_kat.json.gz")
+	vectors := testutil.ReadJSON[[]signTreeNISTKATVector](t, "testdata", "sign_tree_nist_kat.json.gz")
 	if len(vectors) != 100 {
 		t.Fatalf("sign tree NIST KAT vector count = %d, want 100", len(vectors))
 	}
@@ -68,7 +68,7 @@ type verifyRawKATVector struct {
 func readVerifyRawKATVectors(t *testing.T) verifyRawKATFixture {
 	t.Helper()
 
-	vectors := testutil.ReadJSON[verifyRawKATFixture](t, "testdata/verify_raw_kat.json.gz")
+	vectors := testutil.ReadJSON[verifyRawKATFixture](t, "testdata", "verify_raw_kat.json.gz")
 	if vectors.PublicKeyHex == "" {
 		t.Fatal("verify_raw KAT public key is empty")
 	}
