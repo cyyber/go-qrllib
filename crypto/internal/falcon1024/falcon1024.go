@@ -225,6 +225,8 @@ func NewPublicKey(pubBytes []byte) (*PublicKey, error) {
 	return pub, nil
 }
 
+const nonceSize = 40
+
 func Sign(random io.Reader, priv *PrivateKey, message []byte) ([]byte, error) {
 	var seed [SeedSize]byte
 	if _, err := io.ReadFull(random, seed[:]); err != nil {
@@ -322,8 +324,6 @@ func signTreeAttempt(prng *samplerPRNG, priv *PrivateKey, c0 ringElement) (small
 
 	return s2, true
 }
-
-const nonceSize = 40
 
 func Verify(pub *PublicKey, message, sig []byte) error {
 	nonce, s2, err := sigDecode(sig)
