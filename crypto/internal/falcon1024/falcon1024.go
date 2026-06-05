@@ -226,8 +226,6 @@ func NewPublicKey(pubBytes []byte) (*PublicKey, error) {
 }
 
 func Sign(random io.Reader, priv *PrivateKey, message []byte) ([]byte, error) {
-	signature := make([]byte, SignatureSize)
-
 	var seed [SeedSize]byte
 	if _, err := io.ReadFull(random, seed[:]); err != nil {
 		return nil, err
@@ -245,6 +243,7 @@ func Sign(random io.Reader, priv *PrivateKey, message []byte) ([]byte, error) {
 
 	c0 := hashToPoint(hashData)
 
+	signature := make([]byte, SignatureSize)
 	for {
 		s2 := signTree(rng, priv, c0)
 
