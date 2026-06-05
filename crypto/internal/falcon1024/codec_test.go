@@ -127,13 +127,13 @@ func TestPrivateKeyCodec(t *testing.T) {
 }
 
 func TestSignatureCodec(t *testing.T) {
-	verifyRawKATs := readVerifyRawKATVectors(t).Tests
+	verifyRawKATs := readVerifyRawKATFixture(t).Tests
 
 	tc := verifyRawKATs[0]
 	nonceBytes := mustDecodeHex(t, tc.NonceHex)
 	var referenceNonce [nonceSize]byte
 	copy(referenceNonce[:], nonceBytes)
-	s2 := decodeVerifyRawKATSignature(t, mustDecodeHex(t, tc.SignatureHex))
+	s2 := decodeVerifyRawKATS2(t, mustDecodeHex(t, tc.SignatureHex))
 
 	referenceSig := make([]byte, SignatureSize)
 	if err := sigEncode(referenceSig, referenceNonce, s2); err != nil {
@@ -152,7 +152,7 @@ func TestSignatureCodec(t *testing.T) {
 				var nonce [nonceSize]byte
 				copy(nonce[:], nonceBytes)
 
-				wantS2 := decodeVerifyRawKATSignature(t, mustDecodeHex(t, tc.SignatureHex))
+				wantS2 := decodeVerifyRawKATS2(t, mustDecodeHex(t, tc.SignatureHex))
 
 				sig := make([]byte, SignatureSize)
 				if err := sigEncode(sig, nonce, wantS2); err != nil {
@@ -248,7 +248,7 @@ func TestSignatureCodec(t *testing.T) {
 
 func TestCompressedCodec(t *testing.T) {
 	t.Run("reference raw s2 vectors", func(t *testing.T) {
-		verifyRawKATs := readVerifyRawKATVectors(t).Tests
+		verifyRawKATs := readVerifyRawKATFixture(t).Tests
 
 		// The expected lengths and digests were derived from the Falcon reference
 		// implementation comp_encode applied to KAT_SIG_1024 s2 values.
@@ -275,7 +275,7 @@ func TestCompressedCodec(t *testing.T) {
 
 		for i, tc := range verifyRawKATs {
 			t.Run(tc.Message, func(t *testing.T) {
-				s2 := decodeVerifyRawKATSignature(t, mustDecodeHex(t, tc.SignatureHex))
+				s2 := decodeVerifyRawKATS2(t, mustDecodeHex(t, tc.SignatureHex))
 				dst := make([]byte, SignatureSize-signaturePrefixSize)
 
 				written, err := compressedEncode(dst, s2)

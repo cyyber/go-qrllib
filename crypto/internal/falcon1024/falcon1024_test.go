@@ -13,7 +13,7 @@ import (
 )
 
 func TestVerifyRaw(t *testing.T) {
-	vectors := readVerifyRawKATVectors(t)
+	vectors := readVerifyRawKATFixture(t)
 
 	pubBytes := mustDecodeHex(t, vectors.PublicKeyHex)
 	pub, err := NewPublicKey(pubBytes)
@@ -24,7 +24,7 @@ func TestVerifyRaw(t *testing.T) {
 	for _, tc := range vectors.Tests {
 		t.Run(tc.Message, func(t *testing.T) {
 			nonce := mustDecodeHex(t, tc.NonceHex)
-			s2 := decodeVerifyRawKATSignature(t, mustDecodeHex(t, tc.SignatureHex))
+			s2 := decodeVerifyRawKATS2(t, mustDecodeHex(t, tc.SignatureHex))
 
 			h := sha3.NewSHAKE256()
 			_, _ = h.Write(nonce)

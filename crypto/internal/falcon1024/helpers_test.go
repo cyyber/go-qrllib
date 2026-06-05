@@ -65,7 +65,7 @@ type verifyRawKATVector struct {
 	SignatureHex string `json:"signatureHex"`
 }
 
-func readVerifyRawKATVectors(t *testing.T) verifyRawKATFixture {
+func readVerifyRawKATFixture(t *testing.T) verifyRawKATFixture {
 	t.Helper()
 
 	vectors := testutil.ReadJSON[verifyRawKATFixture](t, "testdata", "verify_raw_kat.json.gz")
@@ -81,10 +81,10 @@ func readVerifyRawKATVectors(t *testing.T) verifyRawKATFixture {
 
 func referencePublicKeyBytes(t *testing.T) []byte {
 	t.Helper()
-	return mustDecodeHex(t, readVerifyRawKATVectors(t).PublicKeyHex)
+	return mustDecodeHex(t, readVerifyRawKATFixture(t).PublicKeyHex)
 }
 
-func decodeVerifyRawKATSignature(t *testing.T, sig []byte) smallPolynomial {
+func decodeVerifyRawKATS2(t *testing.T, sig []byte) smallPolynomial {
 	t.Helper()
 	if len(sig) != 1+2*n {
 		t.Fatalf("bad KAT signature length: got %d", len(sig))

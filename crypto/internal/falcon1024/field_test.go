@@ -9,7 +9,7 @@ import (
 )
 
 func TestHashToPointReferenceVectors(t *testing.T) {
-	verifyRawKATs := readVerifyRawKATVectors(t).Tests
+	verifyRawKATs := readVerifyRawKATFixture(t).Tests
 
 	// The expected digests were derived from the Falcon reference
 	// implementation hash_to_point_vartime applied to KAT_SIG_1024
