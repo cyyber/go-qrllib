@@ -5,7 +5,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/theQRL/go-qrllib/crypto/internal/test"
+	"github.com/theQRL/go-qrllib/crypto/internal/testutil"
 )
 
 func requireEqualWords(t *testing.T, name string, got, want []uint32) {

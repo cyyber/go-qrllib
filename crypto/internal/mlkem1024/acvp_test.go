@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/theQRL/go-qrllib/crypto/internal/test"
+	"github.com/theQRL/go-qrllib/crypto/internal/testutil"
 )
 
 // These tests consume the official NIST ACVP sample JSON files for ML-KEM.
