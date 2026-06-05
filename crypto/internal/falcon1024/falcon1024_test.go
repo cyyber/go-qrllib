@@ -637,7 +637,7 @@ func TestNewPrivateKeyFromEncoded(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	priv, err := newPrivateKeyFromEncoded(sk)
+	priv, err := TestingOnlyNewPrivateKeyFromEncoded(sk)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -792,9 +792,9 @@ func nistKATSignTreeInput(t *testing.T, count int) (*PrivateKey, ringElement, *s
 		var keySeed [SeedSize]byte
 		drbg.read(keySeed[:])
 
-		priv, err := NewPrivateKeyFromSeed(keySeed[:])
+		priv, err := NewPrivateKey(keySeed[:])
 		if err != nil {
-			t.Fatalf("NewPrivateKeyFromSeed: %v", err)
+			t.Fatalf("NewPrivateKey: %v", err)
 		}
 
 		var nonce [nonceSize]byte
@@ -974,12 +974,11 @@ func testNISTKATDigest(t *testing.T) {
 		var keySeed [SeedSize]byte
 		drbg.read(keySeed[:])
 
-		priv, err := NewPrivateKeyFromSeed(keySeed[:])
+		priv, sk, err := TestingOnlyNewPrivateKeyFromSeedWithEncoded(keySeed[:])
 		if err != nil {
-			t.Fatalf("NewPrivateKeyFromSeed: %v", err)
+			t.Fatalf("TestingOnlyNewPrivateKeyFromSeedWithEncoded: %v", err)
 		}
 		pub := priv.PublicKey().Bytes()
-		sk := priv.encodedBytes()
 
 		var nonce [nonceSize]byte
 		drbg.read(nonce[:])

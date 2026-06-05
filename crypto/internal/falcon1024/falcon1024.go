@@ -5,7 +5,6 @@ import (
 	"crypto/subtle"
 	"errors"
 	"io"
-	"strconv"
 )
 
 const (
@@ -17,29 +16,22 @@ const (
 
 type PrivateKey struct {
 	seed               [SeedSize]byte
-	raw                [encodedPrivateKeySize]byte
-	pub                *PublicKey
+	pub                PublicKey
 	b00, b01, b10, b11 fftPolynomial
 	tree               fprTree
 }
 
 func (priv *PrivateKey) Equal(x *PrivateKey) bool {
-	// use seed ? check mldsa stdlib
-	return subtle.ConstantTimeCompare(priv.raw[:], x.raw[:]) == 1
+	return subtle.ConstantTimeCompare(priv.seed[:], x.seed[:]) == 1
 }
 
 func (priv *PrivateKey) Bytes() []byte {
-	k := priv.seed
-	return k[:]
-}
-
-func (priv *PrivateKey) encodedBytes() []byte {
-	k := priv.raw
-	return k[:]
+	seed := priv.seed
+	return seed[:]
 }
 
 func (priv *PrivateKey) PublicKey() *PublicKey {
-	return priv.pub
+	return &priv.pub
 }
 
 type PublicKey struct {
@@ -56,14 +48,13 @@ func (pub *PublicKey) Bytes() []byte {
 	return pk[:]
 }
 
-func NewPrivateKeyFromSeed(seed []byte) (*PrivateKey, error) {
-	priv := &PrivateKey{}
-	return newPrivateKeyFromSeed(priv, seed)
-}
+var errInvalidSeedLength = errors.New("falcon-1024: invalid seed length")
 
-func newPrivateKeyFromSeed(priv *PrivateKey, seed []byte) (*PrivateKey, error) {
-	if l := len(seed); l != SeedSize {
-		return nil, errors.New("falcon-1024: invalid seed length: " + strconv.Itoa(l))
+func NewPrivateKey(seed []byte) (*PrivateKey, error) {
+	priv := &PrivateKey{}
+
+	if len(seed) != SeedSize {
+		return nil, errInvalidSeedLength
 	}
 	copy(priv.seed[:], seed)
 
@@ -80,9 +71,14 @@ const (
 )
 
 func keygen(priv *PrivateKey, rng *sha3.SHAKE) (*PrivateKey, error) {
+	f, g, ntruF, ntruG, h := generateKeyComponents(rng)
+	return initPrivateKey(priv, f, g, ntruF, ntruG, h)
+}
+
+func generateKeyComponents(rng *sha3.SHAKE) (f, g, ntruF, ntruG smallPolynomial, h ringElement) {
 	for {
-		f := sampleGaussianPolynomial(rng)
-		g := sampleGaussianPolynomial(rng)
+		f = sampleGaussianPolynomial(rng)
+		g = sampleGaussianPolynomial(rng)
 
 		if coefficientsExceedBound(f, fgBound) ||
 			coefficientsExceedBound(g, fgBound) {
@@ -97,17 +93,18 @@ func keygen(priv *PrivateKey, rng *sha3.SHAKE) (*PrivateKey, error) {
 			continue
 		}
 
-		ntruF, ntruG, ok := solveNTRU(f, g)
+		var ok bool
+		ntruF, ntruG, ok = solveNTRU(f, g)
 		if !ok {
 			continue
 		}
 
-		h, ok := computePublic(f, g)
+		h, ok = computePublic(f, g)
 		if !ok {
 			continue
 		}
 
-		return initPrivateKey(priv, f, g, ntruF, ntruG, h)
+		return f, g, ntruF, ntruG, h
 	}
 }
 
@@ -130,10 +127,6 @@ func computePublic(f, g smallPolynomial) (ringElement, bool) {
 }
 
 func initPrivateKey(priv *PrivateKey, f, g, ntruF, ntruG smallPolynomial, h ringElement) (*PrivateKey, error) {
-	if err := skEncode(priv.raw[:], f, g, ntruF); err != nil {
-		return nil, err
-	}
-
 	pub, err := newPublicKeyFromH(h)
 	if err != nil {
 		return nil, err
@@ -145,10 +138,68 @@ func initPrivateKey(priv *PrivateKey, f, g, ntruF, ntruG smallPolynomial, h ring
 	return priv, nil
 }
 
-func newPublicKeyFromH(h ringElement) (*PublicKey, error) {
-	pub := &PublicKey{}
-	if err := pkEncode(pub.raw[:], h); err != nil {
+// TestingOnlyNewPrivateKeyFromEncoded creates a private key from the Falcon
+// encoded private-key form, for testing purposes.
+//
+// Bytes must not be called on the resulting key, as it will return a
+// deterministic placeholder seed rather than the encoded private key.
+func TestingOnlyNewPrivateKeyFromEncoded(privBytes []byte) (*PrivateKey, error) {
+	f, g, ntruF, err := skDecode(privBytes)
+	if err != nil {
 		return nil, err
+	}
+
+	ntruG, ok := completePrivate(f, g, ntruF)
+	if !ok {
+		return nil, errors.New("falcon-1024: invalid private key")
+	}
+
+	h, ok := computePublic(f, g)
+	if !ok {
+		return nil, errors.New("falcon-1024: invalid private key")
+	}
+
+	priv := &PrivateKey{}
+	seed := sha3.NewSHAKE256()
+	_, _ = seed.Write(privBytes)
+	_, _ = seed.Read(priv.seed[:])
+
+	return initPrivateKey(priv, f, g, ntruF, ntruG, h)
+}
+
+// TestingOnlyNewPrivateKeyFromSeedWithEncoded returns the seed-backed private
+// key and Falcon encoded private-key bytes generated from seed, for testing
+// purposes.
+func TestingOnlyNewPrivateKeyFromSeedWithEncoded(seed []byte) (*PrivateKey, []byte, error) {
+	priv := &PrivateKey{}
+
+	if len(seed) != SeedSize {
+		return nil, nil, errInvalidSeedLength
+	}
+	copy(priv.seed[:], seed)
+
+	rng := sha3.NewSHAKE256()
+	_, _ = rng.Write(seed)
+
+	f, g, ntruF, ntruG, h := generateKeyComponents(rng)
+
+	privBytes := make([]byte, encodedPrivateKeySize)
+	if err := skEncode(privBytes, f, g, ntruF); err != nil {
+		return nil, nil, err
+	}
+
+	priv, err := initPrivateKey(priv, f, g, ntruF, ntruG, h)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return priv, privBytes, nil
+}
+
+func newPublicKeyFromH(h ringElement) (PublicKey, error) {
+	var pub PublicKey
+	if err := pkEncode(pub.raw[:], h); err != nil {
+		return PublicKey{}, err
 	}
 	pub.hNTT = h
 	toNTTMonty(pub.hNTT[:])
@@ -181,34 +232,6 @@ func expandPrivateKey(priv *PrivateKey, f, g, ntruF, ntruG smallPolynomial) {
 	var ffLDLScratch [3 * n]fpr
 	ffLDLFFT(priv.tree[:], g00[:], g01[:], g11[:], logN, ffLDLScratch[:])
 	ffLDLBinaryNormalize(priv.tree[:], logN, logN)
-}
-
-func NewPrivateKey(seed []byte) (*PrivateKey, error) {
-	return NewPrivateKeyFromSeed(seed)
-}
-
-func newPrivateKeyFromEncoded(privBytes []byte) (*PrivateKey, error) {
-	p := &PrivateKey{}
-	return newPrivateKeyFromEncodedInto(p, privBytes)
-}
-
-func newPrivateKeyFromEncodedInto(priv *PrivateKey, privBytes []byte) (*PrivateKey, error) {
-	f, g, ntruF, err := skDecode(privBytes)
-	if err != nil {
-		return nil, err
-	}
-
-	ntruG, ok := completePrivate(f, g, ntruF)
-	if !ok {
-		return nil, errors.New("falcon-1024: invalid private key")
-	}
-
-	h, ok := computePublic(f, g)
-	if !ok {
-		return nil, errors.New("falcon-1024: invalid private key")
-	}
-
-	return initPrivateKey(priv, f, g, ntruF, ntruG, h)
 }
 
 func completePrivate(f, g, ntruF smallPolynomial) (smallPolynomial, bool) {
@@ -264,10 +287,7 @@ func newPublicKey(pub *PublicKey, pubBytes []byte) (*PublicKey, error) {
 
 func Sign(random io.Reader, priv *PrivateKey, message []byte) ([]byte, error) {
 	signature := make([]byte, SignatureSize)
-	return sign(random, signature, priv, message)
-}
 
-func sign(random io.Reader, signature []byte, priv *PrivateKey, message []byte) ([]byte, error) {
 	var seed [SeedSize]byte
 	if _, err := io.ReadFull(random, seed[:]); err != nil {
 		return nil, err
@@ -388,10 +408,6 @@ func newSignature(sig *Signature, sigBytes []byte) (*Signature, error) {
 }
 
 func Verify(pub *PublicKey, message []byte, sig *Signature) error {
-	return verify(pub, message, sig)
-}
-
-func verify(pub *PublicKey, message []byte, sig *Signature) error {
 	h := sha3.NewSHAKE256()
 	_, _ = h.Write(sig.nonce[:])
 	_, _ = h.Write(message)
