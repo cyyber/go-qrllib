@@ -9,7 +9,7 @@ import (
 )
 
 func TestPublicKeyCodec(t *testing.T) {
-	pub := mustDecodeHex(t, verifyRawKATPublicKeyHex)
+	pub := referencePublicKeyBytes(t)
 
 	t.Run("reference public key", func(t *testing.T) {
 		// Derived from the Falcon reference implementation test_falcon.c
@@ -127,11 +127,13 @@ func TestPrivateKeyCodec(t *testing.T) {
 }
 
 func TestSignatureCodec(t *testing.T) {
+	verifyRawKATs := readVerifyRawKATVectors(t).Tests
+
 	tc := verifyRawKATs[0]
-	nonceBytes := mustDecodeHex(t, tc.nonceHex)
+	nonceBytes := mustDecodeHex(t, tc.NonceHex)
 	var referenceNonce [nonceSize]byte
 	copy(referenceNonce[:], nonceBytes)
-	s2 := decodeVerifyRawKATSignature(t, mustDecodeHex(t, tc.signatureHex))
+	s2 := decodeVerifyRawKATSignature(t, mustDecodeHex(t, tc.SignatureHex))
 
 	referenceSig := make([]byte, SignatureSize)
 	if err := sigEncode(referenceSig, referenceNonce, s2); err != nil {
@@ -145,12 +147,12 @@ func TestSignatureCodec(t *testing.T) {
 		// seed is zero-extended only to exercise this package's padded codec.
 		// Source: https://falcon-sign.info/impl/test_falcon.c.html
 		for _, tc := range verifyRawKATs {
-			t.Run(tc.message, func(t *testing.T) {
-				nonceBytes := mustDecodeHex(t, tc.nonceHex)
+			t.Run(tc.Message, func(t *testing.T) {
+				nonceBytes := mustDecodeHex(t, tc.NonceHex)
 				var nonce [nonceSize]byte
 				copy(nonce[:], nonceBytes)
 
-				wantS2 := decodeVerifyRawKATSignature(t, mustDecodeHex(t, tc.signatureHex))
+				wantS2 := decodeVerifyRawKATSignature(t, mustDecodeHex(t, tc.SignatureHex))
 
 				sig := make([]byte, SignatureSize)
 				if err := sigEncode(sig, nonce, wantS2); err != nil {
@@ -246,6 +248,8 @@ func TestSignatureCodec(t *testing.T) {
 
 func TestCompressedCodec(t *testing.T) {
 	t.Run("reference raw s2 vectors", func(t *testing.T) {
+		verifyRawKATs := readVerifyRawKATVectors(t).Tests
+
 		// The expected lengths and digests were derived from the Falcon reference
 		// implementation comp_encode applied to KAT_SIG_1024 s2 values.
 		// Source: https://falcon-sign.info/impl/test_falcon.c.html
@@ -270,8 +274,8 @@ func TestCompressedCodec(t *testing.T) {
 		}
 
 		for i, tc := range verifyRawKATs {
-			t.Run(tc.message, func(t *testing.T) {
-				s2 := decodeVerifyRawKATSignature(t, mustDecodeHex(t, tc.signatureHex))
+			t.Run(tc.Message, func(t *testing.T) {
+				s2 := decodeVerifyRawKATSignature(t, mustDecodeHex(t, tc.SignatureHex))
 				dst := make([]byte, SignatureSize-signaturePrefixSize)
 
 				written, err := compressedEncode(dst, s2)

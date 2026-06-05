@@ -9,6 +9,8 @@ import (
 )
 
 func TestHashToPointReferenceVectors(t *testing.T) {
+	verifyRawKATs := readVerifyRawKATVectors(t).Tests
+
 	// The expected digests were derived from the Falcon reference
 	// implementation hash_to_point_vartime applied to KAT_SIG_1024
 	// nonce/message pairs. Digests are over 1024 big-endian uint16 values.
@@ -31,10 +33,10 @@ func TestHashToPointReferenceVectors(t *testing.T) {
 	}
 
 	for i, tc := range verifyRawKATs {
-		t.Run(tc.message, func(t *testing.T) {
+		t.Run(tc.Message, func(t *testing.T) {
 			h := sha3.NewSHAKE256()
-			_, _ = h.Write(mustDecodeHex(t, tc.nonceHex))
-			_, _ = h.Write([]byte(tc.message))
+			_, _ = h.Write(mustDecodeHex(t, tc.NonceHex))
+			_, _ = h.Write([]byte(tc.Message))
 
 			p := hashToPoint(h)
 

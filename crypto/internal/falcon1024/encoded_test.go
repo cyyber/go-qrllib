@@ -27,7 +27,7 @@ func TestTestingOnlyNewPrivateKeyFromEncoded(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := mustDecodeHex(t, verifyRawKATPublicKeyHex); !bytes.Equal(priv.PublicKey().Bytes(), want) {
+	if want := referencePublicKeyBytes(t); !bytes.Equal(priv.PublicKey().Bytes(), want) {
 		t.Fatal("private key reconstructed unexpected public key")
 	}
 }
