@@ -29,9 +29,9 @@ func TestingOnlyNewPrivateKeyFromEncoded(privBytes []byte) (*PrivateKey, error) 
 	}
 
 	priv := &PrivateKey{}
-	seed := sha3.NewSHAKE256()
-	_, _ = seed.Write(privBytes)
-	_, _ = seed.Read(priv.seed[:])
+	shake := sha3.NewSHAKE256()
+	_, _ = shake.Write(privBytes)
+	_, _ = shake.Read(priv.seed[:])
 
 	return initPrivateKey(priv, f, g, ntruF, ntruG, h)
 }
@@ -40,11 +40,11 @@ func TestingOnlyNewPrivateKeyFromEncoded(privBytes []byte) (*PrivateKey, error) 
 // and Falcon encoded private-key bytes generated from seed, for testing
 // purposes.
 func TestingOnlyNewPrivateKeyWithEncodedBytes(seed []byte) (*PrivateKey, []byte, error) {
-	priv := &PrivateKey{}
-
 	if len(seed) != SeedSize {
 		return nil, nil, errInvalidSeedLength
 	}
+
+	priv := &PrivateKey{}
 	copy(priv.seed[:], seed)
 
 	rng := sha3.NewSHAKE256()
