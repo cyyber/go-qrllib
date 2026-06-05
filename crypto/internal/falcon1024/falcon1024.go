@@ -213,17 +213,13 @@ func completePrivate(f, g, ntruF smallPolynomial) (smallPolynomial, bool) {
 	return ntruG, true
 }
 
-func NewPublicKey(pub []byte) (*PublicKey, error) {
-	p := &PublicKey{}
-	return newPublicKey(p, pub)
-}
-
-func newPublicKey(pub *PublicKey, pubBytes []byte) (*PublicKey, error) {
+func NewPublicKey(pubBytes []byte) (*PublicKey, error) {
 	h, err := pkDecode(pubBytes)
 	if err != nil {
 		return nil, err
 	}
-	pub.hNTT = h
+
+	pub := &PublicKey{hNTT: h}
 	toNTTMonty(pub.hNTT[:])
 	copy(pub.raw[:], pubBytes)
 	return pub, nil
@@ -336,19 +332,12 @@ type Signature struct {
 }
 
 func NewSignature(sig []byte) (*Signature, error) {
-	s := &Signature{}
-	return newSignature(s, sig)
-}
-
-func newSignature(sig *Signature, sigBytes []byte) (*Signature, error) {
-	nonce, s2, err := sigDecode(sigBytes)
+	nonce, s2, err := sigDecode(sig)
 	if err != nil {
 		return nil, err
 	}
-	sig.nonce = nonce
-	sig.s2 = s2
 
-	return sig, nil
+	return &Signature{nonce: nonce, s2: s2}, nil
 }
 
 func Verify(pub *PublicKey, message []byte, sig *Signature) error {
