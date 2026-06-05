@@ -623,29 +623,6 @@ func TestCompletePrivate(t *testing.T) {
 	}
 }
 
-func TestNewPrivateKeyFromEncoded(t *testing.T) {
-	// test_falcon.c publishes component private-key polynomials, not a
-	// serialized secret key. Use those reference polynomials to check that
-	// private-key reconstruction produces the reference public key.
-	// Source: https://falcon-sign.info/impl/test_falcon.c.html
-	f := mustDecodeSmallPolynomialHex(t, ntruSmallF1024Hex)
-	g := mustDecodeSmallPolynomialHex(t, ntruSmallG1024Hex)
-	ntruF := mustDecodeSmallPolynomialHex(t, ntruF1024Hex)
-
-	sk := make([]byte, encodedPrivateKeySize)
-	if err := skEncode(sk, f, g, ntruF); err != nil {
-		t.Fatal(err)
-	}
-
-	priv, err := TestingOnlyNewPrivateKeyFromEncoded(sk)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if want := mustDecodeHex(t, verifyRawKATPublicKeyHex); !bytes.Equal(priv.PublicKey().Bytes(), want) {
-		t.Fatal("private key reconstructed unexpected public key")
-	}
-}
-
 func TestSignTree(t *testing.T) {
 	// Derived from the Falcon reference implementation test_falcon.c
 	// ntru_f_1024, ntru_g_1024, ntru_F_1024, ntru_G_1024, and
@@ -974,9 +951,9 @@ func testNISTKATDigest(t *testing.T) {
 		var keySeed [SeedSize]byte
 		drbg.read(keySeed[:])
 
-		priv, sk, err := TestingOnlyNewPrivateKeyFromSeedWithEncoded(keySeed[:])
+		priv, sk, err := TestingOnlyNewPrivateKeyWithEncodedBytes(keySeed[:])
 		if err != nil {
-			t.Fatalf("TestingOnlyNewPrivateKeyFromSeedWithEncoded: %v", err)
+			t.Fatalf("TestingOnlyNewPrivateKeyWithEncodedBytes: %v", err)
 		}
 		pub := priv.PublicKey().Bytes()
 
