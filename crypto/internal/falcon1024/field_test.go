@@ -96,36 +96,40 @@ func TestFieldArithmetic(t *testing.T) {
 		t.Fatalf("fieldCenteredMod = %d, want -6144", got)
 	}
 
-	for _, x := range []fieldElement{1, 2, 3, 1234, q - 1} {
-		invMont := fieldInvMontgomery(x)
-		if got := fieldMontgomeryMul(x, invMont); got != 1 {
-			t.Fatalf("x * fieldInvMontgomery(%d) = %d, want 1", x, got)
+	t.Run("inverse", func(t *testing.T) {
+		for _, x := range []fieldElement{1, 2, 3, 1234, q - 1} {
+			invMont := fieldInvMontgomery(x)
+			if got := fieldMontgomeryMul(x, invMont); got != 1 {
+				t.Fatalf("x * fieldInvMontgomery(%d) = %d, want 1", x, got)
+			}
 		}
-	}
+	})
 
-	var numerator, denominator, want ringElement
-	for i := range numerator {
-		numerator[i] = fieldElement((7*i + 5) % q)
-		denominator[i] = fieldElement((11*i+3)%(q-1) + 1)
-	}
-	want = numerator
+	t.Run("batched inverse", func(t *testing.T) {
+		var numerator, denominator, want ringElement
+		for i := range numerator {
+			numerator[i] = fieldElement((7*i + 5) % q)
+			denominator[i] = fieldElement((11*i+3)%(q-1) + 1)
+		}
+		want = numerator
 
-	for i := range want {
-		invMont := fieldInvMontgomery(denominator[i])
-		want[i] = fieldMontgomeryMul(want[i], invMont)
-	}
+		for i := range want {
+			invMont := fieldInvMontgomery(denominator[i])
+			want[i] = fieldMontgomeryMul(want[i], invMont)
+		}
 
-	if !divideNTTByBatchedInverse(numerator[:], denominator[:]) {
-		t.Fatal("divideNTTByBatchedInverse rejected nonzero denominator")
-	}
-	if numerator != want {
-		t.Fatal("divideNTTByBatchedInverse returned unexpected quotient")
-	}
+		if !divideNTTByBatchedInverse(numerator[:], denominator[:]) {
+			t.Fatal("divideNTTByBatchedInverse rejected nonzero denominator")
+		}
+		if numerator != want {
+			t.Fatal("divideNTTByBatchedInverse returned unexpected quotient")
+		}
 
-	denominator[17] = 0
-	if divideNTTByBatchedInverse(numerator[:], denominator[:]) {
-		t.Fatal("divideNTTByBatchedInverse accepted zero denominator")
-	}
+		denominator[17] = 0
+		if divideNTTByBatchedInverse(numerator[:], denominator[:]) {
+			t.Fatal("divideNTTByBatchedInverse accepted zero denominator")
+		}
+	})
 }
 
 func TestNTTRoundTrip(t *testing.T) {
