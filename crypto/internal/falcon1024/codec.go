@@ -52,6 +52,8 @@ var (
 
 const maxCompressedCoefficient = 2047
 
+// compressedDecode maps to the Falcon reference comp_decode. Each coefficient
+// is encoded as sign bit || low 7 magnitude bits || unary high magnitude bits.
 func compressedDecode(src []byte) (smallPolynomial, int, error) {
 	var p smallPolynomial
 	r := compressedBitReader{src: src}
@@ -97,6 +99,7 @@ func compressedDecode(src []byte) (smallPolynomial, int, error) {
 	return p, r.pos, nil
 }
 
+// compressedEncode maps to the Falcon reference comp_encode.
 func compressedEncode(dst []byte, s smallPolynomial) (int, error) {
 	var acc uint32
 	accBits := 0

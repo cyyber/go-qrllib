@@ -67,6 +67,33 @@ func TestPublicKeyCodec(t *testing.T) {
 			})
 		}
 	})
+
+	t.Run("rejects invalid output buffer", func(t *testing.T) {
+		h, err := pkDecode(pub)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		for _, tc := range []struct {
+			name string
+			out  []byte
+		}{
+			{
+				name: "short",
+				out:  make([]byte, PublicKeySize-1),
+			},
+			{
+				name: "long",
+				out:  make([]byte, PublicKeySize+1),
+			},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				if err := pkEncode(tc.out, h); err == nil {
+					t.Fatal("pkEncode accepted invalid public key buffer")
+				}
+			})
+		}
+	})
 }
 
 func TestPrivateKeyCodec(t *testing.T) {
@@ -120,6 +147,28 @@ func TestPrivateKeyCodec(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				if _, _, _, err := skDecode(tc.in); err == nil {
 					t.Fatal("skDecode accepted invalid private key")
+				}
+			})
+		}
+	})
+
+	t.Run("rejects invalid output buffer", func(t *testing.T) {
+		for _, tc := range []struct {
+			name string
+			out  []byte
+		}{
+			{
+				name: "short",
+				out:  make([]byte, encodedPrivateKeySize-1),
+			},
+			{
+				name: "long",
+				out:  make([]byte, encodedPrivateKeySize+1),
+			},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				if err := skEncode(tc.out, f, g, ntruF); err == nil {
+					t.Fatal("skEncode accepted invalid private key buffer")
 				}
 			})
 		}
@@ -355,6 +404,10 @@ func TestCompressedCodec(t *testing.T) {
 			{
 				name: "negative zero",
 				src:  []byte{0x80, 0x80},
+			},
+			{
+				name: "coefficient magnitude overflow",
+				src:  []byte{0x7f, 0x00, 0x00},
 			},
 		}
 
