@@ -364,19 +364,13 @@ const signatureNormBound uint64 = 70_265_242
 
 func signatureNormExceedsPartialBound(sqn uint32, s2 smallPolynomial) bool {
 	norm := uint64(sqn)
-	if norm > signatureNormBound {
-		return true
-	}
 
 	for _, x := range s2 {
 		y := int64(x)
 		norm += uint64(y * y)
-		if norm > signatureNormBound {
-			return true
-		}
 	}
 
-	return false
+	return norm > signatureNormBound
 }
 
 func (p smallPolynomial) squaredNorm() uint32 {
@@ -396,11 +390,7 @@ func signatureNormWithinBound(s1, s2 smallPolynomial) bool {
 
 		y := int64(s2[i])
 		norm += uint64(y * y)
-
-		if norm > signatureNormBound {
-			return false
-		}
 	}
 
-	return true
+	return norm <= signatureNormBound
 }

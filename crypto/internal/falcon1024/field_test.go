@@ -132,6 +132,39 @@ func TestFieldArithmetic(t *testing.T) {
 	})
 }
 
+func TestSignatureNormBounds(t *testing.T) {
+	if signatureNormExceedsPartialBound(uint32(signatureNormBound), smallPolynomial{}) {
+		t.Fatal("signatureNormExceedsPartialBound rejected norm at bound")
+	}
+	if !signatureNormExceedsPartialBound(uint32(signatureNormBound+1), smallPolynomial{}) {
+		t.Fatal("signatureNormExceedsPartialBound accepted norm above bound")
+	}
+
+	var s2 smallPolynomial
+	s2[0] = 1
+	if signatureNormExceedsPartialBound(uint32(signatureNormBound-1), s2) {
+		t.Fatal("signatureNormExceedsPartialBound rejected polynomial contribution at bound")
+	}
+	s2[0] = 3
+	if !signatureNormExceedsPartialBound(uint32(signatureNormBound-4), s2) {
+		t.Fatal("signatureNormExceedsPartialBound accepted polynomial contribution above bound")
+	}
+
+	var s1 smallPolynomial
+	// 125^2 + 5889^2 + 5964^2 == signatureNormBound.
+	s1[0] = 125
+	s1[1] = 5889
+	s1[2] = 5964
+	if !signatureNormWithinBound(s1, smallPolynomial{}) {
+		t.Fatal("signatureNormWithinBound rejected norm at bound")
+	}
+	s2 = smallPolynomial{}
+	s2[0] = 1
+	if signatureNormWithinBound(s1, s2) {
+		t.Fatal("signatureNormWithinBound accepted norm above bound")
+	}
+}
+
 func TestNTTRoundTrip(t *testing.T) {
 	var p ringElement
 	for i := range p {

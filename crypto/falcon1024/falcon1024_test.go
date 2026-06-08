@@ -118,6 +118,9 @@ func TestRoundTrip(t *testing.T) {
 	if public.Equal(otherPublic) {
 		t.Fatal("different public keys are Equal")
 	}
+	if Verify(otherPublic, message, signature) {
+		t.Fatal("signature accepted with a different public key")
+	}
 	if private.Equal(otherPrivate) {
 		t.Fatal("different private keys are Equal")
 	}
