@@ -432,7 +432,12 @@ func solveNTRUIntermediate(f, g smallPolynomial, depth int, wk *ntruWorkspace) b
 	copy(Fd, wk.state[:dlen*hn])
 	copy(Gd, wk.state[dlen*hn:2*dlen*hn])
 
-	ft, gt := makeFGPair(wk, f, g, depth)
+	// makeFG leaves ft/gt in wk.makeFGScratch; they remain valid until the
+	// scratch buffer is reused by the next intermediate-depth step.
+	makeFGData := wk.makeFGScratch[:makeFGScratchLen]
+	makeFG(makeFGData, f, g, depth, true)
+	ft := makeFGData[:n*slen]
+	gt := makeFGData[n*slen : 2*n*slen]
 
 	Ft := wk.Ft[:n*llen]
 	Gt := wk.Gt[:n*llen]
@@ -444,20 +449,6 @@ func solveNTRUIntermediate(f, g smallPolynomial, depth int, wk *ntruWorkspace) b
 	}
 	writeReducedNTRUSolution(wk.state, Ft, Gt, n, slen, llen)
 	return true
-}
-
-// makeFGPair returns ft / gt slices into wk.makeFGScratch. The slices are
-// valid until wk.makeFGScratch is reused (i.e. until the next makeFGPair call
-// inside this solveNTRU pass), which the caller controls.
-func makeFGPair(wk *ntruWorkspace, f, g smallPolynomial, depth int) (ft, gt []uint32) {
-	logn := logN - depth
-	n := 1 << logn
-	slen := maxBlSmall[depth]
-
-	data := wk.makeFGScratch[:makeFGScratchLen]
-	makeFG(data, f, g, depth, true)
-
-	return data[:n*slen], data[n*slen : 2*n*slen]
 }
 
 func liftNTRUSolution(wk *ntruWorkspace, Ft, Gt, Fd, Gd, ft, gt []uint32, logn, slen, dlen, llen int) {
@@ -473,6 +464,7 @@ func liftNTRUSolution(wk *ntruWorkspace, Ft, Gt, Fd, Gd, ft, gt []uint32, logn, 
 	Gp := u32s.take(hn)
 	crtScratch := u32s.take(max(llen, slen))
 
+	// First reduce the previous-depth F/G modulo all primes needed for the lift.
 	for u := range llen {
 		derived := smallPrimeDerivedValues[u]
 		p := smallPrimes[u].p
