@@ -248,7 +248,7 @@ func pkDecode(src []byte) (h ringElement, err error) {
 		return ringElement{}, errors.New("falcon-1024: invalid public key")
 	}
 
-	return polyByteDecode[ringElement](src[headerSize:])
+	return polyByteDecode(src[headerSize:])
 }
 
 const (

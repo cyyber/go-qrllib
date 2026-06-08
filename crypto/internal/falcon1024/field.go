@@ -91,7 +91,7 @@ func fieldCenteredMod(x fieldElement) int32 {
 
 type ringElement [n]fieldElement // modulo-q polynomial
 
-func polyByteEncode[T ~[n]fieldElement](dst []byte, p T) {
+func polyByteEncode(dst []byte, p ringElement) {
 	for i := 0; i < n; i += 4 {
 		x := uint64(p[i])<<42 |
 			uint64(p[i+1])<<28 |
@@ -113,12 +113,12 @@ func polyByteEncode[T ~[n]fieldElement](dst []byte, p T) {
 // encodingSize14 is the byte size of a ringElement encoded with 14-bit coefficients.
 const encodingSize14 = 1792
 
-func polyByteDecode[T ~[n]fieldElement](b []byte) (T, error) {
+func polyByteDecode(b []byte) (ringElement, error) {
 	if len(b) != encodingSize14 {
-		return T{}, errors.New("falcon-1024: invalid encoding length")
+		return ringElement{}, errors.New("falcon-1024: invalid encoding length")
 	}
 
-	var p T
+	var p ringElement
 	for i := 0; i < n; i += 4 {
 		x := uint64(b[0])<<48 |
 			uint64(b[1])<<40 |
@@ -134,7 +134,7 @@ func polyByteDecode[T ~[n]fieldElement](b []byte) (T, error) {
 		p[i+3] = fieldElement(x & 0x3FFF)
 
 		if p[i] >= q || p[i+1] >= q || p[i+2] >= q || p[i+3] >= q {
-			return T{}, errors.New("falcon-1024: invalid polynomial encoding")
+			return ringElement{}, errors.New("falcon-1024: invalid polynomial encoding")
 		}
 
 		b = b[7:]
@@ -143,7 +143,7 @@ func polyByteDecode[T ~[n]fieldElement](b []byte) (T, error) {
 	return p, nil
 }
 
-const hashToPointRejectThreshold = 5 * q // 61445
+const hashToPointRejectionThreshold = 5 * q // 61445
 
 // hashToPoint maps a SHAKE stream to a uniform ringElement, matching the Falcon
 // reference hash_to_point_vartime.
@@ -155,7 +155,7 @@ func hashToPoint(h *sha3.SHAKE) ringElement {
 		_, _ = h.Read(buf[:])
 
 		w := uint32(buf[0])<<8 | uint32(buf[1])
-		if w >= hashToPointRejectThreshold {
+		if w >= hashToPointRejectionThreshold {
 			continue
 		}
 

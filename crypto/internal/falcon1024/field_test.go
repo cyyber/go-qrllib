@@ -63,7 +63,7 @@ func TestPolyByteEncodeDecode(t *testing.T) {
 	var enc [encodingSize14]byte
 	polyByteEncode(enc[:], p)
 
-	got, err := polyByteDecode[ringElement](enc[:])
+	got, err := polyByteDecode(enc[:])
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,11 +73,11 @@ func TestPolyByteEncodeDecode(t *testing.T) {
 
 	enc[0] = 0xFF
 	enc[1] = 0xFC // first 14-bit coefficient is 0x3FFF, which is >= q.
-	if _, err := polyByteDecode[ringElement](enc[:]); err == nil {
+	if _, err := polyByteDecode(enc[:]); err == nil {
 		t.Fatal("polyByteDecode accepted coefficient greater than q")
 	}
 
-	if _, err := polyByteDecode[ringElement](enc[:len(enc)-1]); err == nil {
+	if _, err := polyByteDecode(enc[:len(enc)-1]); err == nil {
 		t.Fatal("polyByteDecode accepted short input")
 	}
 }
