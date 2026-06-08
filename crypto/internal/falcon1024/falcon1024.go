@@ -78,6 +78,8 @@ func keygen(priv *PrivateKey, rng *sha3.SHAKE) (*PrivateKey, error) {
 }
 
 func generateKeyComponents(rng *sha3.SHAKE) (f, g, ntruF, ntruG smallPolynomial, h ringElement) {
+	// Falcon key generation is rejection-based; this loop is intentionally
+	// unbounded to match the reference.
 	for {
 		f = sampleGaussianPolynomial(rng)
 		g = sampleGaussianPolynomial(rng)
@@ -246,6 +248,8 @@ func Sign(random io.Reader, priv *PrivateKey, message []byte) ([]byte, error) {
 	c0 := hashToPoint(hashData)
 
 	signature := make([]byte, SignatureSize)
+	// Retry until the sampled signature fits the padded compressed encoding,
+	// matching the Falcon reference signing loop.
 	for {
 		s2 := signTree(rng, priv, c0)
 
@@ -262,6 +266,8 @@ func Sign(random io.Reader, priv *PrivateKey, message []byte) ([]byte, error) {
 }
 
 func signTree(rng *sha3.SHAKE, priv *PrivateKey, c0 ringElement) smallPolynomial {
+	// Falcon's tree-based signing step is rejection-based; this loop is
+	// intentionally unbounded to match the reference.
 	for {
 		var prng samplerPRNG
 		initSamplerPRNG(&prng, rng)
