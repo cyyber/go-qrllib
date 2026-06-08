@@ -474,6 +474,49 @@ func TestTrimI8Encode(t *testing.T) {
 	}
 }
 
+func TestTrimI8RoundTrip(t *testing.T) {
+	testCases := []struct {
+		name string
+		p    smallPolynomial
+		bits int
+	}{
+		{
+			name: "fg",
+			p:    mustDecodeSmallPolynomialHex(t, ntruSmallF1024Hex),
+			bits: fgBits,
+		},
+		{
+			name: "ntruF",
+			p:    mustDecodeSmallPolynomialHex(t, ntruF1024Hex),
+			bits: ntruFBits,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			dst := make([]byte, trimI8Len(tc.bits))
+			written, err := trimI8Encode(dst, tc.p, tc.bits)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if written != len(dst) {
+				t.Fatalf("trimI8Encode wrote %d bytes, want %d", written, len(dst))
+			}
+
+			got, consumed, err := trimI8Decode(dst, tc.bits)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if consumed != len(dst) {
+				t.Fatalf("trimI8Decode consumed %d bytes, want %d", consumed, len(dst))
+			}
+			if got != tc.p {
+				t.Fatal("trimI8Decode(trimI8Encode(p)) did not round-trip")
+			}
+		})
+	}
+}
+
 func TestTrimI8EncodeRejectsInvalidInputs(t *testing.T) {
 	outOfRange := smallPolynomial{}
 	outOfRange[0] = int32(1 << (fgBits - 1))
@@ -554,7 +597,7 @@ func TestTrimI8DecodeRejectsForbiddenValues(t *testing.T) {
 			}(),
 		},
 		{
-			name: "F",
+			name: "ntruF",
 			bits: ntruFBits,
 			src: func() []byte {
 				src := make([]byte, trimI8Len(ntruFBits))
