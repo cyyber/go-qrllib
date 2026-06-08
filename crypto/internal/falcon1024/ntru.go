@@ -48,7 +48,7 @@ const (
 	ntruScratchLen             = 7 * n
 	makeFGScratchLen           = 6 * n
 	polySubScaledNTTScratchLen = 1536
-	ntruU32ScratchLen          = 16 * n
+	ntruU32ScratchLen          = 11 * n
 	ntruFPRScratchLen          = 8 * n
 
 	// Sizes below are the maximum buffers solveNTRUIntermediate / its lift &
