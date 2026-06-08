@@ -86,7 +86,7 @@ func modPDiv(a, b, p, p0i, r uint32) uint32 {
 }
 
 func modPMkgm2(gm, igm []uint32, logn int, primitiveRoot, p, p0i uint32) {
-	nn := 1 << logn
+	degree := 1 << logn
 	r2 := modPR2(p, p0i)
 	g := modPMontyMul(primitiveRoot, r2, p, p0i)
 	for k := logn; k < 10; k++ {
@@ -98,7 +98,7 @@ func modPMkgm2(gm, igm []uint32, logn int, primitiveRoot, p, p0i uint32) {
 	x1 := r
 	x2 := r
 	k := 10 - logn
-	for i := range nn {
+	for i := range degree {
 		j := int(rev10[i]) >> k
 		gm[j] = x1
 		igm[j] = x2
@@ -112,9 +112,9 @@ func modPNTT2Ext(a []uint32, stride int, gm []uint32, logn int, p, p0i uint32) {
 		return
 	}
 
-	nn := 1 << logn
-	t := nn
-	for m := 1; m < nn; m <<= 1 {
+	degree := 1 << logn
+	t := degree
+	for m := 1; m < degree; m <<= 1 {
 		ht := t >> 1
 		for i, v1 := 0, 0; i < m; i, v1 = i+1, v1+t {
 			s := gm[m+i]
@@ -138,9 +138,9 @@ func modPINTT2Ext(a []uint32, stride int, igm []uint32, logn int, p, p0i uint32)
 		return
 	}
 
-	nn := 1 << logn
+	degree := 1 << logn
 	t := 1
-	for m := nn; m > 1; m >>= 1 {
+	for m := degree; m > 1; m >>= 1 {
 		hm := m >> 1
 		dt := t << 1
 		for i, v1 := 0, 0; i < hm; i, v1 = i+1, v1+dt {
@@ -160,7 +160,7 @@ func modPINTT2Ext(a []uint32, stride int, igm []uint32, logn int, p, p0i uint32)
 	}
 
 	ni := uint32(1) << (31 - logn)
-	for k, r := 0, 0; k < nn; k, r = k+1, r+stride {
+	for k, r := 0, 0; k < degree; k, r = k+1, r+stride {
 		a[r] = modPMontyMul(a[r], ni, p, p0i)
 	}
 }

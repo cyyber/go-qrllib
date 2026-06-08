@@ -139,46 +139,46 @@ func ffLDLTreeSize(logn int) int {
 }
 
 func ffLDLFFT(tree, g00, g01, g11 []fpr, logn int, tmp []fpr) {
-	nn := 1 << logn
-	if nn == 1 {
+	degree := 1 << logn
+	if degree == 1 {
 		tree[0] = g00[0]
 		return
 	}
-	if len(tmp) < 3*nn {
+	if len(tmp) < 3*degree {
 		panic("falcon1024: short ffLDLFFT scratch")
 	}
 
-	hn := nn >> 1
-	d00 := tmp[:nn]
-	d11 := tmp[nn : 2*nn]
-	t := tmp[2*nn : 3*nn]
+	hn := degree >> 1
+	d00 := tmp[:degree]
+	d11 := tmp[degree : 2*degree]
+	t := tmp[2*degree : 3*degree]
 
-	copy(d00, g00[:nn])
-	fftLDLMV(d11, tree[:nn], g00[:nn], g01[:nn], g11[:nn], logn)
+	copy(d00, g00[:degree])
+	fftLDLMV(d11, tree[:degree], g00[:degree], g01[:degree], g11[:degree], logn)
 
-	splitFFT(t[:hn], t[hn:nn], d00, logn)
-	splitFFT(d00[:hn], d00[hn:nn], d11, logn)
+	splitFFT(t[:hn], t[hn:degree], d00, logn)
+	splitFFT(d00[:hn], d00[hn:degree], d11, logn)
 	copy(d11, t)
 
-	ffLDLFFTInner(tree[nn:], d11[:hn], d11[hn:nn], logn-1, t)
-	ffLDLFFTInner(tree[nn+ffLDLTreeSize(logn-1):], d00[:hn], d00[hn:nn], logn-1, t)
+	ffLDLFFTInner(tree[degree:], d11[:hn], d11[hn:degree], logn-1, t)
+	ffLDLFFTInner(tree[degree+ffLDLTreeSize(logn-1):], d00[:hn], d00[hn:degree], logn-1, t)
 }
 
 func ffLDLFFTInner(tree, g0, g1 []fpr, logn int, tmp []fpr) {
-	nn := 1 << logn
-	if nn == 1 {
+	degree := 1 << logn
+	if degree == 1 {
 		tree[0] = g0[0]
 		return
 	}
 
-	hn := nn >> 1
-	fftLDLMV(tmp[:nn], tree[:nn], g0[:nn], g1[:nn], g0[:nn], logn)
+	hn := degree >> 1
+	fftLDLMV(tmp[:degree], tree[:degree], g0[:degree], g1[:degree], g0[:degree], logn)
 
-	splitFFT(g1[:hn], g1[hn:nn], g0[:nn], logn)
-	splitFFT(g0[:hn], g0[hn:nn], tmp[:nn], logn)
+	splitFFT(g1[:hn], g1[hn:degree], g0[:degree], logn)
+	splitFFT(g0[:hn], g0[hn:degree], tmp[:degree], logn)
 
-	ffLDLFFTInner(tree[nn:], g1[:hn], g1[hn:nn], logn-1, tmp)
-	ffLDLFFTInner(tree[nn+ffLDLTreeSize(logn-1):], g0[:hn], g0[hn:nn], logn-1, tmp)
+	ffLDLFFTInner(tree[degree:], g1[:hn], g1[hn:degree], logn-1, tmp)
+	ffLDLFFTInner(tree[degree+ffLDLTreeSize(logn-1):], g0[:hn], g0[hn:degree], logn-1, tmp)
 }
 
 func fftLDLMV(d11, l10, g00, g01, g11 []fpr, logn int) {
@@ -206,19 +206,19 @@ func fftLDLMV(d11, l10, g00, g01, g11 []fpr, logn int) {
 }
 
 func ffLDLBinaryNormalize(tree []fpr, origLogn, logn int) {
-	nn := 1 << logn
-	if nn == 1 {
+	degree := 1 << logn
+	if degree == 1 {
 		tree[0] = fpr(math.Sqrt(float64(tree[0]))) * invSigma[origLogn]
 		return
 	}
 
-	ffLDLBinaryNormalize(tree[nn:], origLogn, logn-1)
-	ffLDLBinaryNormalize(tree[nn+ffLDLTreeSize(logn-1):], origLogn, logn-1)
+	ffLDLBinaryNormalize(tree[degree:], origLogn, logn-1)
+	ffLDLBinaryNormalize(tree[degree+ffLDLTreeSize(logn-1):], origLogn, logn-1)
 }
 
 func splitFFT(f0, f1, f []fpr, logn int) {
-	nn := 1 << logn
-	hn := nn >> 1
+	degree := 1 << logn
+	hn := degree >> 1
 	qn := hn >> 1
 
 	f0[0] = f[0]
@@ -245,8 +245,8 @@ func splitFFT(f0, f1, f []fpr, logn int) {
 }
 
 func mergeFFT(f, f0, f1 []fpr, logn int) {
-	nn := 1 << logn
-	hn := nn >> 1
+	degree := 1 << logn
+	hn := degree >> 1
 	qn := hn >> 1
 
 	f[0] = f0[0]
@@ -413,27 +413,27 @@ func ffSamplingFFTRecursive(prng *samplerPRNG, z0, z1, tree, t0, t1, tmp []fpr, 
 		return
 	}
 
-	nn := 1 << logn
-	hn := nn >> 1
-	tree0 := tree[nn:]
-	tree1 := tree[nn+ffLDLTreeSize(logn-1):]
+	degree := 1 << logn
+	hn := degree >> 1
+	tree0 := tree[degree:]
+	tree1 := tree[degree+ffLDLTreeSize(logn-1):]
 
-	splitFFT(z1[:hn], z1[hn:nn], t1[:nn], logn)
-	ffSamplingFFTRecursive(prng, tmp[:hn], tmp[hn:nn], tree1, z1[:hn], z1[hn:nn], tmp[nn:], logn-1)
-	mergeFFT(z1[:nn], tmp[:hn], tmp[hn:nn], logn)
+	splitFFT(z1[:hn], z1[hn:degree], t1[:degree], logn)
+	ffSamplingFFTRecursive(prng, tmp[:hn], tmp[hn:degree], tree1, z1[:hn], z1[hn:degree], tmp[degree:], logn-1)
+	mergeFFT(z1[:degree], tmp[:hn], tmp[hn:degree], logn)
 
-	copy(tmp[:nn], t1[:nn])
-	for i := range nn {
+	copy(tmp[:degree], t1[:degree])
+	for i := range degree {
 		tmp[i] -= z1[i]
 	}
-	fftMul(tmp[:nn], tree[:nn], logn)
-	for i := range nn {
+	fftMul(tmp[:degree], tree[:degree], logn)
+	for i := range degree {
 		tmp[i] += t0[i]
 	}
 
-	splitFFT(z0[:hn], z0[hn:nn], tmp[:nn], logn)
-	ffSamplingFFTRecursive(prng, tmp[:hn], tmp[hn:nn], tree0, z0[:hn], z0[hn:nn], tmp[nn:], logn-1)
-	mergeFFT(z0[:nn], tmp[:hn], tmp[hn:nn], logn)
+	splitFFT(z0[:hn], z0[hn:degree], tmp[:degree], logn)
+	ffSamplingFFTRecursive(prng, tmp[:hn], tmp[hn:degree], tree0, z0[:hn], z0[hn:degree], tmp[degree:], logn-1)
+	mergeFFT(z0[:degree], tmp[:hn], tmp[hn:degree], logn)
 }
 
 func fft(f []fpr, logn int) {
@@ -513,9 +513,9 @@ func fftInvNorm2(dst, a, b []fpr, logn int) {
 }
 
 func fftAdj(a []fpr, logn int) {
-	nn := 1 << logn
-	hn := nn >> 1
-	for i := hn; i < nn; i++ {
+	degree := 1 << logn
+	hn := degree >> 1
+	for i := hn; i < degree; i++ {
 		a[i] = -a[i]
 	}
 }
@@ -615,6 +615,6 @@ func fftDivAutoAdj(a, b []fpr, logn int) {
 
 func ffSamplingFFT(prng *samplerPRNG, z0, z1, t0, t1, tree []fpr, logn int) {
 	var tmp [2 * n]fpr
-	nn := 1 << logn
-	ffSamplingFFTRecursive(prng, z0[:nn], z1[:nn], tree, t0[:nn], t1[:nn], tmp[:nn<<1], logn)
+	degree := 1 << logn
+	ffSamplingFFTRecursive(prng, z0[:degree], z1[:degree], tree, t0[:degree], t1[:degree], tmp[:degree<<1], logn)
 }
