@@ -168,7 +168,9 @@ func (w *Wallet) GetPK() PK {
 }
 
 func (w *Wallet) GetSK() [SKSize]uint8 {
-	return w.d.SecretKeyBytes()
+	var sk [SKSize]uint8
+	copy(sk[:], w.d.Bytes())
+	return sk
 }
 
 func (w *Wallet) GetDescriptor() Descriptor {
@@ -198,9 +200,7 @@ func (w *Wallet) GetChecksumAddressStr() string {
 // descriptor-bound signing context. The random parameter supplies the
 // per-signature RND_BYTES; if random is nil, Sign uses crypto/rand.Reader for
 // the FIPS 204 hedged path. Callers that need deterministic signatures can
-// pass a deterministic reader. See the
-// [github.com/theQRL/go-qrllib/crypto/mldsa87] package doc "Signing Mode"
-// section for the full discussion.
+// pass a deterministic reader.
 func (w *Wallet) Sign(random io.Reader, message []uint8) ([SigSize]uint8, error) {
 	var signature [SigSize]uint8
 	sig, err := mldsa87.Sign(random, w.d, message, &mldsa87.Options{

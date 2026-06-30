@@ -281,10 +281,11 @@ func TestKeySizeInvariants(t *testing.T) {
 			t.Fatalf("Sign failed: %v", err)
 		}
 
-		// Verify expected FIPS 204 ML-DSA-87 sizes
+		// Verify expected ML-DSA-87 wallet sizes. SKSize is the seed-form
+		// private key size exposed by the public crypto package.
 		const (
 			expectedPK  = 2592
-			expectedSK  = 4896
+			expectedSK  = 32
 			expectedSig = 4627
 		)
 		if mldsaWallet.PKSize != expectedPK {

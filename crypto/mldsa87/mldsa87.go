@@ -26,8 +26,6 @@ const (
 	PrivateKeySize = SeedSize
 )
 
-const secretKeySize = 4896
-
 var errUnsupportedSignerOpts = errors.New("mldsa87: opts must be *Options, *SignerOpts, or nil")
 
 // Options contains additional options for signing and verifying ML-DSA-87
@@ -103,14 +101,6 @@ func (priv *PrivateKey) Bytes() []byte {
 		return nil
 	}
 	return priv.key.Bytes()
-}
-
-// SecretKeyBytes returns the expanded ML-DSA-87 secret key bytes.
-func (priv *PrivateKey) SecretKeyBytes() [secretKeySize]uint8 {
-	if priv == nil || priv.key == nil {
-		return [secretKeySize]uint8{}
-	}
-	return priv.key.SecretKeyBytes()
 }
 
 // PublicKey returns the public key corresponding to priv.
