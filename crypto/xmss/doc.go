@@ -28,7 +28,7 @@
 // # Recommendation
 //
 // For new applications, strongly prefer stateless alternatives:
-//   - [github.com/theQRL/go-qrllib/crypto/ml_dsa_87] (FIPS 204, lattice-based)
+//   - [github.com/theQRL/go-qrllib/crypto/mldsa87] (FIPS 204, lattice-based)
 //   - [github.com/theQRL/go-qrllib/crypto/sphincsplus_256s] (pre-FIPS SPHINCS+, hash-based)
 //
 // XMSS in this library should only be used for:

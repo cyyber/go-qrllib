@@ -49,7 +49,7 @@ jobs:
         env:
           WYCHEPROOF_VECTORS_DIR: /tmp/wycheproof/testvectors_v1
         run: |
-          go test -v -tags wycheproof -run TestWycheproof ./crypto/ml_dsa_87/ -timeout 300s
+          go test -v -tags wycheproof -run TestWycheproof ./crypto/internal/mldsa87/ -timeout 300s
 
   mlkem1024-wycheproof:
     name: ML-KEM-1024 Wycheproof & CCTV Verification

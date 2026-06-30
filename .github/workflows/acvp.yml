@@ -63,4 +63,4 @@ jobs:
         env:
           ACVP_VECTORS_DIR: /tmp/acvp-vectors
         run: |
-          go test -v -tags acvp -run TestACVP ./crypto/ml_dsa_87/ -timeout 300s
+          go test -v -tags acvp -run TestACVP ./crypto/internal/mldsa87/ -timeout 300s

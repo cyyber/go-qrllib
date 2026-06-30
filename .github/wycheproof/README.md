@@ -17,7 +17,7 @@ vendored — they always come directly from the upstream repository.
 
 1. **Clone**: Sparse checkout of `github.com/C2SP/wycheproof` (only
    `testvectors_v1/`).
-2. **Test**: `crypto/ml_dsa_87/wycheproof_test.go` walks
+2. **Test**: `crypto/internal/mldsa87/wycheproof_test.go` walks
    `mldsa_87_verify_test.json`, calls go-qrllib's `Verify` for each
    test vector, and asserts the result matches the expected
    `result` field.
@@ -102,7 +102,7 @@ git clone --depth 1 https://github.com/C2SP/wycheproof.git /tmp/wycheproof
 
 # Run the tests
 WYCHEPROOF_VECTORS_DIR=/tmp/wycheproof/testvectors_v1 \
-  go test -v -tags wycheproof -run TestWycheproof ./crypto/ml_dsa_87/
+  go test -v -tags wycheproof -run TestWycheproof ./crypto/internal/mldsa87/
 ```
 
 ## Build Tag

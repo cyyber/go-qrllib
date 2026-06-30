@@ -1,7 +1,7 @@
 //go:build metamorphic
 
 // Exhaustive / structured metamorphic tests for ML-KEM-1024, mirroring the
-// ML-DSA-87 metamorphic suite (crypto/ml_dsa_87/metamorphic_test.go). A KEM has
+// ML-DSA-87 metamorphic suite (crypto/mldsa87/metamorphic_test.go). A KEM has
 // no signature to maul, so the analogous invariants are:
 //
 //   - a mauled ciphertext must decapsulate to the pseudorandom implicit-

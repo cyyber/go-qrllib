@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/theQRL/go-qrllib/crypto/ml_dsa_87"
+	"github.com/theQRL/go-qrllib/crypto/mldsa87"
 )
 
 func main() {
@@ -14,23 +14,24 @@ func main() {
 	msgBytes, _ := os.ReadFile("/tmp/ref_mldsa_msg.bin")
 	ctxBytes, _ := os.ReadFile("/tmp/ref_mldsa_ctx.bin")
 
-	if len(pkBytes) != ml_dsa_87.CRYPTO_PUBLIC_KEY_BYTES {
+	if len(pkBytes) != mldsa87.CRYPTO_PUBLIC_KEY_BYTES {
 		fmt.Fprintf(os.Stderr, "PK size mismatch: got %d, expected %d\n",
-			len(pkBytes), ml_dsa_87.CRYPTO_PUBLIC_KEY_BYTES)
+			len(pkBytes), mldsa87.CRYPTO_PUBLIC_KEY_BYTES)
 		os.Exit(1)
 	}
-	if len(sigBytes) != ml_dsa_87.CRYPTO_BYTES {
+	if len(sigBytes) != mldsa87.CRYPTO_BYTES {
 		fmt.Fprintf(os.Stderr, "Sig size mismatch: got %d, expected %d\n",
-			len(sigBytes), ml_dsa_87.CRYPTO_BYTES)
+			len(sigBytes), mldsa87.CRYPTO_BYTES)
 		os.Exit(1)
 	}
 
-	var pk [ml_dsa_87.CRYPTO_PUBLIC_KEY_BYTES]uint8
-	var sig [ml_dsa_87.CRYPTO_BYTES]uint8
-	copy(pk[:], pkBytes)
-	copy(sig[:], sigBytes)
+	publicKey, err := mldsa87.NewPublicKey(pkBytes)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Public key error: %v\n", err)
+		os.Exit(1)
+	}
 
-	valid := ml_dsa_87.Verify(ctxBytes, msgBytes, sig, &pk)
+	valid := mldsa87.Verify(publicKey, msgBytes, sigBytes, &mldsa87.Options{Context: ctxBytes})
 
 	fmt.Printf("go-qrllib ML-DSA-87 verifier:\n")
 	fmt.Printf("  PK size:  %d bytes\n", len(pkBytes))

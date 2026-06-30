@@ -54,8 +54,8 @@ This library assumes:
 |----------|--------|
 | Post-quantum secure | Yes (Module-LWE assumption) |
 | EUF-CMA secure | Yes |
-| Deterministic signing | **Hedged by default** as per FIPS 204: each call mixes caller-supplied randomness into the per-signature `RND_BYTES`; passing nil uses `crypto/rand.Reader`. Two calls with the same `(key, ctx, message)` and fresh random bytes produce distinct signatures (both verify under the same public key). FIPS 204 deterministic mode (`rnd = 32 zero bytes`) is available as an explicit opt-in via `MLDSA87.SignDeterministic(ctx, msg)` for protocols where determinism is itself a requirement (RANDAO-style verifiable beacon contributions, test-vector reproduction). Equivalent at the wire level to `MLDSA87.Sign(zeroReader, ...)`, `wallet/ml_dsa_87.Wallet.Sign(zeroReader, ...)`, or `crypto.Signer.Sign(zeroReader, ...)` — these paths route into the same internal entry point. |
-| ML-DSA rand handling | The caller-supplied `io.Reader` is honoured by `MLDSA87.New`, `MLDSA87.Sign`, `MLDSA87.SignAttached`, `wallet/ml_dsa_87.Wallet.Sign`, and `crypto.Signer.Sign`: non-nil → its bytes drive key seed or `RND_BYTES`; nil → `crypto/rand.Reader` is used. |
+| Deterministic signing | **Hedged by default** as per FIPS 204: each call mixes caller-supplied randomness into the per-signature `RND_BYTES`; passing nil uses `crypto/rand.Reader`. Two calls with the same `(key, ctx, message)` and fresh random bytes produce distinct signatures (both verify under the same public key). FIPS 204 deterministic mode (`rnd = 32 zero bytes`) is available as an explicit opt-in via `mldsa87.SignDeterministic(privateKey, msg, opts)` for protocols where determinism is itself a requirement (RANDAO-style verifiable beacon contributions, test-vector reproduction). Equivalent at the wire level to `mldsa87.Sign(zeroReader, ...)`, `wallet/mldsa87.Wallet.Sign(zeroReader, ...)`, or `crypto.Signer.Sign(zeroReader, ...)` — these paths route into the same internal entry point. |
+| ML-DSA rand handling | The caller-supplied `io.Reader` is honoured by `mldsa87.GenerateKey`, `mldsa87.Sign`, `wallet/mldsa87.Wallet.Sign`, and `crypto.Signer.Sign`: non-nil → its bytes drive key seed or `RND_BYTES`; nil → `crypto/rand.Reader` is used. |
 | Stateless | Yes |
 | Side-channel resistant | Branchless arithmetic in signing path; see [details below](#constant-time-operations) |
 | Signature malleability | No (canonical encoding enforced) |
@@ -251,7 +251,7 @@ Non-canonical encodings are rejected by the verification functions. This is veri
 
 | Test File | Coverage |
 |-----------|----------|
-| [`crypto/ml_dsa_87/canonicality_test.go`](crypto/ml_dsa_87/canonicality_test.go) | Truncation, hint ordering, padding, cumulative counts |
+| [`crypto/internal/mldsa87/canonicality_test.go`](crypto/internal/mldsa87/canonicality_test.go) | Truncation, hint ordering, padding, cumulative counts |
 | [`crypto/sphincsplus_256s/canonicality_test.go`](crypto/sphincsplus_256s/canonicality_test.go) | Truncation, FORS/WOTS/auth path corruption |
 | [`crypto/xmss/canonicality_test.go`](crypto/xmss/canonicality_test.go) | Truncation, index/R/WOTS/auth path corruption, height validation |
 
@@ -267,9 +267,8 @@ fields of the instance. Internally these route through the package's
 shared `zeroBytes` helper so the wipe behaviour is defined in one place:
 
 ```go
-func (d *MLDSA87) Zeroize() {
-    zeroBytes(d.sk[:])
-    zeroBytes(d.seed[:])
+func (priv *PrivateKey) Zeroize() {
+    priv.key.Zeroize()
 }
 ```
 
@@ -283,8 +282,8 @@ persisting in freed memory:
 
 - **ML-DSA-87 signing** (`cryptoSignSignatureInternal`): `key`, `rhoPrime`, `s1`, `s2`, `t0`
 - **ML-DSA-87 key generation** (`cryptoSignKeypair`): `key`, `rhoPrime`, `s1`, `s1hat`, `s2`, `t0`
-- **ML-DSA-87 hex-seed parsing** (`NewMLDSA87FromHexSeed`): the heap-allocated `unsizedSeed` byte slice and the temporary fixed-size seed array
-- **ML-DSA-87 constructors** (`New`, `NewMLDSA87FromSeed`): the constructor-local `sk`/`seed` array copies are wiped once the returned instance owns them
+- **ML-DSA-87 private-key construction** (`mldsa87.NewPrivateKey`): constructor-local expanded secret-key and seed copies are wiped once the returned instance owns them
+- **ML-DSA-87 key generation** (`mldsa87.GenerateKey`): caller randomness is read into a fixed-size seed before private-key construction
 - **ML-DSA-87 SHAKE pool**: pooled SHAKE256 states are `Reset()` before being returned to the pool, so sponge state that absorbed secret material never lingers between uses
 - **ML-KEM-1024 K-PKE internals** (`pkeKeyGen`/`pkeEncrypt`/`pkeDecrypt`): seed/noise/message-derived polynomial intermediates (`gInput`, `G`, `e`, `y`, `e1`, `e2`, `mu`, `v`, `acc`) are wiped data-independently
 - **SPHINCS+**: `ctx.SkSeed`
@@ -369,16 +368,15 @@ Existing invariant-panic sites include `crypto/xmss/params.go` (WOTS parameter v
 
 | Function | Nil public key | Wrong-size signature | Oversized context | Verification failure |
 |----------|----------------|----------------------|-------------------|----------------------|
-| `crypto/ml_dsa_87.Verify` | returns `false` | returns `false` | returns `false` | returns `false` |
-| `crypto/ml_dsa_87.Open` | `(nil, ErrPublicKeyNil)` | `(nil, ErrInvalidSignatureSize)` | `(nil, ErrInvalidContext)` | `(nil, ErrInvalidSignature)` |
+| `crypto/mldsa87.Verify` | returns `false` | returns `false` | returns `false` | returns `false` |
 | `crypto/sphincsplus_256s.Verify` | returns `false` | returns `false` | n/a | returns `false` |
 | `crypto/sphincsplus_256s.Open` | `(nil, ErrPublicKeyNil)` | `(nil, ErrInvalidSignatureSize)` | n/a | `(nil, ErrInvalidSignature)` |
 | `crypto/xmss.Verify` | n/a (slice; len-checked) | returns `false` | n/a | returns `false` |
 | `legacywallet/xmss.Verify` | n/a (value type) | returns `false` | n/a | returns `false` |
-| `wallet/ml_dsa_87.Verify` | returns `false` | returns `false` | n/a | returns `false` |
+| `wallet/mldsa87.Verify` | returns `false` | returns `false` | n/a | returns `false` |
 | `wallet/sphincsplus_256s.Verify` | returns `false` | returns `false` | n/a | returns `false` |
 
-The crypto-level `Open` functions return `([]byte, error)`. Each failure mode surfaces a distinct typed sentinel from `cryptoerrors`, so callers that need to log or route on specific failure types can use `errors.Is(err, cryptoerrors.ErrPublicKeyNil)` etc. Callers that don't care which failure occurred can write `msg, _ := Open(...)` and treat `msg == nil` as "did not verify".
+The attached-signature `Open` functions return `([]byte, error)`. Each failure mode surfaces a distinct typed sentinel from `cryptoerrors`, so callers that need to log or route on specific failure types can use `errors.Is(err, cryptoerrors.ErrPublicKeyNil)` etc. Callers that don't care which failure occurred can write `msg, _ := Open(...)` and treat `msg == nil` as "did not verify".
 
 Internal entry points (`cryptoSignVerify`, `cryptoSignOpen`) carry the same nil-PK guard as defense-in-depth and surface the same typed sentinels.
 

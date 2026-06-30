@@ -1,6 +1,6 @@
 // Package xmss is the legacy XMSS wallet for QRL v1 mainnet
 // addresses. New issuance on QRL v2 uses ML-DSA-87
-// ([github.com/theQRL/go-qrllib/wallet/ml_dsa_87]); this package exists
+// ([github.com/theQRL/go-qrllib/wallet/mldsa87]); this package exists
 // to recover, verify, and sign for v1-era addresses during and after the
 // v1 → v2 migration.
 //
@@ -57,7 +57,7 @@
 //
 // For new applications strongly prefer the stateless alternative:
 //
-//   - [github.com/theQRL/go-qrllib/wallet/ml_dsa_87] (FIPS 204, lattice-based).
+//   - [github.com/theQRL/go-qrllib/wallet/mldsa87] (FIPS 204, lattice-based).
 //
 // XMSS should only be used for legacy QRL v1 address compatibility.
 //

@@ -45,7 +45,7 @@ Semantic release uses the **Conventional Commits** specification to determine ve
 #### Patch Release (1.0.0 → 1.0.1)
 
 ```
-fix: resolve nil pointer in ml_dsa_87 signature verification
+fix: resolve nil pointer in mldsa87 signature verification
 
 The cryptoSignVerify function was not properly handling nil public keys,
 causing a panic. This change adds proper validation.
@@ -58,9 +58,9 @@ fix(crypto): correct byte order in key serialization
 #### Minor Release (1.0.0 → 1.1.0)
 
 ```
-feat: add NewMLDSA87FromSecretKey function
+feat: add ML-DSA-87 private-key import helpers
 
-This allows creating an MLDSA87 instance directly from a secret key
+This allows creating an ML-DSA-87 private key directly from key material
 without requiring the original seed.
 ```
 
@@ -117,9 +117,9 @@ it up).
 
 ### ML-DSA-87 signing is now hedged by default
 
-Public ML-DSA-87 signing — `MLDSA87.Sign`, `MLDSA87.SignAttached`,
-`wallet/ml_dsa_87.Wallet.Sign`, and `crypto.Signer`-style
-`CryptoSigner.Sign` — is now hedged by default as per FIPS 204 (the
+Public ML-DSA-87 signing — `mldsa87.Sign`, `PrivateKey.Sign`,
+`wallet/mldsa87.Wallet.Sign`, and `crypto.Signer`-style
+`PrivateKey.Sign` — is now hedged by default as per FIPS 204 (the
 recommended mode). Passing nil uses `crypto/rand.Reader`, so two calls
 with the same `(key, ctx, message)` and fresh random bytes now produce
 **distinct** signatures. Callers that pass deterministic readers get
@@ -133,10 +133,10 @@ explicitly reachable via two equivalent public paths for protocols
 that need it (RANDAO-style verifiable beacon contributions,
 test-vector reproduction):
 
-  - `MLDSA87.SignDeterministic(ctx, msg)` — thin convenience helper
+  - `mldsa87.SignDeterministic(privateKey, msg, opts)` — thin convenience helper
     that signs with `rnd = 0^32`. Recommended entry point when the
     deterministic property is itself a protocol requirement.
-  - `wallet/ml_dsa_87.Wallet.Sign(deterministicReader, msg)` — useful
+  - `wallet/mldsa87.Wallet.Sign(deterministicReader, msg)` — useful
     when callers want descriptor-bound wallet signatures with caller-driven
     RND_BYTES.
   - `crypto.Signer.Sign(deterministicReader, …)` — useful when
@@ -147,17 +147,17 @@ test-vector reproduction):
 Both paths route into the same internal entry point and produce
 byte-identical signatures for byte-identical input.
 
-The `MLDSA87.randomizedSigning bool` field was removed from the struct
-(positional struct literals like `&MLDSA87{pk, sk, seed, false}` will
-no longer compile — use the `New(nil)` / `NewMLDSA87FromSeed()` /
-`NewMLDSA87FromHexSeed()` constructors).
+The public `crypto/mldsa87` package now exposes Falcon-style
+`PublicKey` / `PrivateKey` types instead of the old `MLDSA87` public
+struct. Use `GenerateKey(nil)` for fresh keys and `NewPrivateKey(seed)`
+for deterministic seed-backed keys.
 
-`MLDSA87.New`, `MLDSA87.Sign`, `MLDSA87.SignAttached`,
-`wallet/ml_dsa_87.Wallet.Sign`, and `crypto.Signer.Sign` now honour
+`mldsa87.GenerateKey`, `mldsa87.Sign`, `PrivateKey.Sign`,
+`wallet/mldsa87.Wallet.Sign`, and `crypto.Signer.Sign` now honour
 caller-supplied `io.Reader` randomness: if non-nil, key seed bytes or
 RND_BYTES are read from that source; if nil, `crypto/rand.Reader` is used.
-Direct signing callers should pass `Sign(nil, ctx, msg)` /
-`SignAttached(nil, ctx, msg)` for the default hedged path. Wallet callers
+Direct signing callers should pass `Sign(nil, privateKey, msg, opts)` for
+the default hedged path. Wallet callers
 should pass `Sign(nil, msg)` for the default hedged path.
 
 ## Release Workflow

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/theQRL/go-qrllib/crypto/ml_dsa_87"
+	"github.com/theQRL/go-qrllib/crypto/mldsa87"
 )
 
 func main() {
@@ -15,31 +15,33 @@ func main() {
 		seed[i] = byte(i)
 	}
 
-	d, err := ml_dsa_87.NewMLDSA87FromSeed(seed)
+	privateKey, err := mldsa87.NewPrivateKey(seed[:])
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
 
-	pk := d.GetPK()
+	publicKey := privateKey.PublicKey()
 	ctx := []byte("test")
 	msg := []byte("ML-DSA-87 cross-implementation verification")
+	opts := &mldsa87.Options{Context: ctx}
 
-	sig, err := d.Sign(zeroReader{}, ctx, msg)
+	sig, err := mldsa87.Sign(zeroReader{}, privateKey, msg, opts)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Sign error: %v\n", err)
 		os.Exit(1)
 	}
 
 	// Self-verify
-	if !ml_dsa_87.Verify(ctx, msg, sig, &pk) {
+	if !mldsa87.Verify(publicKey, msg, sig, opts) {
 		fmt.Fprintln(os.Stderr, "Self-verification failed!")
 		os.Exit(1)
 	}
 
 	// Write files
-	os.WriteFile("/tmp/mldsa_pk.bin", pk[:], 0644)
-	os.WriteFile("/tmp/mldsa_sig.bin", sig[:], 0644)
+	pk := publicKey.Bytes()
+	os.WriteFile("/tmp/mldsa_pk.bin", pk, 0644)
+	os.WriteFile("/tmp/mldsa_sig.bin", sig, 0644)
 	os.WriteFile("/tmp/mldsa_msg.bin", msg, 0644)
 	os.WriteFile("/tmp/mldsa_ctx.bin", ctx, 0644)
 

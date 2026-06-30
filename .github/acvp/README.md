@@ -44,7 +44,7 @@ python3 .github/acvp/merge_vectors.py \
   --output-dir /tmp/acvp-vectors
 
 # Run the tests
-ACVP_VECTORS_DIR=/tmp/acvp-vectors go test -v -tags acvp -run TestACVP ./crypto/ml_dsa_87/
+ACVP_VECTORS_DIR=/tmp/acvp-vectors go test -v -tags acvp -run TestACVP ./crypto/internal/mldsa87/
 ```
 
 ## Why Not the Other Algorithms?
