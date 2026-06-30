@@ -288,3 +288,63 @@ func TestConstantSizes(t *testing.T) {
 		t.Errorf("SignatureSize mismatch: got %d, want %d", mldsa87.SignatureSize, internal.CRYPTO_BYTES)
 	}
 }
+
+// sink keeps benchmark results observable so the compiler cannot eliminate the
+// work being measured.
+var sink byte
+
+func BenchmarkGenerateKey(b *testing.B) {
+	var zero zeroReader
+	for b.Loop() {
+		public, private, err := mldsa87.GenerateKey(zero)
+		if err != nil {
+			b.Fatal(err)
+		}
+		sink ^= public.Bytes()[0] ^ private.Bytes()[0]
+	}
+}
+
+func BenchmarkNewPrivateKey(b *testing.B) {
+	seed := make([]byte, mldsa87.SeedSize)
+	for b.Loop() {
+		private, err := mldsa87.NewPrivateKey(seed)
+		if err != nil {
+			b.Fatal(err)
+		}
+		sink ^= private.Bytes()[0]
+	}
+}
+
+func BenchmarkSign(b *testing.B) {
+	var zero zeroReader
+	_, private, err := mldsa87.GenerateKey(zero)
+	if err != nil {
+		b.Fatal(err)
+	}
+	message := []byte("Hello, world!")
+	for b.Loop() {
+		signature, err := mldsa87.Sign(zero, private, message, nil)
+		if err != nil {
+			b.Fatal(err)
+		}
+		sink ^= signature[0]
+	}
+}
+
+func BenchmarkVerify(b *testing.B) {
+	var zero zeroReader
+	public, private, err := mldsa87.GenerateKey(zero)
+	if err != nil {
+		b.Fatal(err)
+	}
+	message := []byte("Hello, world!")
+	signature, err := mldsa87.Sign(zero, private, message, nil)
+	if err != nil {
+		b.Fatal(err)
+	}
+	for b.Loop() {
+		if !mldsa87.Verify(public, message, signature, nil) {
+			b.Fatal("signature rejected")
+		}
+	}
+}

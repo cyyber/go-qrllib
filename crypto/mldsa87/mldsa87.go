@@ -1,4 +1,5 @@
-// Package mldsa87 provides ML-DSA-87 digital signature primitives.
+// Package mldsa implements the post-quantum ML-DSA signature scheme specified
+// in FIPS 204.
 package mldsa87
 
 import (
