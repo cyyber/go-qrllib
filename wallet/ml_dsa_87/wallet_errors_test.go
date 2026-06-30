@@ -181,7 +181,7 @@ func TestVerify_InvalidDescriptor(t *testing.T) {
 	}
 
 	message := []byte("test message")
-	sig, err := wallet.Sign(message)
+	sig, err := wallet.Sign(nil, message)
 	if err != nil {
 		t.Fatalf("Sign failed: %v", err)
 	}

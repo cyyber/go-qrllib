@@ -77,7 +77,7 @@ func TestCrossAlgorithmVerificationRejection(t *testing.T) {
 	}
 
 	// Sign with ML-DSA-87
-	mlSig, err := mlWallet.Sign(message)
+	mlSig, err := mlWallet.Sign(nil, message)
 	if err != nil {
 		t.Fatalf("ML-DSA-87 signing failed: %v", err)
 	}
@@ -277,7 +277,7 @@ func TestKeySizeInvariants(t *testing.T) {
 
 		// Verify signature is produced and has correct size
 		// (sig array type has fixed size, just verify signing succeeds)
-		if _, err := wallet.Sign([]byte("test")); err != nil {
+		if _, err := wallet.Sign(nil, []byte("test")); err != nil {
 			t.Fatalf("Sign failed: %v", err)
 		}
 
@@ -489,7 +489,7 @@ func TestSignVerifyRoundTrip(t *testing.T) {
 				msg[i] = byte(i)
 			}
 
-			sig, err := wallet.Sign(msg)
+			sig, err := wallet.Sign(nil, msg)
 			if err != nil {
 				t.Fatalf("sign failed for size %d: %v", size, err)
 			}
@@ -625,8 +625,8 @@ func TestSignatureDeterminism(t *testing.T) {
 		pk := wallet.GetPK()
 		desc := wallet.GetDescriptor().ToDescriptor()
 
-		sig1, _ := wallet.Sign(message)
-		sig2, _ := wallet.Sign(message)
+		sig1, _ := wallet.Sign(nil, message)
+		sig2, _ := wallet.Sign(nil, message)
 
 		// ML-DSA-87 hedged signing (TOB-QRLLIB-6, FIPS 204 §3.4): two
 		// signatures over the same (key, message) MUST differ but both
@@ -671,7 +671,7 @@ func TestSignatureDeterminism(t *testing.T) {
 func TestInvalidDescriptorRejection(t *testing.T) {
 	wallet, _ := ml_dsa_wallet.NewWallet()
 	message := []byte("test")
-	sig, _ := wallet.Sign(message)
+	sig, _ := wallet.Sign(nil, message)
 	pk := wallet.GetPK()
 
 	// Valid descriptor should work

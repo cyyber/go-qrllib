@@ -186,7 +186,7 @@ address := w.GetAddressStr()              // "Q" + hex(64 bytes)
 pk      := w.GetPK()
 desc    := w.GetDescriptor().ToDescriptor()
 
-sig, err := w.Sign(message)
+sig, err := w.Sign(nil, message)
 if err != nil {
     log.Fatal(err)
 }
@@ -194,12 +194,12 @@ if err != nil {
 ok := ml_dsa_87.Verify(message, sig[:], &pk, desc)
 ```
 
-The same API shape is available at `github.com/theQRL/go-qrllib/wallet/sphincsplus_256s`,
-but note that the QRL wallet layer currently treats SPHINCS+/SLH-DSA as **non-issuable**
-(it remains verifiable, so existing addresses keep working): wallet creation under that
-type is gated until the QRL-adopted SLH-DSA parameter set is finalised. See the SPHINCS+
-notes below and `wallet/common/wallettype/type.go` for the `IsIssuable` / `IsVerifiable`
-split.
+The SPHINCS+ wallet package at `github.com/theQRL/go-qrllib/wallet/sphincsplus_256s`
+keeps its original `Sign(message)` shape, but note that the QRL wallet layer currently
+treats SPHINCS+/SLH-DSA as **non-issuable** (it remains verifiable, so existing
+addresses keep working): wallet creation under that type is gated until the QRL-adopted
+SLH-DSA parameter set is finalised. See the SPHINCS+ notes below and
+`wallet/common/wallettype/type.go` for the `IsIssuable` / `IsVerifiable` split.
 
 ### `crypto.Signer` Interface (ML-DSA-87)
 

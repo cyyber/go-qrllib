@@ -136,6 +136,9 @@ test-vector reproduction):
   - `MLDSA87.SignDeterministic(ctx, msg)` — thin convenience helper
     that signs with `rnd = 0^32`. Recommended entry point when the
     deterministic property is itself a protocol requirement.
+  - `wallet/ml_dsa_87.Wallet.Sign(deterministicReader, msg)` — useful
+    when callers want descriptor-bound wallet signatures with caller-driven
+    RND_BYTES.
   - `crypto.Signer.Sign(deterministicReader, …)` — useful when
     integrating with code that drives randomness through Go's
     `crypto.Signer` interface; pass an `io.Reader` returning 32
@@ -149,12 +152,13 @@ The `MLDSA87.randomizedSigning bool` field was removed from the struct
 no longer compile — use the `New(nil)` / `NewMLDSA87FromSeed()` /
 `NewMLDSA87FromHexSeed()` constructors).
 
-`MLDSA87.New`, `MLDSA87.Sign`, `MLDSA87.SignAttached`, and
-`crypto.Signer.Sign` now honour caller-supplied `io.Reader` randomness:
-if non-nil, key seed bytes or RND_BYTES are read from that source; if nil,
-`crypto/rand.Reader` is used. Direct signing callers should pass
-`Sign(nil, ctx, msg)` / `SignAttached(nil, ctx, msg)` for the default
-hedged path.
+`MLDSA87.New`, `MLDSA87.Sign`, `MLDSA87.SignAttached`,
+`wallet/ml_dsa_87.Wallet.Sign`, and `crypto.Signer.Sign` now honour
+caller-supplied `io.Reader` randomness: if non-nil, key seed bytes or
+RND_BYTES are read from that source; if nil, `crypto/rand.Reader` is used.
+Direct signing callers should pass `Sign(nil, ctx, msg)` /
+`SignAttached(nil, ctx, msg)` for the default hedged path. Wallet callers
+should pass `Sign(nil, msg)` for the default hedged path.
 
 ## Release Workflow
 

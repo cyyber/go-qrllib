@@ -18,7 +18,8 @@
 //   - XMSS: RFC 8391 hash-based signature (uses hash function selector instead)
 //
 // The wallet layer (wallet/ml_dsa_87) abstracts this by deriving the
-// descriptor-bound context, providing a consistent Sign(message) API to callers.
+// descriptor-bound context, while still letting callers supply signing
+// randomness via Sign(random, message).
 //
 // # Signing Mode (Hedged by Default)
 //
@@ -39,6 +40,9 @@
 //   - [MLDSA87.SignDeterministic] — thin convenience helper that
 //     signs with `rnd = 32 zero bytes`. Recommended entry point when
 //     the deterministic property is itself a protocol requirement.
+//   - `wallet/ml_dsa_87.Wallet.Sign` with an `io.Reader` that returns
+//     deterministic bytes. Useful when callers need descriptor-bound wallet
+//     signatures and caller-driven RND_BYTES.
 //   - [CryptoSigner.Sign] with an `io.Reader` that returns
 //     deterministic bytes (e.g. `bytes.NewReader(make([]byte, 32))`).
 //     Useful when integrating with code that already uses Go's

@@ -3,6 +3,7 @@ package ml_dsa_87
 import (
 	"bytes"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -21,6 +22,17 @@ type walletTestCase struct {
 	wantSK        string
 	wantSignature string
 }
+
+type zeroReader struct{}
+
+func (zeroReader) Read(buf []byte) (int, error) {
+	clear(buf)
+	return len(buf), nil
+}
+
+type errReader struct{ err error }
+
+func (e errReader) Read(_ []byte) (int, error) { return 0, e.err }
 
 var walletTestCases = []*walletTestCase{
 	{
@@ -259,7 +271,7 @@ func TestWallet_Sign(t *testing.T) {
 		for _, tc := range walletTestCases {
 			t.Run(fmt.Sprintf("%s_%s", creatorName, tc.name), func(t *testing.T) {
 				w := creator(t, tc)
-				got, err := w.Sign([]byte(tc.message))
+				got, err := w.Sign(nil, []byte(tc.message))
 				if err != nil {
 					t.Fatal("failed to sign ", err.Error())
 				}
@@ -270,6 +282,45 @@ func TestWallet_Sign(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestWallet_SignCallerSuppliedRand(t *testing.T) {
+	w, err := NewWallet()
+	if err != nil {
+		t.Fatalf("NewWallet failed: %v", err)
+	}
+	defer w.Zeroize()
+
+	msg := []byte("wallet caller supplied rand")
+	sig1, err := w.Sign(zeroReader{}, msg)
+	if err != nil {
+		t.Fatalf("first Sign with caller rand failed: %v", err)
+	}
+	sig2, err := w.Sign(zeroReader{}, msg)
+	if err != nil {
+		t.Fatalf("second Sign with caller rand failed: %v", err)
+	}
+	if sig1 != sig2 {
+		t.Fatal("Sign did not use caller-supplied rand deterministically")
+	}
+
+	deterministicSig, err := w.d.SignDeterministic(common.SigningContext(w.desc.ToDescriptor()), msg)
+	if err != nil {
+		t.Fatalf("SignDeterministic failed: %v", err)
+	}
+	if sig1 != deterministicSig {
+		t.Fatal("Sign with zeroReader did not match SignDeterministic")
+	}
+
+	pk := w.GetPK()
+	if !Verify(msg, sig1[:], &pk, w.desc.ToDescriptor()) {
+		t.Fatal("caller-rand signature did not verify")
+	}
+
+	wantErr := errors.New("wallet sign rand failure")
+	if _, err := w.Sign(errReader{err: wantErr}, msg); err != wantErr {
+		t.Fatalf("Sign returned %v, want %v", err, wantErr)
 	}
 }
 
@@ -327,7 +378,7 @@ func TestWallet_SignAndVerify(t *testing.T) {
 			}
 
 			// Sign the message
-			signature, err := wallet.Sign(tt.message)
+			signature, err := wallet.Sign(nil, tt.message)
 			if (err != nil) != tt.wantErrSign {
 				t.Errorf("Sign() error = %v\nwantErr %v", err, tt.wantErrSign)
 				return
@@ -382,7 +433,7 @@ func TestWallet_SignMultiple(t *testing.T) {
 	}
 
 	for i, msg := range messages {
-		signature, err := wallet.Sign(msg)
+		signature, err := wallet.Sign(nil, msg)
 		if err != nil {
 			t.Errorf("Failed to sign message %d: %v", i+1, err)
 			continue
@@ -453,7 +504,7 @@ func TestWallet_Zeroize(t *testing.T) {
 
 	// Sign a message to confirm the wallet works before zeroizing
 	msg := []byte("pre-zeroize message")
-	_, err = w.Sign(msg)
+	_, err = w.Sign(nil, msg)
 	if err != nil {
 		t.Fatalf("Sign before Zeroize failed: %v", err)
 	}

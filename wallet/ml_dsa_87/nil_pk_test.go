@@ -13,7 +13,7 @@ func TestVerify_NilPublicKey_ReturnsFalseNoPanic(t *testing.T) {
 		t.Fatalf("setup: NewWallet failed: %v", err)
 	}
 	msg := []byte("nil-pk regression test message (wallet/ml_dsa_87)")
-	sig, err := w.Sign(msg)
+	sig, err := w.Sign(nil, msg)
 	if err != nil {
 		t.Fatalf("setup: Sign failed: %v", err)
 	}
