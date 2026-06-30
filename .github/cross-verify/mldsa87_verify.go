@@ -14,14 +14,14 @@ func main() {
 	msgBytes, _ := os.ReadFile("/tmp/ref_mldsa_msg.bin")
 	ctxBytes, _ := os.ReadFile("/tmp/ref_mldsa_ctx.bin")
 
-	if len(pkBytes) != mldsa87.CRYPTO_PUBLIC_KEY_BYTES {
+	if len(pkBytes) != mldsa87.PublicKeySize {
 		fmt.Fprintf(os.Stderr, "PK size mismatch: got %d, expected %d\n",
-			len(pkBytes), mldsa87.CRYPTO_PUBLIC_KEY_BYTES)
+			len(pkBytes), mldsa87.PublicKeySize)
 		os.Exit(1)
 	}
-	if len(sigBytes) != mldsa87.CRYPTO_BYTES {
+	if len(sigBytes) != mldsa87.SignatureSize {
 		fmt.Fprintf(os.Stderr, "Sig size mismatch: got %d, expected %d\n",
-			len(sigBytes), mldsa87.CRYPTO_BYTES)
+			len(sigBytes), mldsa87.SignatureSize)
 		os.Exit(1)
 	}
 

@@ -20,28 +20,21 @@ import (
 
 const (
 	// PublicKeySize is the size in bytes of an encoded ML-DSA-87 public key.
-	PublicKeySize = internal.CRYPTO_PUBLIC_KEY_BYTES
+	PublicKeySize = 2592
 
 	// SignatureSize is the size in bytes of an encoded ML-DSA-87 signature.
-	SignatureSize = internal.CRYPTO_BYTES
+	SignatureSize = 4627
 
 	// SeedSize is the size in bytes of the seed used to deterministically
 	// generate an ML-DSA-87 private key.
-	SeedSize = internal.SEED_BYTES
+	SeedSize = 32
 
 	// PrivateKeySize is the size in bytes of an ML-DSA-87 private key in seed
 	// form.
 	PrivateKeySize = SeedSize
-
-	// SecretKeySize is the size in bytes of the expanded ML-DSA-87 secret key.
-	SecretKeySize = internal.CRYPTO_SECRET_KEY_BYTES
-
-	// Backwards-compatible constant aliases for callers that used the old
-	// crypto/ml_dsa_87 package names.
-	CRYPTO_PUBLIC_KEY_BYTES = PublicKeySize
-	CRYPTO_SECRET_KEY_BYTES = SecretKeySize
-	CRYPTO_BYTES            = SignatureSize
 )
+
+const secretKeySize = 4896
 
 var errUnsupportedSignerOpts = errors.New("mldsa87: opts must be *Options, *SignerOpts, or nil")
 
@@ -121,9 +114,9 @@ func (priv *PrivateKey) Bytes() []byte {
 }
 
 // SecretKeyBytes returns the expanded ML-DSA-87 secret key bytes.
-func (priv *PrivateKey) SecretKeyBytes() [SecretKeySize]uint8 {
+func (priv *PrivateKey) SecretKeyBytes() [secretKeySize]uint8 {
 	if priv == nil || priv.key == nil {
-		return [SecretKeySize]uint8{}
+		return [secretKeySize]uint8{}
 	}
 	return priv.key.SecretKeyBytes()
 }

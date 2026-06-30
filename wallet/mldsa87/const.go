@@ -4,6 +4,6 @@ import "github.com/theQRL/go-qrllib/crypto/mldsa87"
 
 const (
 	PKSize  = mldsa87.PublicKeySize
-	SKSize  = mldsa87.SecretKeySize
+	SKSize  = 4896
 	SigSize = mldsa87.SignatureSize
 )

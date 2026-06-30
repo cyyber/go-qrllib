@@ -34,8 +34,8 @@ func TestRoundTrip(t *testing.T) {
 	if len(private.Bytes()) != mldsa87.PrivateKeySize {
 		t.Fatalf("private key length = %d, want %d", len(private.Bytes()), mldsa87.PrivateKeySize)
 	}
-	if len(private.SecretKeyBytes()) != mldsa87.SecretKeySize {
-		t.Fatalf("secret key length = %d, want %d", len(private.SecretKeyBytes()), mldsa87.SecretKeySize)
+	if len(private.SecretKeyBytes()) != 4896 {
+		t.Fatalf("secret key length = %d, want %d", len(private.SecretKeyBytes()), 4896)
 	}
 
 	derivedPublic := private.PublicKey()
