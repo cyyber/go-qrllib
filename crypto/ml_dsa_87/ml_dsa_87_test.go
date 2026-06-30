@@ -3,8 +3,11 @@ package ml_dsa_87
 import (
 	"bytes"
 	"encoding/hex"
+	"errors"
 	"reflect"
 	"testing"
+
+	cryptoerrors "github.com/theQRL/go-qrllib/crypto/errors"
 )
 
 const (
@@ -39,8 +42,184 @@ func TestNew(t *testing.T) {
 			t.Error("Panic while creating ml-dsa-87", err)
 		}
 	}()
-	if _, err := New(); err != nil {
+	if _, err := New(nil); err != nil {
 		t.Error("failed to generate new ml-dsa-87", err.Error())
+	}
+}
+
+func TestNewUsesCallerSuppliedRand(t *testing.T) {
+	var seed [SEED_BYTES]uint8
+	for i := range seed {
+		seed[i] = byte(i + 1)
+	}
+
+	got, err := New(bytes.NewReader(seed[:]))
+	if err != nil {
+		t.Fatalf("New with caller rand failed: %v", err)
+	}
+	defer got.Zeroize()
+
+	want, err := NewMLDSA87FromSeed(seed)
+	if err != nil {
+		t.Fatalf("NewMLDSA87FromSeed failed: %v", err)
+	}
+	defer want.Zeroize()
+
+	if got.GetSeed() != seed {
+		t.Fatal("New did not store the caller-supplied seed")
+	}
+	if got.GetPK() != want.GetPK() {
+		t.Fatal("New did not derive the public key from caller-supplied rand")
+	}
+	if got.GetSK() != want.GetSK() {
+		t.Fatal("New did not derive the secret key from caller-supplied rand")
+	}
+
+	var zeroSeed [SEED_BYTES]uint8
+	gotZero, err := New(zeroReader{})
+	if err != nil {
+		t.Fatalf("New with zeroReader failed: %v", err)
+	}
+	defer gotZero.Zeroize()
+
+	wantZero, err := NewMLDSA87FromSeed(zeroSeed)
+	if err != nil {
+		t.Fatalf("NewMLDSA87FromSeed with zero seed failed: %v", err)
+	}
+	defer wantZero.Zeroize()
+
+	if gotZero.GetPK() != wantZero.GetPK() {
+		t.Fatal("New with zeroReader did not match NewMLDSA87FromSeed with zero seed")
+	}
+	if gotZero.GetSK() != wantZero.GetSK() {
+		t.Fatal("New with zeroReader did not derive the expected zero-seed secret key")
+	}
+}
+
+func TestNewRandReaderError(t *testing.T) {
+	wantErr := errors.New("new rand failure")
+
+	_, err := New(errReader{err: wantErr})
+	if err == nil {
+		t.Fatal("expected New to fail when caller rand fails")
+	}
+	if err != wantErr {
+		t.Fatalf("New returned %v, want %v", err, wantErr)
+	}
+}
+
+func TestSignUsesCallerSuppliedRand(t *testing.T) {
+	d, err := NewMLDSA87FromHexSeed(HexSeed)
+	if err != nil {
+		t.Fatalf("NewMLDSA87FromHexSeed failed: %v", err)
+	}
+	defer d.Zeroize()
+
+	ctx := []byte("caller-rand")
+	msg := []byte("message")
+
+	sig1, err := d.Sign(zeroReader{}, ctx, msg)
+	if err != nil {
+		t.Fatalf("first Sign with caller rand failed: %v", err)
+	}
+	sig2, err := d.Sign(zeroReader{}, ctx, msg)
+	if err != nil {
+		t.Fatalf("second Sign with caller rand failed: %v", err)
+	}
+	if sig1 != sig2 {
+		t.Fatal("Sign did not use caller-supplied rand deterministically")
+	}
+	deterministicSig, err := d.SignDeterministic(ctx, msg)
+	if err != nil {
+		t.Fatalf("SignDeterministic failed: %v", err)
+	}
+	if sig1 != deterministicSig {
+		t.Fatal("Sign with zeroReader did not match SignDeterministic")
+	}
+
+	pk := d.GetPK()
+	if !Verify(ctx, msg, sig1, &pk) {
+		t.Fatal("caller-rand signature did not verify")
+	}
+
+	sig3, err := d.Sign(fixedByteReader(0x42), ctx, msg)
+	if err != nil {
+		t.Fatalf("first Sign with fixedByteReader failed: %v", err)
+	}
+	sig4, err := d.Sign(fixedByteReader(0x42), ctx, msg)
+	if err != nil {
+		t.Fatalf("second Sign with fixedByteReader failed: %v", err)
+	}
+	if sig3 != sig4 {
+		t.Fatal("Sign with the same fixed reader should be deterministic")
+	}
+	if sig3 == sig1 {
+		t.Fatal("Sign with non-zero fixed reader matched zeroReader output")
+	}
+	if !Verify(ctx, msg, sig3, &pk) {
+		t.Fatal("fixed-rand signature did not verify")
+	}
+
+	sealed1, err := d.SignAttached(zeroReader{}, ctx, msg)
+	if err != nil {
+		t.Fatalf("first SignAttached with caller rand failed: %v", err)
+	}
+	sealed2, err := d.SignAttached(zeroReader{}, ctx, msg)
+	if err != nil {
+		t.Fatalf("second SignAttached with caller rand failed: %v", err)
+	}
+	if !bytes.Equal(sealed1, sealed2) {
+		t.Fatal("SignAttached did not use caller-supplied rand deterministically")
+	}
+	if !bytes.Equal(sealed1[:CRYPTO_BYTES], deterministicSig[:]) {
+		t.Fatal("SignAttached with zeroReader did not contain the deterministic signature")
+	}
+	sealed3, err := d.SignAttached(fixedByteReader(0x42), ctx, msg)
+	if err != nil {
+		t.Fatalf("SignAttached with fixedByteReader failed: %v", err)
+	}
+	if bytes.Equal(sealed3[:CRYPTO_BYTES], sealed1[:CRYPTO_BYTES]) {
+		t.Fatal("SignAttached with non-zero fixed reader matched zeroReader output")
+	}
+	opened, err := Open(ctx, sealed1, &pk)
+	if err != nil {
+		t.Fatalf("Open failed for caller-rand attached signature: %v", err)
+	}
+	if !bytes.Equal(opened, msg) {
+		t.Fatalf("Open returned %q, want %q", opened, msg)
+	}
+}
+
+func TestSignRandReaderError(t *testing.T) {
+	d, err := NewMLDSA87FromHexSeed(HexSeed)
+	if err != nil {
+		t.Fatalf("NewMLDSA87FromHexSeed failed: %v", err)
+	}
+	defer d.Zeroize()
+
+	wantErr := errors.New("sign rand failure")
+	if _, err := d.Sign(errReader{err: wantErr}, []byte("ctx"), []byte("msg")); err != wantErr {
+		t.Fatalf("Sign returned %v, want %v", err, wantErr)
+	}
+	if _, err := d.SignAttached(errReader{err: wantErr}, []byte("ctx"), []byte("msg")); err != wantErr {
+		t.Fatalf("SignAttached returned %v, want %v", err, wantErr)
+	}
+}
+
+func TestSignInvalidContextBeforeRandRead(t *testing.T) {
+	d, err := NewMLDSA87FromHexSeed(HexSeed)
+	if err != nil {
+		t.Fatalf("NewMLDSA87FromHexSeed failed: %v", err)
+	}
+	defer d.Zeroize()
+
+	randErr := errors.New("rand should not be read")
+	longCtx := bytes.Repeat([]byte{0x42}, 256)
+	if _, err := d.Sign(errReader{err: randErr}, longCtx, []byte("msg")); !errors.Is(err, cryptoerrors.ErrInvalidContext) {
+		t.Fatalf("Sign returned %v, want ErrInvalidContext", err)
+	}
+	if _, err := d.SignAttached(errReader{err: randErr}, longCtx, []byte("msg")); !errors.Is(err, cryptoerrors.ErrInvalidContext) {
+		t.Fatalf("SignAttached returned %v, want ErrInvalidContext", err)
 	}
 }
 
@@ -172,7 +351,7 @@ func TestMLDSA87_SignAttached(t *testing.T) {
 	msg := []uint8{0, 1, 2, 4, 6, 9, 1}
 
 	d := newMLDSA87FromSeed(t, HexSeed)
-	signatureMessage, err := d.SignAttached(ctx, msg)
+	signatureMessage, err := d.SignAttached(nil, ctx, msg)
 	if err != nil {
 		t.Fatal("failed to seal", err.Error())
 	}
@@ -194,7 +373,7 @@ func TestMLDSA87_Open(t *testing.T) {
 	msg := []uint8{0, 1, 2, 4, 6, 9, 1}
 
 	d := newMLDSA87FromSeed(t, HexSeed)
-	signatureMessage, err := d.SignAttached(ctx, msg)
+	signatureMessage, err := d.SignAttached(nil, ctx, msg)
 	if err != nil {
 		t.Fatal("failed to seal", err.Error())
 	}
@@ -217,7 +396,7 @@ func TestMLDSA87_Sign(t *testing.T) {
 	msg := []uint8{0, 1, 2, 4, 6, 9, 1}
 
 	d := newMLDSA87FromSeed(t, HexSeed)
-	signature, err := d.Sign(ctx, msg)
+	signature, err := d.Sign(nil, ctx, msg)
 	if err != nil {
 		t.Fatal("failed to sign", err.Error())
 	}
@@ -235,7 +414,7 @@ func TestMLDSA87_Verify(t *testing.T) {
 	msg := []uint8{0, 1, 2, 4, 6, 9, 1}
 
 	d := newMLDSA87FromSeed(t, HexSeed)
-	signature, err := d.Sign(ctx, msg)
+	signature, err := d.Sign(nil, ctx, msg)
 	if err != nil {
 		t.Fatal("failed to sign", err.Error())
 	}
@@ -252,7 +431,7 @@ func TestExtractMessage(t *testing.T) {
 	msg := []uint8{0, 1, 2, 4, 6, 9, 1}
 	d := newMLDSA87FromSeed(t, HexSeed)
 
-	signatureMessage, err := d.SignAttached(ctx, msg)
+	signatureMessage, err := d.SignAttached(nil, ctx, msg)
 	if err != nil {
 		t.Fatal("failed to seal message: ", err.Error())
 	}
@@ -268,7 +447,7 @@ func TestExtractSignature(t *testing.T) {
 	msg := []uint8{0, 1, 2, 4, 6, 9, 1}
 	d := newMLDSA87FromSeed(t, HexSeed)
 
-	signatureMessage, err := d.SignAttached(ctx, msg)
+	signatureMessage, err := d.SignAttached(nil, ctx, msg)
 	if err != nil {
 		t.Fatal("failed to seal message: ", err.Error())
 	}

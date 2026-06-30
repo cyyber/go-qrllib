@@ -119,12 +119,13 @@ it up).
 
 Public ML-DSA-87 signing — `MLDSA87.Sign`, `MLDSA87.SignAttached`,
 `wallet/ml_dsa_87.Wallet.Sign`, and `crypto.Signer`-style
-`CryptoSigner.Sign` — is now **always hedged** as per FIPS 204 (the
-recommended mode). Each call mixes fresh `crypto/rand` randomness into
-the per-signature `RND_BYTES` value, so two calls with the same
-`(key, ctx, message)` now produce **distinct** signatures. Both still
-verify under the same public key — verification is unchanged and
-existing verifiers, on-chain or off, are unaffected.
+`CryptoSigner.Sign` — is now hedged by default as per FIPS 204 (the
+recommended mode). Passing nil uses `crypto/rand.Reader`, so two calls
+with the same `(key, ctx, message)` and fresh random bytes now produce
+**distinct** signatures. Callers that pass deterministic readers get
+deterministic `RND_BYTES` instead. Both modes still verify under the
+same public key — verification is unchanged and existing verifiers,
+on-chain or off, are unaffected.
 
 The previous deterministic-by-default mode is no longer the default,
 but FIPS 204 deterministic mode (`rnd = 32 zero bytes`) remains
@@ -145,12 +146,15 @@ byte-identical signatures for byte-identical input.
 
 The `MLDSA87.randomizedSigning bool` field was removed from the struct
 (positional struct literals like `&MLDSA87{pk, sk, seed, false}` will
-no longer compile — use the `New()` / `NewMLDSA87FromSeed()` /
+no longer compile — use the `New(nil)` / `NewMLDSA87FromSeed()` /
 `NewMLDSA87FromHexSeed()` constructors).
 
-`crypto.Signer.Sign` now also honours its `rand io.Reader` parameter
-(previously discarded): if non-nil, RND_BYTES are read from the
-caller-supplied source; if nil, `crypto/rand` is used.
+`MLDSA87.New`, `MLDSA87.Sign`, `MLDSA87.SignAttached`, and
+`crypto.Signer.Sign` now honour caller-supplied `io.Reader` randomness:
+if non-nil, key seed bytes or RND_BYTES are read from that source; if nil,
+`crypto/rand.Reader` is used. Direct signing callers should pass
+`Sign(nil, ctx, msg)` / `SignAttached(nil, ctx, msg)` for the default
+hedged path.
 
 ## Release Workflow
 

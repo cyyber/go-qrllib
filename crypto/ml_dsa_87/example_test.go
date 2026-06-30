@@ -9,7 +9,7 @@ import (
 // Example demonstrates basic ML-DSA-87 signature operations.
 func Example() {
 	// Create a new ML-DSA-87 instance with random seed
-	m, err := ml_dsa_87.New()
+	m, err := ml_dsa_87.New(nil)
 	if err != nil {
 		fmt.Println("Error:", err)
 		return
@@ -19,7 +19,7 @@ func Example() {
 	// Sign a message with context (FIPS 204 requirement)
 	ctx := []byte("my-application")
 	message := []byte("Hello, FIPS 204!")
-	signature, err := m.Sign(ctx, message)
+	signature, err := m.Sign(nil, ctx, message)
 	if err != nil {
 		fmt.Println("Error:", err)
 		return
@@ -35,7 +35,7 @@ func Example() {
 // ExampleNew demonstrates creating an ML-DSA-87 instance.
 func ExampleNew() {
 	// Create with random seed
-	m, err := ml_dsa_87.New()
+	m, err := ml_dsa_87.New(nil)
 	if err != nil {
 		fmt.Println("Error:", err)
 		return
@@ -67,7 +67,7 @@ func ExampleNewMLDSA87FromSeed() {
 
 // ExampleMLDSA87_Sign demonstrates signing with context.
 func ExampleMLDSA87_Sign() {
-	m, _ := ml_dsa_87.New()
+	m, _ := ml_dsa_87.New(nil)
 	defer m.Zeroize()
 
 	// FIPS 204 requires a context parameter for domain separation
@@ -75,7 +75,7 @@ func ExampleMLDSA87_Sign() {
 	ctx := []byte("my-application") // application-specific context for domain separation
 	message := []byte("transaction data")
 
-	signature, err := m.Sign(ctx, message)
+	signature, err := m.Sign(nil, ctx, message)
 	if err != nil {
 		fmt.Println("Error:", err)
 		return
@@ -87,12 +87,12 @@ func ExampleMLDSA87_Sign() {
 
 // ExampleVerify demonstrates signature verification with context.
 func ExampleVerify() {
-	m, _ := ml_dsa_87.New()
+	m, _ := ml_dsa_87.New(nil)
 	defer m.Zeroize()
 
 	ctx := []byte("test-context")
 	message := []byte("verify me")
-	signature, _ := m.Sign(ctx, message)
+	signature, _ := m.Sign(nil, ctx, message)
 
 	pk := m.GetPK()
 
@@ -115,14 +115,14 @@ func ExampleVerify() {
 // detached signature returned by Sign. There is no confidentiality —
 // the message bytes are embedded in the result in the clear.
 func ExampleMLDSA87_SignAttached() {
-	m, _ := ml_dsa_87.New()
+	m, _ := ml_dsa_87.New(nil)
 	defer m.Zeroize()
 
 	ctx := []byte("example-context")
 	message := []byte("example transaction payload")
 
 	// SignAttached returns signature || message in a single buffer.
-	signed, err := m.SignAttached(ctx, message)
+	signed, err := m.SignAttached(nil, ctx, message)
 	if err != nil {
 		fmt.Println("Error:", err)
 		return
@@ -136,12 +136,12 @@ func ExampleMLDSA87_SignAttached() {
 // ExampleOpen demonstrates verifying an attached-signature byte string
 // (produced by SignAttached) and recovering the plaintext message.
 func ExampleOpen() {
-	m, _ := ml_dsa_87.New()
+	m, _ := ml_dsa_87.New(nil)
 	defer m.Zeroize()
 
 	ctx := []byte("open-context")
 	original := []byte("example transaction payload")
-	signed, _ := m.SignAttached(ctx, original)
+	signed, _ := m.SignAttached(nil, ctx, original)
 
 	// Open verifies and returns the recovered message
 	pk := m.GetPK()

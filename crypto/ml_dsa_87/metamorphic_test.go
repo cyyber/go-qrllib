@@ -92,7 +92,7 @@ func mustSignerFromSeed(t *testing.T, seed [SEED_BYTES]uint8) *MLDSA87 {
 
 func mustSign(t *testing.T, mldsa *MLDSA87, ctx, message []byte) [CRYPTO_BYTES]uint8 {
 	t.Helper()
-	sig, err := mldsa.Sign(ctx, message)
+	sig, err := mldsa.Sign(nil, ctx, message)
 	if err != nil {
 		t.Fatalf("Sign failed: %v", err)
 	}
@@ -266,7 +266,7 @@ func TestMetamorphicSignAttachedOpenRejectsBitMauledAttachedSignatures(t *testin
 	for _, tc := range metamorphicCorpus() {
 		t.Run(tc.name, func(t *testing.T) {
 			mldsa := mustSignerFromSeed(t, tc.seed)
-			sealed, err := mldsa.SignAttached(tc.ctx, tc.message)
+			sealed, err := mldsa.SignAttached(nil, tc.ctx, tc.message)
 			if err != nil {
 				t.Fatalf("SignAttached failed: %v", err)
 			}

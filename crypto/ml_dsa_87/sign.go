@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"crypto/sha3"
 	"crypto/subtle"
+	"io"
 	"runtime"
 
 	cryptoerrors "github.com/theQRL/go-qrllib/crypto/errors"
@@ -284,22 +285,27 @@ rej:
 	return nil
 }
 
-// cryptoSignSignature is the standard hedged-signing entry point. It
-// reads RND_BYTES from crypto/rand and calls
-// [cryptoSignSignatureWithRnd]. Per FIPS 204 §3.4, hedged (randomised)
-// signing reduces side-channel and fault-injection leverage relative
-// to the deterministic variant; all public ML-DSA-87 signing in this
-// library uses this path. (TOB-QRLLIB-6.)
+// cryptoSignSignature is the standard hedged-signing entry point. It reads
+// RND_BYTES from random and calls [cryptoSignSignatureWithRnd]. If random is
+// nil, crypto/rand.Reader is used. Per FIPS 204 §3.4, hedged (randomised)
+// signing reduces side-channel and fault-injection leverage relative to the
+// deterministic variant; all public ML-DSA-87 signing in this library uses
+// this path. (TOB-QRLLIB-6.)
 //
 // Callers needing an explicit rnd value (the crypto.Signer.Sign
 // caller-supplied io.Reader path; ACVP / KAT determinism tests with
 // rnd=zero) call [cryptoSignSignatureWithRnd] directly.
-func cryptoSignSignature(sig, m []uint8, ctx []uint8, sk *[CRYPTO_SECRET_KEY_BYTES]uint8) error {
+func cryptoSignSignature(random io.Reader, sig, m []uint8, ctx []uint8, sk *[CRYPTO_SECRET_KEY_BYTES]uint8) error {
+	if len(ctx) > 255 {
+		return cryptoerrors.ErrInvalidContext
+	}
+	if random == nil {
+		random = rand.Reader
+	}
+
 	var rnd [RND_BYTES]uint8
-	if _, err := rand.Read(rnd[:]); err != nil {
-		//coverage:ignore
-		//rationale: crypto/rand.Read only fails if system entropy source is broken
-		return cryptoerrors.ErrSeedGeneration
+	if _, err := io.ReadFull(random, rnd[:]); err != nil {
+		return err
 	}
 	return cryptoSignSignatureWithRnd(sig, m, ctx, sk, rnd)
 }
@@ -322,10 +328,10 @@ func cryptoSignSignatureWithRnd(sig, m []uint8, ctx []uint8, sk *[CRYPTO_SECRET_
 }
 
 // attached sig wrappers
-func cryptoSign(msg []uint8, ctx []uint8, sk *[CRYPTO_SECRET_KEY_BYTES]uint8) ([]uint8, error) {
+func cryptoSign(random io.Reader, msg []uint8, ctx []uint8, sk *[CRYPTO_SECRET_KEY_BYTES]uint8) ([]uint8, error) {
 	sm := make([]uint8, CRYPTO_BYTES+len(msg))
 	copy(sm[CRYPTO_BYTES:], msg)
-	err := cryptoSignSignature(sm[:CRYPTO_BYTES], sm[CRYPTO_BYTES:], ctx, sk)
+	err := cryptoSignSignature(random, sm[:CRYPTO_BYTES], sm[CRYPTO_BYTES:], ctx, sk)
 	if err != nil {
 		for i := range sm {
 			sm[i] = 0

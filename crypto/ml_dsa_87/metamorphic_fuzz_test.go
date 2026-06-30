@@ -67,7 +67,7 @@ func FuzzMetamorphicVerifyRejectsMauledPublicKey(f *testing.F) {
 		msg = fuzzableMsg(msg)
 
 		mldsa := mustMetamorphicSigner(t, seedBytes)
-		sig, err := mldsa.Sign(ctx, msg)
+		sig, err := mldsa.Sign(nil, ctx, msg)
 		if err != nil {
 			t.Fatalf("Sign failed: %v", err)
 		}
@@ -96,7 +96,7 @@ func FuzzMetamorphicVerifyRejectsMauledMessage(f *testing.F) {
 		msg = fuzzableMsg(msg)
 
 		mldsa := mustMetamorphicSigner(t, seedBytes)
-		sig, err := mldsa.Sign(ctx, msg)
+		sig, err := mldsa.Sign(nil, ctx, msg)
 		if err != nil {
 			t.Fatalf("Sign failed: %v", err)
 		}
@@ -125,7 +125,7 @@ func FuzzMetamorphicVerifyRejectsMauledSignature(f *testing.F) {
 		msg = fuzzableMsg(msg)
 
 		mldsa := mustMetamorphicSigner(t, seedBytes)
-		sig, err := mldsa.Sign(ctx, msg)
+		sig, err := mldsa.Sign(nil, ctx, msg)
 		if err != nil {
 			t.Fatalf("Sign failed: %v", err)
 		}
@@ -187,7 +187,7 @@ func FuzzMetamorphicOpenRejectsMauledAttachedSignature(f *testing.F) {
 		msg = fuzzableMsg(msg)
 
 		mldsa := mustMetamorphicSigner(t, seedBytes)
-		sealed, err := mldsa.SignAttached(ctx, msg)
+		sealed, err := mldsa.SignAttached(nil, ctx, msg)
 		if err != nil {
 			t.Fatalf("SignAttached failed: %v", err)
 		}

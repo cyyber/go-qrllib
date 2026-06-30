@@ -108,7 +108,7 @@ func FuzzMLDSA87SignVerifyRoundTripMutate(f *testing.F) {
 			t.Fatalf("NewMLDSA87FromSeed failed: %v", err)
 		}
 
-		sig, err := mldsa.Sign(ctx, message)
+		sig, err := mldsa.Sign(nil, ctx, message)
 		if len(ctx) > 255 {
 			if err == nil {
 				t.Fatal("Sign succeeded with oversized context")
@@ -167,7 +167,7 @@ func FuzzMLDSA87SignAttachedOpenRoundTripMutate(f *testing.F) {
 			t.Fatalf("NewMLDSA87FromSeed failed: %v", err)
 		}
 
-		sealed, err := mldsa.SignAttached(ctx, message)
+		sealed, err := mldsa.SignAttached(nil, ctx, message)
 		if len(ctx) > 255 {
 			if err == nil {
 				t.Fatal("SignAttached succeeded with oversized context")

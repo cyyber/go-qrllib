@@ -34,8 +34,8 @@
 //	signature, _ := wallet.Sign(message)
 //
 //	// Crypto layer - context is an explicit parameter
-//	signer, _ := crypto_ml_dsa_87.New()
-//	signature, _ := signer.Sign(common.SigningContext(desc), message)
+//	signer, _ := crypto_ml_dsa_87.New(nil)
+//	signature, _ := signer.Sign(nil, common.SigningContext(desc), message)
 //
 // # Seed Derivation
 //

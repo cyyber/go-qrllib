@@ -129,12 +129,12 @@ func TestKATHedgedSignature(t *testing.T) {
 			}
 
 			// Sign the same message twice with the same key.
-			sig1, err := mldsa.Sign(ctx, msg)
+			sig1, err := mldsa.Sign(nil, ctx, msg)
 			if err != nil {
 				t.Fatalf("Failed to sign (1): %v", err)
 			}
 
-			sig2, err := mldsa.Sign(ctx, msg)
+			sig2, err := mldsa.Sign(nil, ctx, msg)
 			if err != nil {
 				t.Fatalf("Failed to sign (2): %v", err)
 			}
@@ -222,7 +222,7 @@ func TestKATSignDeterministic(t *testing.T) {
 			// Hedged Sign over the same input MUST differ from the
 			// deterministic output (defends against any future
 			// regression that wires Sign to the deterministic path).
-			hedgedSig, err := mldsa.Sign(ctx, msg)
+			hedgedSig, err := mldsa.Sign(nil, ctx, msg)
 			if err != nil {
 				t.Fatalf("Sign: %v", err)
 			}
@@ -238,7 +238,7 @@ func TestKATSignDeterministic(t *testing.T) {
 // max is 255 bytes). Closes the coverage gap on the helper's error
 // return.
 func TestKATSignDeterministicContextTooLong(t *testing.T) {
-	mldsa, err := New()
+	mldsa, err := New(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -333,7 +333,7 @@ func TestKATSignVerifyRoundTrip(t *testing.T) {
 			}
 
 			// Sign
-			sig, err := mldsa.Sign(ctx, msg)
+			sig, err := mldsa.Sign(nil, ctx, msg)
 			if err != nil {
 				t.Fatalf("Failed to sign: %v", err)
 			}
@@ -345,7 +345,7 @@ func TestKATSignVerifyRoundTrip(t *testing.T) {
 			}
 
 			// Verify with wrong public key should fail
-			wrongMldsa, err := New()
+			wrongMldsa, err := New(nil)
 			if err != nil {
 				t.Fatalf("Failed to create random MLDSA87: %v", err)
 			}
@@ -405,7 +405,7 @@ func TestKATSignAttachedOpenRoundTrip(t *testing.T) {
 			}
 
 			// SignAttached
-			sealed, err := mldsa.SignAttached(ctx, msg)
+			sealed, err := mldsa.SignAttached(nil, ctx, msg)
 			if err != nil {
 				t.Fatalf("Failed to sign attached: %v", err)
 			}

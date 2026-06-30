@@ -23,17 +23,17 @@ import (
 // alternative explanation when asserting the nil-pk refusal path.
 func fixtureSign(t *testing.T) (msg []byte, ctx []byte, sig [CRYPTO_BYTES]uint8, sealed []byte) {
 	t.Helper()
-	mldsa, err := New()
+	mldsa, err := New(nil)
 	if err != nil {
 		t.Fatalf("setup: New failed: %v", err)
 	}
 	msg = []byte("nil-pk regression test message")
 	ctx = []byte("test-ctx")
-	sig, err = mldsa.Sign(ctx, msg)
+	sig, err = mldsa.Sign(nil, ctx, msg)
 	if err != nil {
 		t.Fatalf("setup: Sign failed: %v", err)
 	}
-	sealed, err = mldsa.SignAttached(ctx, msg)
+	sealed, err = mldsa.SignAttached(nil, ctx, msg)
 	if err != nil {
 		t.Fatalf("setup: SignAttached failed: %v", err)
 	}

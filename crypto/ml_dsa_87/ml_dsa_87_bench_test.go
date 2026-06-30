@@ -4,11 +4,16 @@ import (
 	"testing"
 )
 
+// Benchmarks use zeroReader to measure ML-DSA work without OS entropy-source
+// overhead or variance, matching the deterministic benchmark style used by
+// the Falcon package.
+
 // Benchmark key generation
 func BenchmarkKeyGeneration(b *testing.B) {
+	var zero zeroReader
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, err := New()
+		_, err := New(zero)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -17,7 +22,8 @@ func BenchmarkKeyGeneration(b *testing.B) {
 
 // Benchmark signing
 func BenchmarkSign(b *testing.B) {
-	mldsa, err := New()
+	var zero zeroReader
+	mldsa, err := New(zero)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -27,7 +33,7 @@ func BenchmarkSign(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, err := mldsa.Sign(ctx, msg)
+		_, err := mldsa.Sign(zero, ctx, msg)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -36,7 +42,8 @@ func BenchmarkSign(b *testing.B) {
 
 // Benchmark signing with context
 func BenchmarkSignWithContext(b *testing.B) {
-	mldsa, err := New()
+	var zero zeroReader
+	mldsa, err := New(zero)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -46,7 +53,7 @@ func BenchmarkSignWithContext(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, err := mldsa.Sign(ctx, msg)
+		_, err := mldsa.Sign(zero, ctx, msg)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -55,14 +62,15 @@ func BenchmarkSignWithContext(b *testing.B) {
 
 // Benchmark verification
 func BenchmarkVerify(b *testing.B) {
-	mldsa, err := New()
+	var zero zeroReader
+	mldsa, err := New(zero)
 	if err != nil {
 		b.Fatal(err)
 	}
 
 	msg := []byte("benchmark message for verification")
 	ctx := []byte{}
-	sig, err := mldsa.Sign(ctx, msg)
+	sig, err := mldsa.Sign(zero, ctx, msg)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -78,7 +86,8 @@ func BenchmarkVerify(b *testing.B) {
 
 // Benchmark seal (sign + attach message)
 func BenchmarkSignAttached(b *testing.B) {
-	mldsa, err := New()
+	var zero zeroReader
+	mldsa, err := New(zero)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -88,7 +97,7 @@ func BenchmarkSignAttached(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, err := mldsa.SignAttached(ctx, msg)
+		_, err := mldsa.SignAttached(zero, ctx, msg)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -97,14 +106,15 @@ func BenchmarkSignAttached(b *testing.B) {
 
 // Benchmark open (verify + extract message)
 func BenchmarkOpen(b *testing.B) {
-	mldsa, err := New()
+	var zero zeroReader
+	mldsa, err := New(zero)
 	if err != nil {
 		b.Fatal(err)
 	}
 
 	msg := []byte("benchmark message for opening")
 	ctx := []byte{}
-	sealed, err := mldsa.SignAttached(ctx, msg)
+	sealed, err := mldsa.SignAttached(zero, ctx, msg)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -121,7 +131,8 @@ func BenchmarkOpen(b *testing.B) {
 
 // Benchmark with various message sizes
 func BenchmarkSignMessageSizes(b *testing.B) {
-	mldsa, err := New()
+	var zero zeroReader
+	mldsa, err := New(zero)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -142,7 +153,7 @@ func BenchmarkSignMessageSizes(b *testing.B) {
 		msg := make([]byte, size.size)
 		b.Run(size.name, func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-				_, err := mldsa.Sign(ctx, msg)
+				_, err := mldsa.Sign(zero, ctx, msg)
 				if err != nil {
 					b.Fatal(err)
 				}
@@ -153,7 +164,8 @@ func BenchmarkSignMessageSizes(b *testing.B) {
 
 // Benchmark with various context sizes
 func BenchmarkSignContextSizes(b *testing.B) {
-	mldsa, err := New()
+	var zero zeroReader
+	mldsa, err := New(zero)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -174,7 +186,7 @@ func BenchmarkSignContextSizes(b *testing.B) {
 		ctx := make([]byte, size.size)
 		b.Run(size.name, func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-				_, err := mldsa.Sign(ctx, msg)
+				_, err := mldsa.Sign(zero, ctx, msg)
 				if err != nil {
 					b.Fatal(err)
 				}

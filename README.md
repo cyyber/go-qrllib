@@ -119,7 +119,7 @@ randomness, constant-time comparison) comes from the Go standard library
 import "github.com/theQRL/go-qrllib/crypto/ml_dsa_87"
 
 // Generate keypair
-signer, err := ml_dsa_87.New()
+signer, err := ml_dsa_87.New(nil)
 if err != nil {
     log.Fatal(err)
 }
@@ -128,7 +128,7 @@ defer signer.Zeroize() // Clear sensitive data when done
 // Sign with context (required by FIPS 204)
 ctx := []byte("my-application")
 message := []byte("The sleeper must awaken")
-signature, err := signer.Sign(ctx, message)
+signature, err := signer.Sign(nil, ctx, message)
 if err != nil {
     log.Fatal(err)
 }
@@ -208,7 +208,7 @@ ML-DSA-87 implements Go's `crypto.Signer` interface for interoperability with `c
 ```go
 import "github.com/theQRL/go-qrllib/crypto/ml_dsa_87"
 
-d, err := ml_dsa_87.New()
+d, err := ml_dsa_87.New(nil)
 if err != nil {
     log.Fatal(err)
 }
@@ -270,7 +270,7 @@ func signConcurrently(messages [][]byte, seed [32]byte) {
             // Create NEW instance for each goroutine
             signer, _ := ml_dsa_87.NewMLDSA87FromSeed(seed)
             defer signer.Zeroize()
-            signer.Sign(ctx, m)
+            signer.Sign(nil, ctx, m)
         }(msg)
     }
     wg.Wait()

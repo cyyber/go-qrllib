@@ -12,7 +12,7 @@ import (
 
 // TestEdgeCaseZeroLengthMessage tests signing and verifying empty messages
 func TestEdgeCaseZeroLengthMessage(t *testing.T) {
-	mldsa, err := New()
+	mldsa, err := New(nil)
 	if err != nil {
 		t.Fatalf("Failed to create MLDSA87: %v", err)
 	}
@@ -21,7 +21,7 @@ func TestEdgeCaseZeroLengthMessage(t *testing.T) {
 	ctx := []byte{}
 
 	// Sign empty message
-	sig, err := mldsa.Sign(ctx, emptyMsg)
+	sig, err := mldsa.Sign(nil, ctx, emptyMsg)
 	if err != nil {
 		t.Fatalf("Failed to sign empty message: %v", err)
 	}
@@ -33,7 +33,7 @@ func TestEdgeCaseZeroLengthMessage(t *testing.T) {
 	}
 
 	// SignAttached/Open empty message
-	sealed, err := mldsa.SignAttached(ctx, emptyMsg)
+	sealed, err := mldsa.SignAttached(nil, ctx, emptyMsg)
 	if err != nil {
 		t.Fatalf("Failed to sign attached empty message: %v", err)
 	}
@@ -52,7 +52,7 @@ func TestEdgeCaseZeroLengthMessage(t *testing.T) {
 
 // TestEdgeCaseNilMessage tests handling of nil messages
 func TestEdgeCaseNilMessage(t *testing.T) {
-	mldsa, err := New()
+	mldsa, err := New(nil)
 	if err != nil {
 		t.Fatalf("Failed to create MLDSA87: %v", err)
 	}
@@ -61,7 +61,7 @@ func TestEdgeCaseNilMessage(t *testing.T) {
 	ctx := []byte{}
 
 	// Sign nil message (should behave like empty)
-	sig, err := mldsa.Sign(ctx, nilMsg)
+	sig, err := mldsa.Sign(nil, ctx, nilMsg)
 	if err != nil {
 		t.Fatalf("Failed to sign nil message: %v", err)
 	}
@@ -75,7 +75,7 @@ func TestEdgeCaseNilMessage(t *testing.T) {
 
 // TestEdgeCaseLargeMessage tests signing large messages
 func TestEdgeCaseLargeMessage(t *testing.T) {
-	mldsa, err := New()
+	mldsa, err := New(nil)
 	if err != nil {
 		t.Fatalf("Failed to create MLDSA87: %v", err)
 	}
@@ -96,7 +96,7 @@ func TestEdgeCaseLargeMessage(t *testing.T) {
 
 			ctx := []byte{}
 
-			sig, err := mldsa.Sign(ctx, largeMsg)
+			sig, err := mldsa.Sign(nil, ctx, largeMsg)
 			if err != nil {
 				t.Fatalf("Failed to sign %d byte message: %v", size, err)
 			}
@@ -111,7 +111,7 @@ func TestEdgeCaseLargeMessage(t *testing.T) {
 
 // TestEdgeCaseInvalidSignature tests various invalid signature scenarios
 func TestEdgeCaseInvalidSignature(t *testing.T) {
-	mldsa, err := New()
+	mldsa, err := New(nil)
 	if err != nil {
 		t.Fatalf("Failed to create MLDSA87: %v", err)
 	}
@@ -146,7 +146,7 @@ func TestEdgeCaseInvalidSignature(t *testing.T) {
 	})
 
 	t.Run("corrupted_valid_signature", func(t *testing.T) {
-		sig, err := mldsa.Sign(ctx, msg)
+		sig, err := mldsa.Sign(nil, ctx, msg)
 		if err != nil {
 			t.Fatalf("Failed to sign: %v", err)
 		}
@@ -164,7 +164,7 @@ func TestEdgeCaseInvalidSignature(t *testing.T) {
 
 // TestEdgeCaseMalformedSignatureHints tests signature hint encoding validation
 func TestEdgeCaseMalformedSignatureHints(t *testing.T) {
-	mldsa, err := New()
+	mldsa, err := New(nil)
 	if err != nil {
 		t.Fatalf("Failed to create MLDSA87: %v", err)
 	}
@@ -174,7 +174,7 @@ func TestEdgeCaseMalformedSignatureHints(t *testing.T) {
 	pk := mldsa.GetPK()
 
 	// Get a valid signature to use as base
-	validSig, err := mldsa.Sign(ctx, msg)
+	validSig, err := mldsa.Sign(nil, ctx, msg)
 	if err != nil {
 		t.Fatalf("Failed to sign: %v", err)
 	}
@@ -226,14 +226,14 @@ func TestEdgeCaseMalformedSignatureHints(t *testing.T) {
 
 // TestEdgeCaseInvalidPublicKey tests verification with invalid public keys
 func TestEdgeCaseInvalidPublicKey(t *testing.T) {
-	mldsa, err := New()
+	mldsa, err := New(nil)
 	if err != nil {
 		t.Fatalf("Failed to create MLDSA87: %v", err)
 	}
 
 	msg := []byte("test message")
 	ctx := []byte{}
-	sig, err := mldsa.Sign(ctx, msg)
+	sig, err := mldsa.Sign(nil, ctx, msg)
 	if err != nil {
 		t.Fatalf("Failed to sign: %v", err)
 	}
@@ -256,7 +256,7 @@ func TestEdgeCaseInvalidPublicKey(t *testing.T) {
 
 // TestEdgeCaseContextVariations tests various context scenarios
 func TestEdgeCaseContextVariations(t *testing.T) {
-	mldsa, err := New()
+	mldsa, err := New(nil)
 	if err != nil {
 		t.Fatalf("Failed to create MLDSA87: %v", err)
 	}
@@ -275,7 +275,7 @@ func TestEdgeCaseContextVariations(t *testing.T) {
 
 	for i, ctx := range contexts {
 		t.Run(string(rune(i)), func(t *testing.T) {
-			sig, err := mldsa.Sign(ctx, msg)
+			sig, err := mldsa.Sign(nil, ctx, msg)
 			if err != nil {
 				t.Fatalf("Failed to sign with context %d: %v", i, err)
 			}
@@ -295,12 +295,12 @@ func TestEdgeCaseContextVariations(t *testing.T) {
 	// Test context exceeding max length (256 bytes, exceeds 255 limit per FIPS 204)
 	t.Run("context_too_long", func(t *testing.T) {
 		longCtx := bytes.Repeat([]byte{0x42}, 256)
-		_, err := mldsa.Sign(longCtx, msg)
+		_, err := mldsa.Sign(nil, longCtx, msg)
 		if err == nil {
 			t.Error("Sign should fail with context > 255 bytes")
 		}
 
-		_, err = mldsa.SignAttached(longCtx, msg)
+		_, err = mldsa.SignAttached(nil, longCtx, msg)
 		if err == nil {
 			t.Error("SignAttached should fail with context > 255 bytes")
 		}
@@ -352,7 +352,7 @@ func TestEdgeCaseExtractFunctions(t *testing.T) {
 
 // TestEdgeCaseOpenFunction tests Open function with edge cases
 func TestEdgeCaseOpenFunction(t *testing.T) {
-	mldsa, err := New()
+	mldsa, err := New(nil)
 	if err != nil {
 		t.Fatalf("Failed to create MLDSA87: %v", err)
 	}
@@ -399,7 +399,7 @@ func TestEdgeCaseSeedBoundaries(t *testing.T) {
 
 		msg := []byte("test")
 		ctx := []byte{}
-		sig, err := mldsa.Sign(ctx, msg)
+		sig, err := mldsa.Sign(nil, ctx, msg)
 		if err != nil {
 			t.Fatalf("Failed to sign with zero seed: %v", err)
 		}
@@ -422,7 +422,7 @@ func TestEdgeCaseSeedBoundaries(t *testing.T) {
 
 		msg := []byte("test")
 		ctx := []byte{}
-		sig, err := mldsa.Sign(ctx, msg)
+		sig, err := mldsa.Sign(nil, ctx, msg)
 		if err != nil {
 			t.Fatalf("Failed to sign with max seed: %v", err)
 		}

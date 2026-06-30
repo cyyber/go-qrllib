@@ -11,25 +11,26 @@
 //   - Is a byte slice of 0-255 bytes
 //   - Is prepended to the message hash as [0x00, len(ctx), ...ctx]
 //   - Enables domain separation between different applications
-//   - QRL wallet uses ctx = ['Z', 'O', 'N', 'D'] for blockchain transactions
+//   - QRL wallet uses "ZOND" || version || descriptor for blockchain transactions
 //
 // Why other packages don't have context:
 //   - SPHINCS+: pre-FIPS hash-based signature (context not part of spec)
 //   - XMSS: RFC 8391 hash-based signature (uses hash function selector instead)
 //
-// The wallet layer (wallet/ml_dsa_87) abstracts this by hardcoding the context,
-// providing a consistent Sign(message) API to callers.
+// The wallet layer (wallet/ml_dsa_87) abstracts this by deriving the
+// descriptor-bound context, providing a consistent Sign(message) API to callers.
 //
 // # Signing Mode (Hedged by Default)
 //
 // Public ML-DSA-87 signing — [MLDSA87.Sign], [MLDSA87.SignAttached],
 // the `wallet/ml_dsa_87` Sign wrapper, and the [crypto.Signer]-style
-// [CryptoSigner.Sign] — is **always hedged** per FIPS 204 §3.4 (the
-// recommended mode). Each call mixes fresh `crypto/rand` randomness
-// into the per-signature `RND_BYTES` value, so two calls with the
-// same `(key, ctx, message)` produce **distinct** signatures, both of
-// which verify under the same public key. Verification is unchanged
-// and existing verifiers — on-chain or off — are unaffected.
+// [CryptoSigner.Sign] — is hedged by default per FIPS 204 §3.4 (the
+// recommended mode). Passing nil uses `crypto/rand.Reader`; two calls with
+// the same `(key, ctx, message)` and fresh random bytes produce **distinct**
+// signatures, both of which verify under the same public key. Callers that
+// pass deterministic readers get deterministic `RND_BYTES` instead.
+// Verification is unchanged and existing verifiers — on-chain or off — are
+// unaffected.
 //
 // FIPS-204-deterministic signing is available for callers that need
 // it (RANDAO-style verifiable beacon contributions, test-vector
@@ -51,9 +52,9 @@
 // rather than as alternatives to be picked casually. See SECURITY.md
 // for the full discussion (TOB-QRLLIB-6).
 //
-// [crypto.Signer.Sign] also honours its `rand io.Reader` parameter:
-// when non-nil, its bytes drive `RND_BYTES`; when nil, `crypto/rand`
-// is used.
+// [MLDSA87.Sign], [MLDSA87.SignAttached], and [crypto.Signer.Sign] also
+// honour their `rand io.Reader` parameter: when non-nil, its bytes drive
+// `RND_BYTES`; when nil, `crypto/rand.Reader` is used.
 //
 // # Thread Safety
 //
@@ -65,34 +66,37 @@ package ml_dsa_87
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"io"
 	"strings"
 
 	cryptoerrors "github.com/theQRL/go-qrllib/crypto/errors"
 )
 
-// MLDSA87 holds an ML-DSA-87 keypair. Signing is **always hedged**
-// (per FIPS 204 §3.4 — the recommended mode); the previous
+// MLDSA87 holds an ML-DSA-87 keypair. Signing is hedged by default
+// when callers pass nil or a fresh entropy source. The previous
 // `randomizedSigning bool` field was removed in TOB-QRLLIB-6 alongside
 // the dead deterministic-default path. Callers needing
 // FIPS-204-deterministic signing for test-vector reproduction
-// (ACVP / KAT) call the unexported [cryptoSignSignatureWithRnd] with
-// rnd=zero directly.
+// (ACVP / KAT) can use [MLDSA87.SignDeterministic].
 type MLDSA87 struct {
 	pk   [CRYPTO_PUBLIC_KEY_BYTES]uint8
 	sk   [CRYPTO_SECRET_KEY_BYTES]uint8
 	seed [SEED_BYTES]uint8
 }
 
-func New() (*MLDSA87, error) {
+// New generates a fresh ML-DSA-87 keypair using entropy from random.
+// If random is nil, New uses crypto/rand.Reader.
+func New(random io.Reader) (*MLDSA87, error) {
+	if random == nil {
+		random = rand.Reader
+	}
+
 	var sk [CRYPTO_SECRET_KEY_BYTES]uint8
 	var pk [CRYPTO_PUBLIC_KEY_BYTES]uint8
 	var seed [SEED_BYTES]uint8
 
-	_, err := rand.Read(seed[:])
-	if err != nil {
-		//coverage:ignore
-		//rationale: crypto/rand.Read only fails if system entropy source is broken
-		return nil, cryptoerrors.ErrSeedGeneration
+	if _, err := io.ReadFull(random, seed[:]); err != nil {
+		return nil, err
 	}
 
 	if _, err := cryptoSignKeypair(&seed, &pk, &sk); err != nil {
@@ -186,11 +190,12 @@ func (d *MLDSA87) GetHexSeed() string {
 // TOB-QRLLIB-12 to remove the misleading AEAD-style connotation.
 //
 // Signing is hedged (FIPS 204 §3.4): the per-signature RND_BYTES are
-// drawn from crypto/rand, so two SignAttached calls with the same
-// (ctx, message) under the same key produce distinct signatures, both
-// of which verify under the same public key. (TOB-QRLLIB-6.)
-func (d *MLDSA87) SignAttached(ctx, message []uint8) ([]uint8, error) {
-	return cryptoSign(message, ctx, &d.sk)
+// drawn from random. If random is nil, SignAttached uses crypto/rand.Reader,
+// so two calls with the same (ctx, message) under the same key produce
+// distinct signatures, both of which verify under the same public key.
+// (TOB-QRLLIB-6.)
+func (d *MLDSA87) SignAttached(random io.Reader, ctx, message []uint8) ([]uint8, error) {
+	return cryptoSign(random, message, ctx, &d.sk)
 }
 
 // Sign the message with the given context, and return a detached signature.
@@ -198,13 +203,14 @@ func (d *MLDSA87) SignAttached(ctx, message []uint8) ([]uint8, error) {
 // ML-DSA-87 detached signatures are fixed-size: exactly CRYPTO_BYTES (4,627) bytes.
 //
 // Signing is hedged (FIPS 204 §3.4): the per-signature RND_BYTES are
-// drawn from crypto/rand, so two Sign calls with the same
-// (ctx, message) under the same key produce distinct signatures, both
-// of which verify under the same public key. (TOB-QRLLIB-6.)
-func (d *MLDSA87) Sign(ctx, message []uint8) ([CRYPTO_BYTES]uint8, error) {
+// drawn from random. If random is nil, Sign uses crypto/rand.Reader, so
+// two calls with the same (ctx, message) under the same key produce
+// distinct signatures, both of which verify under the same public key.
+// (TOB-QRLLIB-6.)
+func (d *MLDSA87) Sign(random io.Reader, ctx, message []uint8) ([CRYPTO_BYTES]uint8, error) {
 	var signature [CRYPTO_BYTES]uint8
 
-	sm, err := cryptoSign(message, ctx, &d.sk)
+	sm, err := cryptoSign(random, message, ctx, &d.sk)
 	if err == nil {
 		copy(signature[:CRYPTO_BYTES], sm[:CRYPTO_BYTES])
 	}

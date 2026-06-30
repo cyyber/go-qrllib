@@ -25,12 +25,12 @@ import (
 
 func openFixture(t *testing.T) (mldsa *MLDSA87, ctx []byte, sealed []byte) {
 	t.Helper()
-	m, err := New()
+	m, err := New(nil)
 	if err != nil {
 		t.Fatalf("setup: New: %v", err)
 	}
 	ctx = []byte("open-errors-test")
-	signed, err := m.SignAttached(ctx, []byte("test message"))
+	signed, err := m.SignAttached(nil, ctx, []byte("test message"))
 	if err != nil {
 		t.Fatalf("setup: SignAttached: %v", err)
 	}

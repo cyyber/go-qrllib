@@ -197,7 +197,7 @@ func (w *Wallet) GetChecksumAddressStr() string {
 // [github.com/theQRL/go-qrllib/crypto/ml_dsa_87] package doc
 // "Signing Mode" section for the full discussion.
 func (w *Wallet) Sign(message []uint8) ([SigSize]uint8, error) {
-	return w.d.Sign(common.SigningContext(w.desc.ToDescriptor()), message)
+	return w.d.Sign(nil, common.SigningContext(w.desc.ToDescriptor()), message)
 }
 
 // Zeroize clears sensitive key material from memory.

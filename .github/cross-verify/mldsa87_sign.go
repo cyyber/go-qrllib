@@ -25,7 +25,7 @@ func main() {
 	ctx := []byte("test")
 	msg := []byte("ML-DSA-87 cross-implementation verification")
 
-	sig, err := d.Sign(ctx, msg)
+	sig, err := d.Sign(zeroReader{}, ctx, msg)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Sign error: %v\n", err)
 		os.Exit(1)
@@ -48,4 +48,11 @@ func main() {
 	fmt.Printf("  Sig size: %d bytes\n", len(sig))
 	fmt.Printf("  Context:  %s\n", string(ctx))
 	fmt.Printf("  Self-verify: PASSED\n")
+}
+
+type zeroReader struct{}
+
+func (zeroReader) Read(buf []byte) (int, error) {
+	clear(buf)
+	return len(buf), nil
 }

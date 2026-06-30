@@ -5,18 +5,26 @@ import (
 	"crypto"
 	"errors"
 	"testing"
+
+	cryptoerrors "github.com/theQRL/go-qrllib/crypto/errors"
 )
 
-// zeroReader is an io.Reader that always returns zero bytes. Used
-// in TestCryptoSignerCallerSuppliedRand to demonstrate that the
-// caller-supplied rand really feeds the per-signature rnd value
-// (so two calls with the same zero source produce identical
-// signatures, matching the FIPS 204 §3.5 deterministic mode).
+// zeroReader is an io.Reader that always returns zero bytes. It exercises
+// caller-supplied entropy paths without pulling from the OS entropy source.
 type zeroReader struct{}
 
 func (zeroReader) Read(p []byte) (int, error) {
 	for i := range p {
 		p[i] = 0
+	}
+	return len(p), nil
+}
+
+type fixedByteReader byte
+
+func (r fixedByteReader) Read(p []byte) (int, error) {
+	for i := range p {
+		p[i] = byte(r)
 	}
 	return len(p), nil
 }
@@ -29,7 +37,7 @@ type errReader struct{ err error }
 func (e errReader) Read(_ []byte) (int, error) { return 0, e.err }
 
 func TestCryptoSignerInterface(t *testing.T) {
-	d, err := New()
+	d, err := New(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,7 +60,7 @@ func TestCryptoSignerInterface(t *testing.T) {
 }
 
 func TestCryptoSignerSignVerify(t *testing.T) {
-	d, err := New()
+	d, err := New(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -80,7 +88,7 @@ func TestCryptoSignerSignVerify(t *testing.T) {
 }
 
 func TestCryptoSignerNilOpts(t *testing.T) {
-	d, err := New()
+	d, err := New(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,7 +112,7 @@ func TestCryptoSignerNilOpts(t *testing.T) {
 }
 
 func TestCryptoSignerEmptyContext(t *testing.T) {
-	d, err := New()
+	d, err := New(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,7 +130,7 @@ func TestCryptoSignerEmptyContext(t *testing.T) {
 		t.Fatalf("CryptoSigner sign failed: %v", err)
 	}
 
-	sig2, err := d.Sign(nil, msg)
+	sig2, err := d.Sign(nil, nil, msg)
 	if err != nil {
 		t.Fatalf("Direct sign failed: %v", err)
 	}
@@ -145,7 +153,7 @@ func TestCryptoSignerEmptyContext(t *testing.T) {
 // which verify. The previous TestCryptoSignerDeterministic asserted
 // the opposite — was retired alongside the deterministic-default path.
 func TestCryptoSignerHedged(t *testing.T) {
-	d, err := New()
+	d, err := New(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -181,7 +189,7 @@ func TestCryptoSignerHedged(t *testing.T) {
 }
 
 func TestCryptoSignerWrongContext(t *testing.T) {
-	d, err := New()
+	d, err := New(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -206,13 +214,13 @@ func TestCryptoSignerWrongContext(t *testing.T) {
 }
 
 func TestCryptoPublicKeyEqual(t *testing.T) {
-	d1, err := New()
+	d1, err := New(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer d1.Zeroize()
 
-	d2, err := New()
+	d2, err := New(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -239,7 +247,7 @@ func TestCryptoPublicKeyEqual(t *testing.T) {
 }
 
 func TestCryptoSignerTypedNilOpts(t *testing.T) {
-	d, err := New()
+	d, err := New(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -264,7 +272,7 @@ func TestCryptoSignerTypedNilOpts(t *testing.T) {
 }
 
 func TestCryptoSignerUnsupportedOpts(t *testing.T) {
-	d, err := New()
+	d, err := New(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -281,7 +289,7 @@ func TestCryptoSignerUnsupportedOpts(t *testing.T) {
 }
 
 func TestCryptoSignerContextTooLong(t *testing.T) {
-	d, err := New()
+	d, err := New(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -312,7 +320,7 @@ func TestSignerOptsHashFunc(t *testing.T) {
 // while two calls with crypto/rand-derived sources produce distinct
 // signatures.
 func TestCryptoSignerCallerSuppliedRand(t *testing.T) {
-	d, err := New()
+	d, err := New(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -344,6 +352,27 @@ func TestCryptoSignerCallerSuppliedRand(t *testing.T) {
 		t.Error("Caller-rnd-driven signature failed verification under its own pk")
 	}
 
+	// A different deterministic reader must drive different RND_BYTES,
+	// while remaining deterministic across repeated calls.
+	sig3, err := signer.Sign(fixedByteReader(0x42), msg, opts)
+	if err != nil {
+		t.Fatalf("first Sign with fixedByteReader failed: %v", err)
+	}
+	sig4, err := signer.Sign(fixedByteReader(0x42), msg, opts)
+	if err != nil {
+		t.Fatalf("second Sign with fixedByteReader failed: %v", err)
+	}
+	if !bytes.Equal(sig3, sig4) {
+		t.Error("Sign with the same fixed reader should be deterministic; got differing signatures")
+	}
+	if bytes.Equal(sig3, sig1) {
+		t.Error("Sign with non-zero fixed reader matched zeroReader output; caller-supplied RND_BYTES may be ignored")
+	}
+	copy(sigArr[:], sig3)
+	if !Verify(opts.Context, msg, sigArr, &pk) {
+		t.Error("Fixed-rnd-driven signature failed verification under its own pk")
+	}
+
 	// Nil rand (default path) still produces hedged signatures.
 	sigA, err := signer.Sign(nil, msg, opts)
 	if err != nil {
@@ -364,7 +393,7 @@ func TestCryptoSignerCallerSuppliedRand(t *testing.T) {
 // surface the underlying reader error rather than panic or silently
 // fall back to crypto/rand. Closes the coverage gap on this branch.
 func TestCryptoSignerRandReaderError(t *testing.T) {
-	d, err := New()
+	d, err := New(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -388,7 +417,7 @@ func TestCryptoSignerRandReaderError(t *testing.T) {
 // TestCryptoSignerContextTooLong uses nil rand and so exercises the
 // MLDSA87.Sign error path instead).
 func TestCryptoSignerRandSuppliedContextTooLong(t *testing.T) {
-	d, err := New()
+	d, err := New(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -400,5 +429,9 @@ func TestCryptoSignerRandSuppliedContextTooLong(t *testing.T) {
 	_, err = signer.Sign(zeroReader{}, []byte("msg"), &SignerOpts{Context: longCtx})
 	if err == nil {
 		t.Error("expected an error for context > 255 bytes via the rand-supplied path")
+	}
+	_, err = signer.Sign(errReader{err: errors.New("rand should not be read")}, []byte("msg"), &SignerOpts{Context: longCtx})
+	if !errors.Is(err, cryptoerrors.ErrInvalidContext) {
+		t.Errorf("expected invalid context before rand read; got %v", err)
 	}
 }
