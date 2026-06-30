@@ -1,12 +1,4 @@
 // Package mldsa87 provides ML-DSA-87 digital signature primitives.
-//
-// # Signing Mode
-//
-// Signing is hedged by default per FIPS 204. [GenerateKey], [Sign], and
-// [PrivateKey.Sign] honour the caller-supplied randomness parameter; passing
-// nil uses crypto/rand.Reader. Callers that need deterministic signatures for
-// tests or protocols where determinism is itself a requirement can use
-// [SignDeterministic] or pass an io.Reader that returns deterministic bytes.
 package mldsa87
 
 import (
