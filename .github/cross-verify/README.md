@@ -11,7 +11,7 @@ These tests verify that go-qrllib's signature implementations are interoperable 
 ### ML-DSA-87 (FIPS 204)
 - Reference: https://github.com/pq-crystals/dilithium (current master)
 - Tests bidirectional signature verification with context parameter
-- Key sizes: PK=2592, Go private seed=32, reference SK=4896, Sig=4627 bytes
+- Key sizes: PK=2592, SK=4896, Sig=4627 bytes
 
 ### SPHINCS+ (SHAKE-256s-robust)
 - Reference: https://github.com/sphincs/sphincsplus @ branch `consistent-basew`
