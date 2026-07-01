@@ -47,33 +47,38 @@ func TestACVPKeyGen(t *testing.T) {
 	}
 }
 
-// TestACVPSigGen verifies that deterministic signature generation produces
-// byte-exact matches against NIST ACVP expected signatures.
+// TestACVPSigGen verifies that signature generation produces byte-exact
+// matches against NIST ACVP expected signatures.
 //
-// Only deterministic, external-interface, pure (non-preHash) vectors are
-// tested, as go-qrllib implements pure ML-DSA signing.
+// Only external-interface, pure (non-preHash) vectors are tested, as
+// go-qrllib implements pure ML-DSA signing. Deterministic vectors use zero rnd;
+// randomized vectors use the ACVP-provided rnd.
 func TestACVPSigGen(t *testing.T) {
 	prompt := internaltest.ReadACVPFile[acvpPromptFile](t, "ML-DSA-sigGen-FIPS204", "prompt.json")
 	expected := internaltest.ReadACVPFile[acvpExpectedFile](t, "ML-DSA-sigGen-FIPS204", "expectedResults.json")
 
-	tested := 0
+	deterministicTested := 0
+	randomizedTested := 0
 	for _, group := range prompt.TestGroups {
 		if group.ParameterSet != "ML-DSA-87" ||
-			!group.Deterministic ||
 			group.SignatureInterface != "external" ||
 			group.PreHash != "pure" {
 			continue
 		}
 		wantGroup := expected.group(t, group.TgID)
 		for _, test := range group.Tests {
-			tested++
+			if group.Deterministic {
+				deterministicTested++
+			} else {
+				randomizedTested++
+			}
 			want := wantGroup.test(t, test.TcID)
 
 			sk := decodeACVPSecretKey(t, test.SK)
 			message := internaltest.DecodeACVPHex(t, test.Message)
 			context := internaltest.DecodeACVPHex(t, test.Context)
 
-			var rnd [RND_BYTES]uint8 // zero - FIPS 204 deterministic mode
+			rnd := acvpRnd(t, group, test)
 			signature := make([]uint8, CRYPTO_BYTES)
 			if err := cryptoSignSignatureWithRnd(signature, message, context, &sk, rnd); err != nil {
 				t.Fatalf("tcId %d: cryptoSignSignatureWithRnd: %v", test.TcID, err)
@@ -89,8 +94,11 @@ func TestACVPSigGen(t *testing.T) {
 			}
 		}
 	}
-	if tested == 0 {
+	if deterministicTested == 0 {
 		t.Fatal("no ML-DSA-87 deterministic external pure ACVP sigGen test cases")
+	}
+	if randomizedTested == 0 {
+		t.Fatal("no ML-DSA-87 randomized external pure ACVP sigGen test cases")
 	}
 }
 
@@ -157,6 +165,7 @@ type acvpPromptTest struct {
 	SK        string `json:"sk"`
 	Message   string `json:"message"`
 	Context   string `json:"context"`
+	Rnd       string `json:"rnd"`
 	Signature string `json:"signature"`
 }
 
@@ -195,6 +204,20 @@ func decodeACVPSecretKey(t *testing.T, s string) [CRYPTO_SECRET_KEY_BYTES]uint8 
 	t.Helper()
 	b := internaltest.DecodeACVPHexLength(t, s, CRYPTO_SECRET_KEY_BYTES)
 	var out [CRYPTO_SECRET_KEY_BYTES]uint8
+	copy(out[:], b)
+	return out
+}
+
+func acvpRnd(t *testing.T, group acvpPromptGroup, test acvpPromptTest) [RND_BYTES]uint8 {
+	t.Helper()
+	if group.Deterministic {
+		return [RND_BYTES]uint8{}
+	}
+	if test.Rnd == "" {
+		t.Fatalf("tcId %d: missing randomized ACVP rnd", test.TcID)
+	}
+	b := internaltest.DecodeACVPHexLength(t, test.Rnd, RND_BYTES)
+	var out [RND_BYTES]uint8
 	copy(out[:], b)
 	return out
 }
