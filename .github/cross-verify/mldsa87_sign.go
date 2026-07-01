@@ -26,9 +26,9 @@ func main() {
 	msg := []byte("ML-DSA-87 cross-implementation verification")
 	opts := &mldsa87.Options{Context: ctx}
 
-	sig, err := mldsa87.Sign(zeroReader{}, privateKey, msg, opts)
+	sig, err := mldsa87.SignDeterministic(privateKey, msg, opts)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Sign error: %v\n", err)
+		fmt.Fprintf(os.Stderr, "SignDeterministic error: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -50,11 +50,4 @@ func main() {
 	fmt.Printf("  Sig size: %d bytes\n", len(sig))
 	fmt.Printf("  Context:  %s\n", string(ctx))
 	fmt.Printf("  Self-verify: PASSED\n")
-}
-
-type zeroReader struct{}
-
-func (zeroReader) Read(buf []byte) (int, error) {
-	clear(buf)
-	return len(buf), nil
 }
