@@ -124,7 +124,7 @@ test-thread:
 # Run thread safety tests for fast packages only (excludes SPHINCS+)
 test-thread-fast:
 	@echo "Running thread safety tests (fast packages only)..."
-	@go test -race -v ./crypto/internal/mldsa87/... ./crypto/xmss/... -run 'ThreadSafety'
+	@go test -race -v ./crypto/mldsa87/... ./crypto/xmss/... -run 'ThreadSafety'
 
 # Run all fuzz tests for a short duration
 fuzz: fuzz-xmss fuzz-mldsa fuzz-mlkem fuzz-sphincs fuzz-mnemonic
