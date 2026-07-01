@@ -30,7 +30,7 @@ func TestEdgeCaseZeroLengthMessage(t *testing.T) {
 	}
 
 	// Verify empty message
-	pk := mldsa.PublicKey().key
+	pk := mldsa.PublicKey().raw
 	if !verifyForTest(ctx, emptyMsg, sig, &pk) {
 		t.Error("Failed to verify signature on empty message")
 	}
@@ -54,7 +54,7 @@ func TestEdgeCaseNilMessage(t *testing.T) {
 	}
 
 	// Verify nil message
-	pk := mldsa.PublicKey().key
+	pk := mldsa.PublicKey().raw
 	if !verifyForTest(ctx, nilMsg, sig, &pk) {
 		t.Error("Failed to verify signature on nil message")
 	}
@@ -88,7 +88,7 @@ func TestEdgeCaseLargeMessage(t *testing.T) {
 				t.Fatalf("Failed to sign %d byte message: %v", size, err)
 			}
 
-			pk := mldsa.PublicKey().key
+			pk := mldsa.PublicKey().raw
 			if !verifyForTest(ctx, largeMsg, sig, &pk) {
 				t.Errorf("Failed to verify signature on %d byte message", size)
 			}
@@ -105,7 +105,7 @@ func TestEdgeCaseInvalidSignature(t *testing.T) {
 
 	msg := []byte("test message")
 	ctx := []byte{}
-	pk := mldsa.PublicKey().key
+	pk := mldsa.PublicKey().raw
 
 	t.Run("all_zeros_signature", func(t *testing.T) {
 		var zeroSig [CRYPTO_BYTES]uint8
@@ -158,7 +158,7 @@ func TestEdgeCaseMalformedSignatureHints(t *testing.T) {
 
 	msg := []byte("test message")
 	ctx := []byte{}
-	pk := mldsa.PublicKey().key
+	pk := mldsa.PublicKey().raw
 
 	// Get a valid signature to use as base
 	validSig, err := mldsa.Sign(nil, ctx, msg)
@@ -249,7 +249,7 @@ func TestEdgeCaseContextVariations(t *testing.T) {
 	}
 
 	msg := []byte("test message")
-	pk := mldsa.PublicKey().key
+	pk := mldsa.PublicKey().raw
 
 	contexts := [][]byte{
 		nil,
@@ -306,7 +306,7 @@ func TestEdgeCaseSeedBoundaries(t *testing.T) {
 			t.Fatalf("Failed to sign with zero seed: %v", err)
 		}
 
-		pk := mldsa.PublicKey().key
+		pk := mldsa.PublicKey().raw
 		if !verifyForTest(ctx, msg, sig, &pk) {
 			t.Error("Failed to verify with zero seed keypair")
 		}
@@ -329,7 +329,7 @@ func TestEdgeCaseSeedBoundaries(t *testing.T) {
 			t.Fatalf("Failed to sign with max seed: %v", err)
 		}
 
-		pk := mldsa.PublicKey().key
+		pk := mldsa.PublicKey().raw
 		if !verifyForTest(ctx, msg, sig, &pk) {
 			t.Error("Failed to verify with max seed keypair")
 		}

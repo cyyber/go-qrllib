@@ -116,7 +116,7 @@ func FuzzPrivateKeySignVerifyRoundTripMutate(f *testing.F) {
 			t.Fatalf("Sign failed: %v", err)
 		}
 
-		pk := mldsa.PublicKey().key
+		pk := mldsa.PublicKey().raw
 		if !verifyForTest(ctx, message, sig, &pk) {
 			t.Fatal("Valid signature failed verification")
 		}
@@ -168,7 +168,7 @@ func FuzzPrivateKeyFromSeedSignVerify(f *testing.F) {
 		if err != nil {
 			t.Fatalf("Round-trip seed failed: %v", err)
 		}
-		if mldsa.PublicKey().key != roundTrip.PublicKey().key {
+		if mldsa.PublicKey().raw != roundTrip.PublicKey().raw {
 			t.Fatal("Seed round-trip changed the derived public key")
 		}
 
@@ -183,7 +183,7 @@ func FuzzPrivateKeyFromSeedSignVerify(f *testing.F) {
 			t.Fatalf("PrivateKey.Sign failed: %v", err)
 		}
 
-		pk := mldsa.PublicKey().key
+		pk := mldsa.PublicKey().raw
 		if !verifyForTest(ctx, digest, sig, &pk) {
 			t.Fatal("PrivateKey.Sign produced a signature that does not verify")
 		}

@@ -79,8 +79,8 @@ func TestKATDeterministicKeypair(t *testing.T) {
 			}
 
 			// Public keys must be identical
-			pk1 := mldsa1.PublicKey().key
-			pk2 := mldsa2.PublicKey().key
+			pk1 := mldsa1.PublicKey().raw
+			pk2 := mldsa2.PublicKey().raw
 			if !bytes.Equal(pk1[:], pk2[:]) {
 				t.Error("Public keys should be identical for same seed")
 			}
@@ -145,7 +145,7 @@ func TestKATHedgedSignature(t *testing.T) {
 			}
 
 			// Both signatures MUST verify under the same public key.
-			pk := mldsa.PublicKey().key
+			pk := mldsa.PublicKey().raw
 			if !verifyForTest(ctx, msg, sig1, &pk) {
 				t.Error("First signature failed verification")
 			}
@@ -201,7 +201,7 @@ func TestKATSignDeterministic(t *testing.T) {
 			}
 
 			// The signature MUST verify under the public key.
-			pk := mldsa.PublicKey().key
+			pk := mldsa.PublicKey().raw
 			if !verifyForTest(ctx, msg, sig1, &pk) {
 				t.Error("SignDeterministic produced a signature that did not verify")
 			}
@@ -295,7 +295,7 @@ func TestKATDeterministicSignatureViaInternalAPI(t *testing.T) {
 			}
 
 			// Sanity: both verify.
-			pk := mldsa.PublicKey().key
+			pk := mldsa.PublicKey().raw
 			var sigArr [CRYPTO_BYTES]uint8
 			copy(sigArr[:], sig1)
 			if !verifyForTest(ctx, msg, sigArr, &pk) {
@@ -339,7 +339,7 @@ func TestKATSignVerifyRoundTrip(t *testing.T) {
 			}
 
 			// Verify with correct public key
-			pk := mldsa.PublicKey().key
+			pk := mldsa.PublicKey().raw
 			if !verifyForTest(ctx, msg, sig, &pk) {
 				t.Error("Signature verification failed with correct key")
 			}
@@ -349,7 +349,7 @@ func TestKATSignVerifyRoundTrip(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to create random PrivateKey: %v", err)
 			}
-			wrongPk := wrongMldsa.PublicKey().key
+			wrongPk := wrongMldsa.PublicKey().raw
 			if verifyForTest(ctx, msg, sig, &wrongPk) {
 				t.Error("Signature verification should fail with wrong key")
 			}
@@ -447,8 +447,8 @@ func TestKATSeedBytesRoundTrip(t *testing.T) {
 			}
 
 			// Should produce identical keypairs
-			pk1 := mldsa1.PublicKey().key
-			pk2 := mldsa2.PublicKey().key
+			pk1 := mldsa1.PublicKey().raw
+			pk2 := mldsa2.PublicKey().raw
 			if !bytes.Equal(pk1[:], pk2[:]) {
 				t.Error("round-trip seed bytes should produce identical public keys")
 			}
@@ -479,8 +479,8 @@ func TestKATDifferentSeeds(t *testing.T) {
 		t.Fatalf("Failed to create PrivateKey (2): %v", err)
 	}
 
-	pk1 := mldsa1.PublicKey().key
-	pk2 := mldsa2.PublicKey().key
+	pk1 := mldsa1.PublicKey().raw
+	pk2 := mldsa2.PublicKey().raw
 	if bytes.Equal(pk1[:], pk2[:]) {
 		t.Error("Different seeds should produce different public keys")
 	}
@@ -541,7 +541,7 @@ func TestKATZeroize(t *testing.T) {
 	}
 
 	// PK should still be accessible (not zeroized)
-	_ = mldsa.PublicKey().key
+	_ = mldsa.PublicKey().raw
 
 	// Suppress unused variable warnings
 	_ = storedSeed

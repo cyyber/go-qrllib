@@ -30,5 +30,5 @@ func verifyForTest(ctx, message []byte, signature [CRYPTO_BYTES]uint8, pk *[CRYP
 	if pk == nil {
 		return Verify(nil, message, signature[:], ctx) == nil
 	}
-	return Verify(&PublicKey{key: *pk}, message, signature[:], ctx) == nil
+	return Verify(&PublicKey{raw: *pk}, message, signature[:], ctx) == nil
 }

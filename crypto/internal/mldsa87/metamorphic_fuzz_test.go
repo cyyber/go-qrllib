@@ -71,7 +71,7 @@ func FuzzMetamorphicVerifyRejectsMauledPublicKey(f *testing.F) {
 			t.Fatalf("Sign failed: %v", err)
 		}
 
-		pk := mldsa.PublicKey().key
+		pk := mldsa.PublicKey().raw
 		if !verifyForTest(ctx, msg, sig, &pk) {
 			t.Fatal("baseline signature failed verification")
 		}
@@ -100,7 +100,7 @@ func FuzzMetamorphicVerifyRejectsMauledMessage(f *testing.F) {
 			t.Fatalf("Sign failed: %v", err)
 		}
 
-		pk := mldsa.PublicKey().key
+		pk := mldsa.PublicKey().raw
 		if !verifyForTest(ctx, msg, sig, &pk) {
 			t.Fatal("baseline signature failed verification")
 		}
@@ -129,7 +129,7 @@ func FuzzMetamorphicVerifyRejectsMauledSignature(f *testing.F) {
 			t.Fatalf("Sign failed: %v", err)
 		}
 
-		pk := mldsa.PublicKey().key
+		pk := mldsa.PublicKey().raw
 		if !verifyForTest(ctx, msg, sig, &pk) {
 			t.Fatal("baseline signature failed verification")
 		}

@@ -63,7 +63,7 @@ func newPrivateKey(seed *[SEED_BYTES]uint8) (*PrivateKey, error) {
 	return &PrivateKey{
 		seed: *seed,
 		sk:   sk,
-		pub:  PublicKey{key: pk},
+		pub:  PublicKey{raw: pk},
 	}, nil
 }
 
@@ -141,7 +141,7 @@ func (priv *PrivateKey) Zeroize() {
 
 // PublicKey is an encoded ML-DSA-87 public key.
 type PublicKey struct {
-	key [CRYPTO_PUBLIC_KEY_BYTES]uint8
+	raw [CRYPTO_PUBLIC_KEY_BYTES]uint8
 }
 
 // NewPublicKey constructs a public key from its encoded form.
@@ -150,7 +150,7 @@ func NewPublicKey(publicKey []byte) (*PublicKey, error) {
 		return nil, errInvalidPublicKeyLength
 	}
 	pub := &PublicKey{}
-	copy(pub.key[:], publicKey)
+	copy(pub.raw[:], publicKey)
 	return pub, nil
 }
 
@@ -159,7 +159,7 @@ func (pub *PublicKey) Bytes() []byte {
 	if pub == nil {
 		return nil
 	}
-	return bytes.Clone(pub.key[:])
+	return bytes.Clone(pub.raw[:])
 }
 
 // Equal reports whether pub and x have the same encoded public key.
@@ -167,7 +167,7 @@ func (pub *PublicKey) Equal(x *PublicKey) bool {
 	if pub == nil || x == nil {
 		return pub == x
 	}
-	return subtle.ConstantTimeCompare(pub.key[:], x.key[:]) == 1
+	return subtle.ConstantTimeCompare(pub.raw[:], x.raw[:]) == 1
 }
 
 // Sign signs message using ctx and the randomness from random.
@@ -204,7 +204,7 @@ func Verify(publicKey *PublicKey, message, sig, ctx []byte) error {
 	}
 	var signature [CRYPTO_BYTES]uint8
 	copy(signature[:], sig)
-	result, err := cryptoSignVerify(signature, message, ctx, &publicKey.key)
+	result, err := cryptoSignVerify(signature, message, ctx, &publicKey.raw)
 	if err != nil {
 		return err
 	}

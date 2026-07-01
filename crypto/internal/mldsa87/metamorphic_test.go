@@ -110,7 +110,7 @@ func TestMetamorphicVerifyRejectsBitMauledPublicKeys(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			mldsa := mustSignerFromSeed(t, tc.seed)
 			sig := mustSign(t, mldsa, tc.ctx, tc.message)
-			pk := mldsa.PublicKey().key
+			pk := mldsa.PublicKey().raw
 
 			if !verifyForTest(tc.ctx, tc.message, sig, &pk) {
 				t.Fatal("baseline signature failed verification")
@@ -134,7 +134,7 @@ func TestMetamorphicVerifyRejectsBitMauledMessages(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			mldsa := mustSignerFromSeed(t, tc.seed)
 			sig := mustSign(t, mldsa, tc.ctx, tc.message)
-			pk := mldsa.PublicKey().key
+			pk := mldsa.PublicKey().raw
 
 			if !verifyForTest(tc.ctx, tc.message, sig, &pk) {
 				t.Fatal("baseline signature failed verification")
@@ -155,7 +155,7 @@ func TestMetamorphicVerifyRejectsBitMauledSignatures(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			mldsa := mustSignerFromSeed(t, tc.seed)
 			sig := mustSign(t, mldsa, tc.ctx, tc.message)
-			pk := mldsa.PublicKey().key
+			pk := mldsa.PublicKey().raw
 
 			if !verifyForTest(tc.ctx, tc.message, sig, &pk) {
 				t.Fatal("baseline signature failed verification")
@@ -210,7 +210,7 @@ func TestMetamorphicSecretKeyMaulingFeatureScan(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			mldsa := mustSignerFromSeed(t, tc.seed)
 			baseSig := mustSignDeterministic(t, mldsa, tc.ctx, tc.message)
-			pk := mldsa.PublicKey().key
+			pk := mldsa.PublicKey().raw
 			sk := mldsa.sk
 
 			regions := []struct {

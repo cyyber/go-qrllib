@@ -67,7 +67,7 @@ func TestNewUsesCallerSuppliedRand(t *testing.T) {
 	if !bytes.Equal(got.Bytes(), seed[:]) {
 		t.Fatal("GenerateKey did not store the caller-supplied seed")
 	}
-	if got.PublicKey().key != want.PublicKey().key {
+	if got.PublicKey().raw != want.PublicKey().raw {
 		t.Fatal("GenerateKey did not derive the public key from caller-supplied rand")
 	}
 	if got.sk != want.sk {
@@ -87,7 +87,7 @@ func TestNewUsesCallerSuppliedRand(t *testing.T) {
 	}
 	defer wantZero.Zeroize()
 
-	if gotZero.PublicKey().key != wantZero.PublicKey().key {
+	if gotZero.PublicKey().raw != wantZero.PublicKey().raw {
 		t.Fatal("GenerateKey with zeroReader did not match NewPrivateKey with zero seed")
 	}
 	if gotZero.sk != wantZero.sk {
@@ -133,7 +133,7 @@ func TestSignUsesCallerSuppliedRand(t *testing.T) {
 		t.Fatal("Sign with zeroReader did not match SignDeterministic")
 	}
 
-	pk := d.PublicKey().key
+	pk := d.PublicKey().raw
 	if !verifyForTest(ctx, msg, sig1, &pk) {
 		t.Fatal("caller-rand signature did not verify")
 	}
@@ -200,7 +200,7 @@ func TestNewPrivateKey(t *testing.T) {
 		t.Fatal("ml-dsa-87 is nil")
 	}
 
-	pk := d.PublicKey().key
+	pk := d.PublicKey().raw
 	sk := d.sk
 	strPK := hex.EncodeToString(pk[:])
 	strSK := hex.EncodeToString(sk[:])
@@ -223,8 +223,8 @@ func TestPrivateKey_PublicKey(t *testing.T) {
 	pk := PKHStrToBin(PK)
 
 	d := newPrivateKeyFromSeed(t, HexSeed)
-	if pk != d.PublicKey().key {
-		t.Errorf("PK mismatch\nExpected: %x\nFound: %x", pk, d.PublicKey().key)
+	if pk != d.PublicKey().raw {
+		t.Errorf("PK mismatch\nExpected: %x\nFound: %x", pk, d.PublicKey().raw)
 	}
 }
 
@@ -274,7 +274,7 @@ func TestPrivateKey_Sign(t *testing.T) {
 
 	// Hedged signing (TOB-QRLLIB-6) means signatures are not pinable;
 	// verify the produced signature under the matching public key.
-	pk := d.PublicKey().key
+	pk := d.PublicKey().raw
 	if !verifyForTest(ctx, msg, signature, &pk) {
 		t.Error("Sign produced a signature that did not verify under its own public key")
 	}
@@ -291,7 +291,7 @@ func TestPrivateKey_Verify(t *testing.T) {
 	}
 
 	// Hedged signing (TOB-QRLLIB-6): no fixed-hex pin; verify only.
-	pk := d.PublicKey().key
+	pk := d.PublicKey().raw
 	if !verifyForTest(ctx, msg, signature, &pk) {
 		t.Error("Signature Verification failed")
 	}
