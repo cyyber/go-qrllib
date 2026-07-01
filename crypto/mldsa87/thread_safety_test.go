@@ -1,159 +1,198 @@
 package mldsa87_test
 
 import (
-	"fmt"
 	"sync"
 	"testing"
 
 	"github.com/theQRL/go-qrllib/crypto/mldsa87"
 )
 
-// Thread safety tests for the public ML-DSA-87 API.
-//
-// Run with:
-//
-//	go test -race ./crypto/mldsa87
+type MLDSA87 struct {
+	publicKey  *mldsa87.PublicKey
+	privateKey *mldsa87.PrivateKey
+}
 
-func TestThreadSafetyConcurrentVerify(t *testing.T) {
+func New() (*MLDSA87, error) {
 	publicKey, privateKey, err := mldsa87.GenerateKey(nil)
 	if err != nil {
-		t.Fatalf("GenerateKey failed: %v", err)
+		return nil, err
+	}
+	return &MLDSA87{publicKey: publicKey, privateKey: privateKey}, nil
+}
+
+func (mldsa *MLDSA87) Sign(ctx, msg []byte) ([]byte, error) {
+	return mldsa.privateKey.Sign(nil, msg, &mldsa87.Options{Context: ctx})
+}
+
+func (mldsa *MLDSA87) GetPK() mldsa87.PublicKey {
+	return *mldsa.publicKey
+}
+
+func Verify(ctx, msg, sig []byte, pk *mldsa87.PublicKey) bool {
+	return mldsa87.Verify(pk, msg, sig, &mldsa87.Options{Context: ctx})
+}
+
+// Thread safety tests for ML-DSA-87 (TST-006)
+// Run with: go test -race ./crypto/mldsa87/...
+//
+// These tests verify that concurrent operations don't cause data races.
+
+// TestThreadSafetyConcurrentVerify tests parallel verification with shared public key
+func TestThreadSafetyConcurrentVerify(t *testing.T) {
+	mldsa, err := New()
+	if err != nil {
+		t.Fatalf("Failed to create MLDSA87: %v", err)
 	}
 
 	msg := []byte("test message for concurrent verification")
-	opts := &mldsa87.Options{Context: []byte("context")}
+	ctx := []byte("context")
 
-	sig, err := privateKey.Sign(nil, msg, opts)
+	sig, err := mldsa.Sign(ctx, msg)
 	if err != nil {
-		t.Fatalf("Sign failed: %v", err)
+		t.Fatalf("Failed to sign: %v", err)
 	}
 
+	pk := mldsa.GetPK()
+
+	// Run many concurrent verifications
 	const numGoroutines = 100
 	var wg sync.WaitGroup
 	wg.Add(numGoroutines)
 
-	errs := make(chan string, numGoroutines)
-	for range numGoroutines {
+	errors := make(chan error, numGoroutines)
+
+	for i := 0; i < numGoroutines; i++ {
 		go func() {
 			defer wg.Done()
-			if !mldsa87.Verify(publicKey, msg, sig, opts) {
-				errs <- "concurrent verification failed"
+			if !Verify(ctx, msg, sig, &pk) {
+				errors <- nil // Use nil to indicate verification failure
 			}
 		}()
 	}
 
 	wg.Wait()
-	close(errs)
-	for errMsg := range errs {
-		t.Error(errMsg)
+	close(errors)
+
+	for err := range errors {
+		if err == nil {
+			t.Error("Concurrent verification failed")
+		}
 	}
 }
 
+// TestThreadSafetyConcurrentSign tests parallel signing with different instances
 func TestThreadSafetyConcurrentSign(t *testing.T) {
 	const numGoroutines = 50
 	var wg sync.WaitGroup
 	wg.Add(numGoroutines)
 
-	errs := make(chan string, numGoroutines)
-	for i := range numGoroutines {
+	errors := make(chan string, numGoroutines)
+
+	for i := 0; i < numGoroutines; i++ {
 		go func(idx int) {
 			defer wg.Done()
 
-			publicKey, privateKey, err := mldsa87.GenerateKey(nil)
+			// Each goroutine creates its own instance
+			mldsa, err := New()
 			if err != nil {
-				errs <- fmt.Sprintf("GenerateKey(%d) failed: %v", idx, err)
+				errors <- "Failed to create instance"
 				return
 			}
 
 			msg := []byte("test message")
-			sig, err := privateKey.Sign(nil, msg, nil)
+			ctx := []byte{}
+
+			sig, err := mldsa.Sign(ctx, msg)
 			if err != nil {
-				errs <- fmt.Sprintf("Sign(%d) failed: %v", idx, err)
+				errors <- "Failed to sign"
 				return
 			}
-			if !mldsa87.Verify(publicKey, msg, sig, nil) {
-				errs <- fmt.Sprintf("Verify(%d) failed", idx)
+
+			pk := mldsa.GetPK()
+			if !Verify(ctx, msg, sig, &pk) {
+				errors <- "Verification failed"
+				return
 			}
 		}(i)
 	}
 
 	wg.Wait()
-	close(errs)
-	for errMsg := range errs {
+	close(errors)
+
+	for errMsg := range errors {
 		t.Error(errMsg)
 	}
 }
 
+// TestThreadSafetyConcurrentKeyGeneration tests parallel key generation
 func TestThreadSafetyConcurrentKeyGeneration(t *testing.T) {
 	const numGoroutines = 50
 	var wg sync.WaitGroup
 	wg.Add(numGoroutines)
 
-	publicKeys := make(chan *mldsa87.PublicKey, numGoroutines)
-	errs := make(chan string, numGoroutines)
-	for i := range numGoroutines {
-		go func(idx int) {
+	results := make(chan *MLDSA87, numGoroutines)
+
+	for i := 0; i < numGoroutines; i++ {
+		go func() {
 			defer wg.Done()
-			publicKey, _, err := mldsa87.GenerateKey(nil)
+			mldsa, err := New()
 			if err != nil {
-				errs <- fmt.Sprintf("GenerateKey(%d) failed: %v", idx, err)
+				t.Errorf("Failed to create MLDSA87: %v", err)
 				return
 			}
-			publicKeys <- publicKey
-		}(i)
+			results <- mldsa
+		}()
 	}
 
 	wg.Wait()
-	close(publicKeys)
-	close(errs)
+	close(results)
 
-	for errMsg := range errs {
-		t.Error(errMsg)
-	}
-
-	seen := make(map[string]bool)
-	for publicKey := range publicKeys {
-		publicKeyBytes := publicKey.Bytes()
-		key := string(publicKeyBytes)
-		if seen[key] {
-			t.Error("duplicate public key generated")
+	// Verify all instances are unique
+	pks := make(map[string]bool)
+	for mldsa := range results {
+		if mldsa == nil {
+			continue
 		}
-		seen[key] = true
+		pk := mldsa.GetPK()
+		pkBytes := pk.Bytes()
+		pkStr := string(pkBytes)
+		if pks[pkStr] {
+			t.Error("Duplicate public key generated")
+		}
+		pks[pkStr] = true
 	}
 }
 
-func TestThreadSafetySamePrivateKeySign(t *testing.T) {
-	publicKey, privateKey, err := mldsa87.GenerateKey(nil)
+// TestThreadSafetySameInstanceSign tests signing from same instance (should be safe for ML-DSA)
+func TestThreadSafetySameInstanceSign(t *testing.T) {
+	mldsa, err := New()
 	if err != nil {
-		t.Fatalf("GenerateKey failed: %v", err)
+		t.Fatalf("Failed to create MLDSA87: %v", err)
 	}
 
-	opts := &mldsa87.Options{Context: []byte("context")}
+	pk := mldsa.GetPK()
+	ctx := []byte{}
 
 	const numGoroutines = 50
 	var wg sync.WaitGroup
 	wg.Add(numGoroutines)
 
-	errs := make(chan string, numGoroutines)
-	for i := range numGoroutines {
+	for i := 0; i < numGoroutines; i++ {
 		go func(idx int) {
 			defer wg.Done()
 			msg := []byte("message")
 
-			sig, err := privateKey.Sign(nil, msg, opts)
+			sig, err := mldsa.Sign(ctx, msg)
 			if err != nil {
-				errs <- fmt.Sprintf("Sign(%d) failed: %v", idx, err)
+				t.Errorf("Sign failed: %v", err)
 				return
 			}
-			if !mldsa87.Verify(publicKey, msg, sig, opts) {
-				errs <- fmt.Sprintf("Verify(%d) failed", idx)
+
+			if !Verify(ctx, msg, sig, &pk) {
+				t.Error("Verification failed")
 			}
 		}(i)
 	}
 
 	wg.Wait()
-	close(errs)
-	for errMsg := range errs {
-		t.Error(errMsg)
-	}
 }
