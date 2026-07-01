@@ -71,7 +71,7 @@ func TestPolyZUnpackKnownAnswer(t *testing.T) {
 // the distinct neighbours.
 func TestPolyZPackUnpackRoundTrip(t *testing.T) {
 	var in poly
-	for i := 0; i < N; i++ {
+	for i := range N {
 		// raw = GAMMA1 - coeff must land in [0, 2^20). Step by a prime so
 		// adjacent coefficients are always distinct.
 		raw := int32((i*4099 + 7) & 0xFFFFF)
@@ -84,7 +84,7 @@ func TestPolyZPackUnpackRoundTrip(t *testing.T) {
 	var out poly
 	polyZUnpack(&out, buf[:])
 
-	for i := 0; i < N; i++ {
+	for i := range N {
 		if in.coeffs[i] != out.coeffs[i] {
 			t.Fatalf("round-trip mismatch at coeff %d: in=%d out=%d", i, in.coeffs[i], out.coeffs[i])
 		}

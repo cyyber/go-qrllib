@@ -314,7 +314,7 @@ func TestCanonicalityNonZeroPadding(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			malformedSig := validSig
 			// Set all cumulative counts to 0 (no hints)
-			for i := 0; i < K; i++ {
+			for i := range K {
 				malformedSig[hintStart+OMEGA+i] = 0
 			}
 			// Add non-zero value in padding area
@@ -448,7 +448,7 @@ func TestCanonicalityRandomSignatures(t *testing.T) {
 	pk := mldsa.PublicKey().raw
 
 	// Test multiple random signatures
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		var randomSig [CRYPTO_BYTES]uint8
 		_, _ = rand.Read(randomSig[:])
 

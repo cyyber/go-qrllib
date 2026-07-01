@@ -19,9 +19,18 @@ var (
 
 // PrivateKey is an in-memory ML-DSA-87 private key.
 type PrivateKey struct {
-	seed [SEED_BYTES]uint8
-	sk   [CRYPTO_SECRET_KEY_BYTES]uint8
-	pub  PublicKey
+	seed    [SEED_BYTES]uint8
+	sk      [CRYPTO_SECRET_KEY_BYTES]uint8
+	signing signingKey
+	pub     PublicKey
+}
+
+type signingKey struct {
+	tr  [TR_BYTES]uint8
+	key [SEED_BYTES]uint8
+	s1  polyVecL // NTT(s1)
+	s2  polyVecK // NTT(s2)
+	t0  polyVecK // NTT(t0)
 }
 
 // GenerateKey generates a fresh ML-DSA-87 private key using entropy from random.
@@ -53,17 +62,20 @@ func NewPrivateKey(seed []byte) (*PrivateKey, error) {
 func newPrivateKey(seed *[SEED_BYTES]uint8) (*PrivateKey, error) {
 	var sk [CRYPTO_SECRET_KEY_BYTES]uint8
 	var pk [CRYPTO_PUBLIC_KEY_BYTES]uint8
+	var signing signingKey
+	var pub PublicKey
 	defer zeroBytes(sk[:])
 
-	if _, err := cryptoSignKeypair(seed, &pk, &sk); err != nil {
+	if _, err := cryptoSignKeypair(seed, &pk, &sk, &signing, &pub); err != nil {
 		//coverage:ignore
 		//rationale: cryptoSignKeypair only fails if sha3 operations fail, which never happens
 		return nil, err
 	}
 	return &PrivateKey{
-		seed: *seed,
-		sk:   sk,
-		pub:  PublicKey{raw: pk},
+		seed:    *seed,
+		sk:      sk,
+		signing: signing,
+		pub:     pub,
 	}, nil
 }
 
@@ -105,7 +117,7 @@ func (priv *PrivateKey) Sign(random io.Reader, ctx, message []uint8) ([CRYPTO_BY
 	if priv == nil {
 		return signature, errPrivateKeyNil
 	}
-	if err := cryptoSignSignature(random, signature[:], message, ctx, &priv.sk); err != nil {
+	if err := cryptoSignSignature(random, signature[:], message, ctx, &priv.signing, &priv.pub.mat); err != nil {
 		return signature, err
 	}
 	return signature, nil
@@ -119,7 +131,7 @@ func (priv *PrivateKey) SignDeterministic(ctx, message []uint8) ([CRYPTO_BYTES]u
 		return signature, errPrivateKeyNil
 	}
 	var rnd [RND_BYTES]uint8 // zero — FIPS 204 §3.5 deterministic mode
-	if err := cryptoSignSignatureWithRnd(signature[:], message, ctx, &priv.sk, rnd); err != nil {
+	if err := cryptoSignSignatureWithKeyAndRnd(signature[:], message, ctx, &priv.signing, &priv.pub.mat, rnd); err != nil {
 		return signature, err
 	}
 	return signature, nil
@@ -137,11 +149,16 @@ func (priv *PrivateKey) Zeroize() {
 	}
 	zeroBytes(priv.sk[:])
 	zeroBytes(priv.seed[:])
+	priv.signing.zeroize()
 }
 
 // PublicKey is an encoded ML-DSA-87 public key.
 type PublicKey struct {
-	raw [CRYPTO_PUBLIC_KEY_BYTES]uint8
+	raw    [CRYPTO_PUBLIC_KEY_BYTES]uint8
+	tr     [TR_BYTES]uint8
+	mat    [K]polyVecL
+	t1     polyVecK // NTT(t1 * 2^D)
+	cached bool
 }
 
 // NewPublicKey constructs a public key from its encoded form.
@@ -149,9 +166,9 @@ func NewPublicKey(publicKey []byte) (*PublicKey, error) {
 	if len(publicKey) != CRYPTO_PUBLIC_KEY_BYTES {
 		return nil, errInvalidPublicKeyLength
 	}
-	pub := &PublicKey{}
-	copy(pub.raw[:], publicKey)
-	return pub, nil
+	var raw [CRYPTO_PUBLIC_KEY_BYTES]uint8
+	copy(raw[:], publicKey)
+	return newPublicKeyFromRaw(&raw)
 }
 
 // Bytes returns a copy of the encoded public key.
@@ -204,7 +221,7 @@ func Verify(publicKey *PublicKey, message, sig, ctx []byte) error {
 	}
 	var signature [CRYPTO_BYTES]uint8
 	copy(signature[:], sig)
-	result, err := cryptoSignVerify(signature, message, ctx, &publicKey.raw)
+	result, err := cryptoSignVerify(signature, message, ctx, publicKey)
 	if err != nil {
 		return err
 	}

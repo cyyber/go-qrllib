@@ -199,7 +199,7 @@ func TestEdgeCaseMalformedSignatureHints(t *testing.T) {
 	t.Run("non_zero_padding_in_hints", func(t *testing.T) {
 		malformedSig := validSig
 		// Set all cumulative counts to 0 (no hints)
-		for i := 0; i < K; i++ {
+		for i := range K {
 			malformedSig[hintStart+OMEGA+i] = 0
 		}
 		// But put non-zero data in the hint indices area
