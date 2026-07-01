@@ -7,25 +7,25 @@ import (
 	"github.com/theQRL/go-qrllib/crypto/mldsa87"
 )
 
-type MLDSA87 struct {
+type testKeyPair struct {
 	publicKey  *mldsa87.PublicKey
 	privateKey *mldsa87.PrivateKey
 }
 
-func New() (*MLDSA87, error) {
+func New() (*testKeyPair, error) {
 	publicKey, privateKey, err := mldsa87.GenerateKey(nil)
 	if err != nil {
 		return nil, err
 	}
-	return &MLDSA87{publicKey: publicKey, privateKey: privateKey}, nil
+	return &testKeyPair{publicKey: publicKey, privateKey: privateKey}, nil
 }
 
-func (mldsa *MLDSA87) Sign(ctx, msg []byte) ([]byte, error) {
-	return mldsa.privateKey.Sign(nil, msg, &mldsa87.Options{Context: ctx})
+func (kp *testKeyPair) Sign(ctx, msg []byte) ([]byte, error) {
+	return kp.privateKey.Sign(nil, msg, &mldsa87.Options{Context: ctx})
 }
 
-func (mldsa *MLDSA87) GetPK() mldsa87.PublicKey {
-	return *mldsa.publicKey
+func (kp *testKeyPair) GetPK() mldsa87.PublicKey {
+	return *kp.publicKey
 }
 
 func Verify(ctx, msg, sig []byte, pk *mldsa87.PublicKey) bool {
@@ -59,24 +59,22 @@ func TestThreadSafetyConcurrentVerify(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(numGoroutines)
 
-	errors := make(chan error, numGoroutines)
+	errs := make(chan string, numGoroutines)
 
 	for i := 0; i < numGoroutines; i++ {
 		go func() {
 			defer wg.Done()
 			if !Verify(ctx, msg, sig, &pk) {
-				errors <- nil // Use nil to indicate verification failure
+				errs <- "concurrent verification failed"
 			}
 		}()
 	}
 
 	wg.Wait()
-	close(errors)
+	close(errs)
 
-	for err := range errors {
-		if err == nil {
-			t.Error("Concurrent verification failed")
-		}
+	for errMsg := range errs {
+		t.Error(errMsg)
 	}
 }
 
@@ -86,7 +84,7 @@ func TestThreadSafetyConcurrentSign(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(numGoroutines)
 
-	errors := make(chan string, numGoroutines)
+	errs := make(chan string, numGoroutines)
 
 	for i := 0; i < numGoroutines; i++ {
 		go func(idx int) {
@@ -95,7 +93,7 @@ func TestThreadSafetyConcurrentSign(t *testing.T) {
 			// Each goroutine creates its own instance
 			mldsa, err := New()
 			if err != nil {
-				errors <- "Failed to create instance"
+				errs <- "Failed to create instance"
 				return
 			}
 
@@ -104,22 +102,22 @@ func TestThreadSafetyConcurrentSign(t *testing.T) {
 
 			sig, err := mldsa.Sign(ctx, msg)
 			if err != nil {
-				errors <- "Failed to sign"
+				errs <- "Failed to sign"
 				return
 			}
 
 			pk := mldsa.GetPK()
 			if !Verify(ctx, msg, sig, &pk) {
-				errors <- "Verification failed"
+				errs <- "Verification failed"
 				return
 			}
 		}(i)
 	}
 
 	wg.Wait()
-	close(errors)
+	close(errs)
 
-	for errMsg := range errors {
+	for errMsg := range errs {
 		t.Error(errMsg)
 	}
 }
@@ -130,7 +128,7 @@ func TestThreadSafetyConcurrentKeyGeneration(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(numGoroutines)
 
-	results := make(chan *MLDSA87, numGoroutines)
+	results := make(chan *testKeyPair, numGoroutines)
 
 	for i := 0; i < numGoroutines; i++ {
 		go func() {
