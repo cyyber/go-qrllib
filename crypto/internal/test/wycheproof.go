@@ -1,31 +1,21 @@
 package test
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
 )
 
-// WycheproofDir returns the local Wycheproof fixture directory, unless
-// WYCHEPROOF_VECTORS_DIR points at an external checkout.
+// WycheproofDir returns the local Wycheproof fixture directory.
 func WycheproofDir() string {
-	return envOrTestDataDir("WYCHEPROOF_VECTORS_DIR", "wycheproof")
+	return filepath.Join("testdata", "wycheproof")
 }
 
-// CCTVDir returns the local CCTV fixture directory, unless CCTV_VECTORS_DIR
-// points at an external checkout.
+// CCTVDir returns the local CCTV fixture directory.
 func CCTVDir() string {
-	return envOrTestDataDir("CCTV_VECTORS_DIR", "cctv")
+	return filepath.Join("testdata", "cctv")
 }
 
-func envOrTestDataDir(envName, testDataName string) string {
-	if dir := os.Getenv(envName); dir != "" {
-		return dir
-	}
-	return filepath.Join("testdata", testDataName)
-}
-
-// ReadWycheproofJSON reads a Wycheproof JSON fixture from the active vector
+// ReadWycheproofJSON reads a Wycheproof JSON fixture from the local vector
 // directory. It accepts either plain JSON or gzip-compressed JSON with a .gz
 // suffix.
 func ReadWycheproofJSON[T any](t testing.TB, name string) T {
