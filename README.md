@@ -193,12 +193,7 @@ if err != nil {
 ok := mldsa87.Verify(message, sig[:], &pk, desc)
 ```
 
-The SPHINCS+ wallet package at `github.com/theQRL/go-qrllib/wallet/sphincsplus_256s`
-keeps its original `Sign(message)` shape, but note that the QRL wallet layer currently
-treats SPHINCS+/SLH-DSA as **non-issuable** (it remains verifiable, so existing
-addresses keep working): wallet creation under that type is gated until the QRL-adopted
-SLH-DSA parameter set is finalised. See the SPHINCS+ notes below and
-`wallet/common/wallettype/type.go` for the `IsIssuable` / `IsVerifiable` split.
+The same API shape is available at `github.com/theQRL/go-qrllib/wallet/sphincsplus_256s`.
 
 ### `crypto.Signer` Interface (ML-DSA-87)
 
