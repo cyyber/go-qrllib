@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/theQRL/go-qrllib/crypto/mldsa87"
@@ -14,9 +15,9 @@ import (
 )
 
 type Wallet struct {
-	desc Descriptor
-	d    *mldsa87.MLDSA87
-	seed common.Seed
+	desc       Descriptor
+	privateKey *mldsa87.PrivateKey
+	seed       common.Seed
 }
 
 func NewWallet() (*Wallet, error) {
@@ -37,7 +38,8 @@ func NewWalletFromSeed(seed common.Seed) (*Wallet, error) {
 		//rationale: descriptor uses hardcoded valid wallet type, cannot fail
 		return nil, fmt.Errorf("failed to create descriptor: %w", err)
 	}
-	d, err := mldsa87.NewMLDSA87FromSeed(seed.HashSHA256())
+	keySeed := seed.HashSHA256()
+	privateKey, err := mldsa87.NewPrivateKey(keySeed[:])
 	if err != nil {
 		//coverage:ignore
 		//rationale: keypair generation only fails if buffer sizes wrong, Go's type system guarantees correct sizes
@@ -45,9 +47,9 @@ func NewWalletFromSeed(seed common.Seed) (*Wallet, error) {
 	}
 
 	return &Wallet{
-		desc,
-		d,
-		seed,
+		desc:       desc,
+		privateKey: privateKey,
+		seed:       seed,
 	}, nil
 }
 
@@ -80,7 +82,8 @@ func NewWalletFromExtendedSeed(extendedSeed common.ExtendedSeed) (*Wallet, error
 		return nil, fmt.Errorf(common.ErrExtendedSeedToSeed, wallettype.ML_DSA_87, err)
 	}
 
-	d, err := mldsa87.NewMLDSA87FromSeed(seed.HashSHA256())
+	keySeed := seed.HashSHA256()
+	privateKey, err := mldsa87.NewPrivateKey(keySeed[:])
 	if err != nil {
 		//coverage:ignore
 		//rationale: keypair generation only fails if buffer sizes wrong, Go's type system guarantees correct sizes
@@ -88,9 +91,9 @@ func NewWalletFromExtendedSeed(extendedSeed common.ExtendedSeed) (*Wallet, error
 	}
 
 	return &Wallet{
-		desc,
-		d,
-		seed,
+		desc:       desc,
+		privateKey: privateKey,
+		seed:       seed,
 	}, nil
 }
 
@@ -159,11 +162,15 @@ func (w *Wallet) GetMnemonic() (string, error) {
 }
 
 func (w *Wallet) GetPK() PK {
-	return w.d.GetPK()
+	var pk PK
+	copy(pk[:], w.privateKey.PublicKey().Bytes())
+	return pk
 }
 
 func (w *Wallet) GetSK() [SKSize]uint8 {
-	return w.d.GetSK()
+	var sk [SKSize]uint8
+	copy(sk[:], w.privateKey.Bytes())
+	return sk
 }
 
 func (w *Wallet) GetDescriptor() Descriptor {
@@ -190,14 +197,20 @@ func (w *Wallet) GetChecksumAddressStr() string {
 }
 
 // Sign produces an ML-DSA-87 signature over message using the
-// descriptor-bound signing context. Signing is hedged by default as per
-// FIPS 204: each call mixes fresh `crypto/rand` randomness into the per-signature
-// `RND_BYTES`, so two calls over the same message produce distinct signatures,
-// both of which verify under the same public key + descriptor. See the
-// [github.com/theQRL/go-qrllib/crypto/mldsa87] package doc
-// "Signing Mode" section for the full discussion.
-func (w *Wallet) Sign(message []uint8) ([SigSize]uint8, error) {
-	return w.d.Sign(common.SigningContext(w.desc.ToDescriptor()), message)
+// descriptor-bound signing context. The random parameter supplies the
+// per-signature RND_BYTES; if random is nil, Sign uses crypto/rand.Reader for
+// the FIPS 204 hedged path. Callers that need deterministic signatures can
+// pass a deterministic reader.
+func (w *Wallet) Sign(random io.Reader, message []uint8) ([SigSize]uint8, error) {
+	var signature [SigSize]uint8
+	sig, err := mldsa87.Sign(random, w.privateKey, message, &mldsa87.Options{
+		Context: common.SigningContext(w.desc.ToDescriptor()),
+	})
+	if err != nil {
+		return signature, err
+	}
+	copy(signature[:], sig)
+	return signature, nil
 }
 
 // Zeroize clears sensitive key material from memory.
@@ -206,7 +219,7 @@ func (w *Wallet) Zeroize() {
 	for i := range w.seed {
 		w.seed[i] = 0
 	}
-	w.d.Zeroize()
+	w.privateKey.Zeroize()
 }
 
 // Verify reports whether the signature is a valid ML-DSA-87 signature
@@ -226,10 +239,11 @@ func Verify(message, signature []uint8, pk *PK, desc [descriptor.DescriptorSize]
 		return false
 	}
 
-	var sig [SigSize]uint8
-	copy(sig[:], signature)
-
-	pk2 := (*[mldsa87.CRYPTO_PUBLIC_KEY_BYTES]uint8)(pk)
-
-	return mldsa87.Verify(common.SigningContext(d.ToDescriptor()), message, sig, pk2)
+	publicKey, err := mldsa87.NewPublicKey(pk[:])
+	if err != nil {
+		return false
+	}
+	return mldsa87.Verify(publicKey, message, signature, &mldsa87.Options{
+		Context: common.SigningContext(d.ToDescriptor()),
+	})
 }

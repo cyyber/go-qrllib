@@ -31,11 +31,13 @@
 //
 //	// Wallet layer - context is derived from the descriptor
 //	wallet, _ := mldsa87.NewWallet()
-//	signature, _ := wallet.Sign(message)
+//	signature, _ := wallet.Sign(nil, message)
 //
-//	// Crypto layer - context is an explicit parameter
-//	signer, _ := crypto_mldsa87.New()
-//	signature, _ := signer.Sign(common.SigningContext(desc), message)
+//	// Crypto layer - context is an explicit option
+//	_, signer, _ := cryptoMldsa87.GenerateKey(nil)
+//	signature, _ := signer.Sign(nil, message, &cryptoMldsa87.Options{
+//	    Context: common.SigningContext(desc),
+//	})
 //
 // # Seed Derivation
 //
@@ -47,10 +49,11 @@
 // # Signing Mode
 //
 // Wallet signing is hedged by default as per FIPS 204: each call to
-// [Wallet.Sign] mixes fresh `crypto/rand` randomness into the
-// per-signature `RND_BYTES`, so two signs over the same message
-// produce distinct signature bytes, both of which verify under the
-// wallet's public key and descriptor. See the
+// [Wallet.Sign] with nil randomness mixes fresh `crypto/rand` randomness into
+// the per-signature `RND_BYTES`, so two signs over the same message produce
+// distinct signature bytes, both of which verify under the wallet's public key
+// and descriptor. Callers that need deterministic signatures can pass a
+// deterministic reader. See the
 // [github.com/theQRL/go-qrllib/crypto/mldsa87] package doc
 // "Signing Mode" section for the full discussion.
 //
@@ -77,7 +80,7 @@
 //	pk      := w.GetPK()
 //	desc    := w.GetDescriptor().ToDescriptor()
 //
-//	sig, err := w.Sign(message)
+//	sig, err := w.Sign(nil, message)
 //	if err != nil {
 //	    log.Fatal(err)
 //	}
@@ -87,6 +90,6 @@
 // # Thread Safety
 //
 // A Wallet instance has the same thread safety characteristics as the underlying
-// MLDSA87 type: safe for concurrent reads, but Sign should not be called
+// crypto/mldsa87 private-key type: safe for concurrent reads, but Sign should not be called
 // concurrently on the same instance.
 package mldsa87

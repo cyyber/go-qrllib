@@ -1,12 +1,12 @@
 package mldsa87
 
-import cryptoerrors "github.com/theQRL/go-qrllib/crypto/errors"
+import "errors"
 
 func packPk(pkb *[CRYPTO_PUBLIC_KEY_BYTES]uint8, rho [SEED_BYTES]uint8, t1 *polyVecK) {
 	pk := pkb[:]
 	copy(pk[:], rho[:])
 	pk = pk[SEED_BYTES:]
-	for i := 0; i < K; i++ {
+	for i := range K {
 		polyT1Pack(pk[i*POLY_T1_PACKED_BYTES:], &t1.vec[i])
 	}
 }
@@ -17,7 +17,7 @@ func unpackPk(rho *[SEED_BYTES]uint8,
 	pk := pkb[:]
 	copy(rho[:], pk[:])
 	pk = pk[SEED_BYTES:]
-	for i := 0; i < K; i++ {
+	for i := range K {
 		polyT1Unpack(&t1.vec[i], pk[i*POLY_T1_PACKED_BYTES:])
 	}
 }
@@ -35,17 +35,17 @@ func packSk(skb *[CRYPTO_SECRET_KEY_BYTES]uint8,
 
 	sk = sk[SEED_BYTES*2+TR_BYTES:]
 
-	for i := 0; i < L; i++ {
+	for i := range L {
 		polyEtaPack(sk[i*POLY_ETA_PACKED_BYTES:], &s1.vec[i])
 	}
 	sk = sk[L*POLY_ETA_PACKED_BYTES:]
 
-	for i := 0; i < K; i++ {
+	for i := range K {
 		polyEtaPack(sk[i*POLY_ETA_PACKED_BYTES:], &s2.vec[i])
 	}
 	sk = sk[K*POLY_ETA_PACKED_BYTES:]
 
-	for i := 0; i < K; i++ {
+	for i := range K {
 		polyT0Pack(sk[i*POLY_T0_PACKED_BYTES:], &t0.vec[i])
 	}
 }
@@ -63,17 +63,17 @@ func unpackSk(rho *[SEED_BYTES]byte,
 	copy(tr[:], sk[SEED_BYTES*2:])
 	sk = sk[SEED_BYTES*2+TR_BYTES:]
 
-	for i := 0; i < L; i++ {
+	for i := range L {
 		polyEtaUnpack(&s1.vec[i], sk[i*POLY_ETA_PACKED_BYTES:])
 	}
 	sk = sk[L*POLY_ETA_PACKED_BYTES:]
 
-	for i := 0; i < K; i++ {
+	for i := range K {
 		polyEtaUnpack(&s2.vec[i], sk[i*POLY_ETA_PACKED_BYTES:])
 	}
 	sk = sk[K*POLY_ETA_PACKED_BYTES:]
 
-	for i := 0; i < K; i++ {
+	for i := range K {
 		polyT0Unpack(&t0.vec[i], sk[i*POLY_T0_PACKED_BYTES:])
 	}
 }
@@ -82,26 +82,26 @@ func packSig(sigb []uint8, c [C_TILDE_BYTES]uint8, z *polyVecL, h *polyVecK) err
 	if len(sigb) != CRYPTO_BYTES {
 		//coverage:ignore
 		//rationale: internal callers always pass correctly sized buffers
-		return cryptoerrors.ErrInvalidSignatureSize
+		return errors.New("mldsa87: invalid signature size")
 	}
 	sig := sigb[:]
 
 	copy(sig[:C_TILDE_BYTES], c[:C_TILDE_BYTES])
 	sig = sig[C_TILDE_BYTES:]
 
-	for i := 0; i < L; i++ {
+	for i := range L {
 		polyZPack(sig[i*POLY_Z_PACKED_BYTES:], &z.vec[i])
 	}
 	sig = sig[L*POLY_Z_PACKED_BYTES:]
 
 	/* Encode h */
-	for i := 0; i < OMEGA+K; i++ {
+	for i := range OMEGA + K {
 		sig[i] = 0
 	}
 
 	k := 0
-	for i := 0; i < K; i++ {
-		for j := 0; j < N; j++ {
+	for i := range K {
+		for j := range N {
 			if h.vec[i].coeffs[j] != 0 {
 				sig[k] = uint8(j)
 				k++
@@ -121,15 +121,15 @@ func unpackSig(c *[C_TILDE_BYTES]uint8,
 	copy(c[:C_TILDE_BYTES], sig[:C_TILDE_BYTES])
 
 	sig = sig[C_TILDE_BYTES:]
-	for i := 0; i < L; i++ {
+	for i := range L {
 		polyZUnpack(&z.vec[i], sig[i*POLY_Z_PACKED_BYTES:])
 	}
 	sig = sig[L*POLY_Z_PACKED_BYTES:]
 
 	/* Decode h */
 	k := uint(0)
-	for i := 0; i < K; i++ {
-		for j := 0; j < N; j++ {
+	for i := range K {
+		for j := range N {
 			h.vec[i].coeffs[j] = 0
 		}
 		if uint(sig[OMEGA+i]) < k || sig[OMEGA+i] > OMEGA {

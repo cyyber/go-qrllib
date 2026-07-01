@@ -2,14 +2,10 @@ package mlkem1024
 
 import (
 	"bytes"
-	"compress/gzip"
-	"encoding/hex"
-	"encoding/json"
 	"errors"
-	"io"
-	"os"
-	"path/filepath"
 	"testing"
+
+	internaltest "github.com/theQRL/go-qrllib/crypto/internal/test"
 )
 
 // These tests consume the official NIST ACVP sample JSON files for ML-KEM.
@@ -18,8 +14,8 @@ import (
 // The checked-in fixtures live under testdata/acvp as gzip-compressed JSON.
 
 func TestACVPJSONKeyGen(t *testing.T) {
-	prompt := readACVPFile[acvpPromptFile](t, "ML-KEM-keyGen-FIPS203", "prompt.json")
-	expected := readACVPFile[acvpExpectedFile](t, "ML-KEM-keyGen-FIPS203", "expectedResults.json")
+	prompt := internaltest.ReadACVPFile[acvpPromptFile](t, "ML-KEM-keyGen-FIPS203", "prompt.json")
+	expected := internaltest.ReadACVPFile[acvpExpectedFile](t, "ML-KEM-keyGen-FIPS203", "expectedResults.json")
 
 	tested := 0
 	for _, group := range prompt.TestGroups {
@@ -31,8 +27,8 @@ func TestACVPJSONKeyGen(t *testing.T) {
 			tested++
 			want := wantGroup.test(t, test.TcID)
 
-			d := decodeACVPHex32(t, test.D)
-			z := decodeACVPHex32(t, test.Z)
+			d := internaltest.DecodeACVPHex32(t, test.D)
+			z := internaltest.DecodeACVPHex32(t, test.Z)
 
 			var seed [SeedSize]byte
 			copy(seed[:32], d[:])
@@ -43,10 +39,10 @@ func TestACVPJSONKeyGen(t *testing.T) {
 				t.Fatalf("tcId %d: NewDecapsulationKey: %v", test.TcID, err)
 			}
 
-			if got := dk.EncapsulationKey().Bytes(); !bytes.Equal(got, decodeACVPHex(t, want.EK)) {
+			if got := dk.EncapsulationKey().Bytes(); !bytes.Equal(got, internaltest.DecodeACVPHex(t, want.EK)) {
 				t.Fatalf("tcId %d: encapsulation key mismatch", test.TcID)
 			}
-			if got := expandedDecapsulationKeyBytes(dk); !bytes.Equal(got, decodeACVPHex(t, want.DK)) {
+			if got := expandedDecapsulationKeyBytes(dk); !bytes.Equal(got, internaltest.DecodeACVPHex(t, want.DK)) {
 				t.Fatalf("tcId %d: expanded decapsulation key mismatch", test.TcID)
 			}
 		}
@@ -57,8 +53,8 @@ func TestACVPJSONKeyGen(t *testing.T) {
 }
 
 func TestACVPJSONEncapsulation(t *testing.T) {
-	prompt := readACVPFile[acvpPromptFile](t, "ML-KEM-encapDecap-FIPS203", "prompt.json")
-	expected := readACVPFile[acvpExpectedFile](t, "ML-KEM-encapDecap-FIPS203", "expectedResults.json")
+	prompt := internaltest.ReadACVPFile[acvpPromptFile](t, "ML-KEM-encapDecap-FIPS203", "prompt.json")
+	expected := internaltest.ReadACVPFile[acvpExpectedFile](t, "ML-KEM-encapDecap-FIPS203", "expectedResults.json")
 
 	tested := 0
 	for _, group := range prompt.TestGroups {
@@ -70,18 +66,18 @@ func TestACVPJSONEncapsulation(t *testing.T) {
 			tested++
 			want := wantGroup.test(t, test.TcID)
 
-			ek, err := NewEncapsulationKey(decodeACVPHex(t, test.EK))
+			ek, err := NewEncapsulationKey(internaltest.DecodeACVPHex(t, test.EK))
 			if err != nil {
 				t.Fatalf("tcId %d: NewEncapsulationKey: %v", test.TcID, err)
 			}
-			m := decodeACVPHex32(t, test.M)
+			m := internaltest.DecodeACVPHex32(t, test.M)
 			var ct [CiphertextSize]byte
 			gotK := encapsulateTo(&ct, ek, &m)
 
-			if !bytes.Equal(gotK, decodeACVPHex(t, want.K)) {
+			if !bytes.Equal(gotK, internaltest.DecodeACVPHex(t, want.K)) {
 				t.Fatalf("tcId %d: shared key mismatch", test.TcID)
 			}
-			if !bytes.Equal(ct[:], decodeACVPHex(t, want.C)) {
+			if !bytes.Equal(ct[:], internaltest.DecodeACVPHex(t, want.C)) {
 				t.Fatalf("tcId %d: ciphertext mismatch", test.TcID)
 			}
 		}
@@ -92,8 +88,8 @@ func TestACVPJSONEncapsulation(t *testing.T) {
 }
 
 func TestACVPJSONDecapsulation(t *testing.T) {
-	prompt := readACVPFile[acvpPromptFile](t, "ML-KEM-encapDecap-FIPS203", "prompt.json")
-	expected := readACVPFile[acvpExpectedFile](t, "ML-KEM-encapDecap-FIPS203", "expectedResults.json")
+	prompt := internaltest.ReadACVPFile[acvpPromptFile](t, "ML-KEM-encapDecap-FIPS203", "prompt.json")
+	expected := internaltest.ReadACVPFile[acvpExpectedFile](t, "ML-KEM-encapDecap-FIPS203", "expectedResults.json")
 
 	tested := 0
 	for _, group := range prompt.TestGroups {
@@ -104,16 +100,16 @@ func TestACVPJSONDecapsulation(t *testing.T) {
 		for _, test := range group.Tests {
 			tested++
 			want := wantGroup.test(t, test.TcID)
-			dk, err := newDecapsulationKeyFromExpandedACVP(decodeACVPHex(t, test.DK))
+			dk, err := newDecapsulationKeyFromExpandedACVP(internaltest.DecodeACVPHex(t, test.DK))
 			if err != nil {
 				t.Fatalf("tcId %d: decapsulation key: %v", test.TcID, err)
 			}
 
-			gotK, err := dk.Decapsulate(decodeACVPHex(t, test.C))
+			gotK, err := dk.Decapsulate(internaltest.DecodeACVPHex(t, test.C))
 			if err != nil {
 				t.Fatalf("tcId %d: Decapsulate: %v", test.TcID, err)
 			}
-			if !bytes.Equal(gotK, decodeACVPHex(t, want.K)) {
+			if !bytes.Equal(gotK, internaltest.DecodeACVPHex(t, want.K)) {
 				t.Fatalf("tcId %d: shared key mismatch", test.TcID)
 			}
 		}
@@ -124,8 +120,8 @@ func TestACVPJSONDecapsulation(t *testing.T) {
 }
 
 func TestACVPJSONDecapsulationKeyCheck(t *testing.T) {
-	prompt := readACVPFile[acvpPromptFile](t, "ML-KEM-encapDecap-FIPS203", "prompt.json")
-	expected := readACVPFile[acvpExpectedFile](t, "ML-KEM-encapDecap-FIPS203", "expectedResults.json")
+	prompt := internaltest.ReadACVPFile[acvpPromptFile](t, "ML-KEM-encapDecap-FIPS203", "prompt.json")
+	expected := internaltest.ReadACVPFile[acvpExpectedFile](t, "ML-KEM-encapDecap-FIPS203", "expectedResults.json")
 
 	tested := 0
 	for _, group := range prompt.TestGroups {
@@ -137,7 +133,7 @@ func TestACVPJSONDecapsulationKeyCheck(t *testing.T) {
 			tested++
 			want := wantGroup.test(t, test.TcID)
 
-			_, err := newDecapsulationKeyFromExpandedACVP(decodeACVPHex(t, test.DK))
+			_, err := newDecapsulationKeyFromExpandedACVP(internaltest.DecodeACVPHex(t, test.DK))
 			if got := err == nil; got != want.TestPassed {
 				t.Fatalf("tcId %d: validation result = %t, want %t", test.TcID, got, want.TestPassed)
 			}
@@ -149,8 +145,8 @@ func TestACVPJSONDecapsulationKeyCheck(t *testing.T) {
 }
 
 func TestACVPJSONEncapsulationKeyCheck(t *testing.T) {
-	prompt := readACVPFile[acvpPromptFile](t, "ML-KEM-encapDecap-FIPS203", "prompt.json")
-	expected := readACVPFile[acvpExpectedFile](t, "ML-KEM-encapDecap-FIPS203", "expectedResults.json")
+	prompt := internaltest.ReadACVPFile[acvpPromptFile](t, "ML-KEM-encapDecap-FIPS203", "prompt.json")
+	expected := internaltest.ReadACVPFile[acvpExpectedFile](t, "ML-KEM-encapDecap-FIPS203", "expectedResults.json")
 
 	tested := 0
 	for _, group := range prompt.TestGroups {
@@ -162,7 +158,7 @@ func TestACVPJSONEncapsulationKeyCheck(t *testing.T) {
 			tested++
 			want := wantGroup.test(t, test.TcID)
 
-			_, err := NewEncapsulationKey(decodeACVPHex(t, test.EK))
+			_, err := NewEncapsulationKey(internaltest.DecodeACVPHex(t, test.EK))
 			if got := err == nil; got != want.TestPassed {
 				t.Fatalf("tcId %d: validation result = %t, want %t", test.TcID, got, want.TestPassed)
 			}
@@ -212,87 +208,18 @@ type acvpExpectedTest struct {
 	TestPassed bool   `json:"testPassed"`
 }
 
-func readACVPFile[T any](t *testing.T, suite, name string) T {
-	t.Helper()
-
-	path := filepath.Join("testdata", "acvp", suite, name)
-	b, path := readACVPBytes(t, path)
-
-	var f T
-	if err := json.Unmarshal(b, &f); err != nil {
-		t.Fatalf("parse ACVP JSON %q: %v", path, err)
-	}
-	return f
-}
-
-func readACVPBytes(t *testing.T, path string) ([]byte, string) {
-	t.Helper()
-
-	b, err := os.ReadFile(path)
-	if err == nil {
-		return b, path
-	}
-
-	gzPath := path + ".gz"
-	f, err := os.Open(gzPath)
-	if err != nil {
-		t.Fatalf("read ACVP JSON %q: %v", path, err)
-	}
-	defer func() { _ = f.Close() }()
-
-	gz, err := gzip.NewReader(f)
-	if err != nil {
-		t.Fatalf("open compressed ACVP JSON %q: %v", gzPath, err)
-	}
-	defer func() { _ = gz.Close() }()
-
-	b, err = io.ReadAll(gz)
-	if err != nil {
-		t.Fatalf("read compressed ACVP JSON %q: %v", gzPath, err)
-	}
-	return b, gzPath
-}
-
 func (f acvpExpectedFile) group(t *testing.T, tgID int) acvpExpectedGroup {
 	t.Helper()
-	for _, group := range f.TestGroups {
-		if group.TgID == tgID {
-			return group
-		}
-	}
-	t.Fatalf("missing ACVP test group %d", tgID)
-	return acvpExpectedGroup{}
+	return internaltest.FindACVPByID(t, "test group", tgID, f.TestGroups, func(group acvpExpectedGroup) int {
+		return group.TgID
+	})
 }
 
 func (g acvpExpectedGroup) test(t *testing.T, tcID int) acvpExpectedTest {
 	t.Helper()
-	for _, test := range g.Tests {
-		if test.TcID == tcID {
-			return test
-		}
-	}
-	t.Fatalf("missing ACVP test case %d", tcID)
-	return acvpExpectedTest{}
-}
-
-func decodeACVPHex(t *testing.T, s string) []byte {
-	t.Helper()
-	b, err := hex.DecodeString(s)
-	if err != nil {
-		t.Fatalf("decode ACVP hex: %v", err)
-	}
-	return b
-}
-
-func decodeACVPHex32(t *testing.T, s string) [32]byte {
-	t.Helper()
-	b := decodeACVPHex(t, s)
-	if len(b) != 32 {
-		t.Fatalf("decode ACVP hex length = %d, want 32", len(b))
-	}
-	var out [32]byte
-	copy(out[:], b)
-	return out
+	return internaltest.FindACVPByID(t, "test case", tcID, g.Tests, func(test acvpExpectedTest) int {
+		return test.TcID
+	})
 }
 
 // expandedDecapsulationKeyBytes returns the ACVP/NIST expanded decapsulation key form.

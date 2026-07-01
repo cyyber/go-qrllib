@@ -4,10 +4,37 @@ import (
 	"crypto/rand"
 	"crypto/sha3"
 	"crypto/subtle"
+	"errors"
+	"io"
 	"runtime"
-
-	cryptoerrors "github.com/theQRL/go-qrllib/crypto/errors"
+	"sync"
 )
+
+// shake256Pool provides pooled SHAKE256 hashers to reduce allocations
+// in high-frequency signing and verification operations.
+var shake256Pool = sync.Pool{
+	New: func() any {
+		return sha3.NewSHAKE256()
+	},
+}
+
+// getShake256 returns a clean, reset SHAKE256 hasher from the pool.
+func getShake256() *sha3.SHAKE {
+	h := shake256Pool.Get().(*sha3.SHAKE)
+	h.Reset()
+	return h
+}
+
+// putShake256 resets a SHAKE256 hasher and returns it to the pool.
+//
+// The Reset is a security measure: the signing path absorbs secret key
+// material through pooled states, and without a wipe-on-put that
+// secret-derived sponge state would linger in the pool indefinitely.
+// getShake256's Reset-on-Get is kept as defence-in-depth.
+func putShake256(h *sha3.SHAKE) {
+	h.Reset()
+	shake256Pool.Put(h)
+}
 
 // zeroBytes overwrites b with zeros. runtime.KeepAlive prevents the compiler
 // from eliding the writes as a dead store.
@@ -38,7 +65,7 @@ func zeroPolyVecK(v *polyVecK) {
 }
 
 // Take a random seed, and compute sk/pk pair.
-func cryptoSignKeypair(seed *[SEED_BYTES]uint8, pk *[CRYPTO_PUBLIC_KEY_BYTES]uint8, sk *[CRYPTO_SECRET_KEY_BYTES]uint8) (*[SEED_BYTES]uint8, error) {
+func cryptoSignKeypair(seed *[SEED_BYTES]uint8, pk *[CRYPTO_PUBLIC_KEY_BYTES]uint8, sk *[CRYPTO_SECRET_KEY_BYTES]uint8, priv *PrivateKey, pub *PublicKey) (*[SEED_BYTES]uint8, error) {
 	var tr [TR_BYTES]uint8
 	var rho, key [SEED_BYTES]uint8
 	var rhoPrime [CRH_BYTES]uint8
@@ -52,7 +79,7 @@ func cryptoSignKeypair(seed *[SEED_BYTES]uint8, pk *[CRYPTO_PUBLIC_KEY_BYTES]uin
 	// paths handle their unpacked secret material consistently. Go's GC
 	// may copy values before zeroization executes, so this is a
 	// best-effort reduction of the in-memory exposure window rather than
-	// a guarantee — see SECURITY.md and MLDSA87.Zeroize for the exact
+	// a guarantee — see SECURITY.md and PrivateKey.Zeroize for the exact
 	// boundary. (TOB-QRLLIB-10)
 	defer func() {
 		zeroBytes(key[:])
@@ -65,13 +92,13 @@ func cryptoSignKeypair(seed *[SEED_BYTES]uint8, pk *[CRYPTO_PUBLIC_KEY_BYTES]uin
 
 	if seed == nil {
 		//coverage:ignore
-		//rationale: all public API callers (New, NewMLDSA87FromSeed) always provide a seed
+		//rationale: all public API callers (GenerateKey, NewPrivateKey) always provide a seed
 		seed = new([SEED_BYTES]uint8)
 		_, err := rand.Read(seed[:])
 		if err != nil {
 			//coverage:ignore
 			//rationale: crypto/rand.Read only fails if system entropy source is broken
-			return nil, cryptoerrors.ErrSeedGeneration
+			return nil, errors.New("mldsa87: seed generation failed")
 		}
 	}
 	/* Expand 32 bytes of randomness into rho, rhoprime and key */
@@ -142,56 +169,79 @@ func cryptoSignKeypair(seed *[SEED_BYTES]uint8, pk *[CRYPTO_PUBLIC_KEY_BYTES]uin
 	copy(tr[:], sha3.SumSHAKE256(pk[:], TR_BYTES))
 	packSk(sk, rho, tr, key, &t0, &s1, &s2)
 
+	if priv != nil {
+		priv.tr = tr
+		priv.key = key
+		priv.s1 = s1hat
+		priv.s2 = s2
+		polyVecKNTT(&priv.s2)
+		priv.t0 = t0
+		polyVecKNTT(&priv.t0)
+	}
+	if pub != nil {
+		pub.raw = *pk
+		pub.tr = tr
+		pub.mat = mat
+		pub.t1 = t1
+		polyVecKShiftL(&pub.t1)
+		polyVecKNTT(&pub.t1)
+	}
+
 	return seed, nil
 }
 
-func cryptoSignSignatureInternal(sig, m []uint8, pre []uint8, rnd [RND_BYTES]uint8, sk *[CRYPTO_SECRET_KEY_BYTES]uint8) error {
-	var rho, key [SEED_BYTES]uint8
-	var tr [TR_BYTES]uint8
-	var mu, rhoPrime [CRH_BYTES]uint8
-	var s1, y, z polyVecL
+func privateKeyFromSecretKey(sk *[CRYPTO_SECRET_KEY_BYTES]uint8) (*PrivateKey, [K]polyVecL, error) {
+	var rho [SEED_BYTES]uint8
 	var mat [K]polyVecL
-	var s2, t0, w1, h, w0 polyVecK
+
+	if sk == nil {
+		return nil, mat, errPrivateKeyNil
+	}
+	priv := new(PrivateKey)
+	unpackSk(&rho, &priv.tr, &priv.key, &priv.t0, &priv.s1, &priv.s2, sk)
+	if err := polyVecMatrixExpand(&mat, &rho); err != nil {
+		//coverage:ignore
+		//rationale: polyVecMatrixExpand's sha3 operations never return errors
+		priv.Zeroize()
+		return nil, mat, err
+	}
+	polyVecLNTT(&priv.s1)
+	polyVecKNTT(&priv.s2)
+	polyVecKNTT(&priv.t0)
+	return priv, mat, nil
+}
+
+func cryptoSignSignatureInternal(sig, m []uint8, pre []uint8, rnd [RND_BYTES]uint8, priv *PrivateKey, mat *[K]polyVecL) error {
+	if priv == nil || mat == nil {
+		return errPrivateKeyNil
+	}
+	var mu, rhoPrime [CRH_BYTES]uint8
+	var y, z polyVecL
+	var w1, h, w0 polyVecK
 	var cp poly
 	var nonce uint16
-
-	unpackSk(&rho, &tr, &key, &t0, &s1, &s2, sk)
 
 	// Zeroize secret temporaries when signing completes.
 	// Go's GC may copy values before zeroization, but this still reduces
 	// the window for secrets persisting in freed memory.
 	defer func() {
-		zeroBytes(key[:])
 		zeroBytes(rhoPrime[:])
-		zeroPolyVecL(&s1)
-		zeroPolyVecK(&s2)
-		zeroPolyVecK(&t0)
 	}()
 
 	/* Compute mu = CRH(tr, 0, ctxlen, ctx, msg) */
 	state := getShake256()
 	defer putShake256(state)
-	_, _ = state.Write(tr[:])
+	_, _ = state.Write(priv.tr[:])
 	_, _ = state.Write(pre)
 	_, _ = state.Write(m)
 	_, _ = state.Read(mu[:]) // ShakeHash.Read never returns an error
 
 	/* Compute rhoprime = CRH(key, rnd, mu) */
 	state.Reset() // Reuse pooled hasher
-	_, _ = state.Write(key[:])
+	_, _ = state.Write(priv.key[:])
 	_, _ = state.Write(rnd[:])
 	_, _ = state.Write(mu[:])
 	_, _ = state.Read(rhoPrime[:]) // ShakeHash.Read never returns an error
-
-	/* Expand matrix and transform vectors */
-	if err := polyVecMatrixExpand(&mat, &rho); err != nil {
-		//coverage:ignore
-		//rationale: polyVecMatrixExpand's sha3 operations never return errors
-		return err
-	}
-	polyVecLNTT(&s1)
-	polyVecKNTT(&s2)
-	polyVecKNTT(&t0)
 
 rej:
 
@@ -202,7 +252,7 @@ rej:
 	/* Matrix-vector multiplication */
 	z = y
 	polyVecLNTT(&z)
-	polyVecMatrixPointWiseMontgomery(&w1, &mat, &z)
+	polyVecMatrixPointWiseMontgomery(&w1, mat, &z)
 	polyVecKReduce(&w1)
 	polyVecKInvNTTToMont(&w1)
 
@@ -239,7 +289,7 @@ rej:
 	polyNTT(&cp)
 
 	/* Compute z, reject if it reveals secret */
-	polyVecLPointWisePolyMontgomery(&z, &cp, &s1)
+	polyVecLPointWisePolyMontgomery(&z, &cp, &priv.s1)
 	polyVecLInvNTTToMont(&z)
 	polyVecLAdd(&z, &z, &y)
 	polyVecLReduce(&z)
@@ -249,7 +299,7 @@ rej:
 
 	/* Check that subtracting cs2 does not change high bits of w and low bits
 	 * do not reveal secret information */
-	polyVecKPointWisePolyMontgomery(&h, &cp, &s2)
+	polyVecKPointWisePolyMontgomery(&h, &cp, &priv.s2)
 	polyVecKInvNTTToMont(&h)
 	polyVecKSub(&w0, &w0, &h)
 	polyVecKReduce(&w0)
@@ -258,7 +308,7 @@ rej:
 	}
 
 	/* Compute hints for w1 */
-	polyVecKPointWisePolyMontgomery(&h, &cp, &t0)
+	polyVecKPointWisePolyMontgomery(&h, &cp, &priv.t0)
 	polyVecKInvNTTToMont(&h)
 	polyVecKReduce(&h)
 	if polyVecKChkNorm(&h, GAMMA2) != 0 {
@@ -284,24 +334,29 @@ rej:
 	return nil
 }
 
-// cryptoSignSignature is the standard hedged-signing entry point. It
-// reads RND_BYTES from crypto/rand and calls
-// [cryptoSignSignatureWithRnd]. Per FIPS 204 §3.4, hedged (randomised)
-// signing reduces side-channel and fault-injection leverage relative
-// to the deterministic variant; all public ML-DSA-87 signing in this
-// library uses this path. (TOB-QRLLIB-6.)
+// cryptoSignSignature is the standard hedged-signing entry point. It reads
+// RND_BYTES from random and calls [cryptoSignSignatureWithRnd]. If random is
+// nil, crypto/rand.Reader is used. Per FIPS 204 §3.4, hedged (randomised)
+// signing reduces side-channel and fault-injection leverage relative to the
+// deterministic variant; all public ML-DSA-87 signing in this library uses
+// this path. (TOB-QRLLIB-6.)
 //
 // Callers needing an explicit rnd value (the crypto.Signer.Sign
 // caller-supplied io.Reader path; ACVP / KAT determinism tests with
 // rnd=zero) call [cryptoSignSignatureWithRnd] directly.
-func cryptoSignSignature(sig, m []uint8, ctx []uint8, sk *[CRYPTO_SECRET_KEY_BYTES]uint8) error {
-	var rnd [RND_BYTES]uint8
-	if _, err := rand.Read(rnd[:]); err != nil {
-		//coverage:ignore
-		//rationale: crypto/rand.Read only fails if system entropy source is broken
-		return cryptoerrors.ErrSeedGeneration
+func cryptoSignSignature(random io.Reader, sig, m []uint8, ctx []uint8, priv *PrivateKey, mat *[K]polyVecL) error {
+	if len(ctx) > 255 {
+		return errors.New("mldsa87: invalid context")
 	}
-	return cryptoSignSignatureWithRnd(sig, m, ctx, sk, rnd)
+	if random == nil {
+		random = rand.Reader
+	}
+
+	var rnd [RND_BYTES]uint8
+	if _, err := io.ReadFull(random, rnd[:]); err != nil {
+		return err
+	}
+	return cryptoSignSignatureWithKeyAndRnd(sig, m, ctx, priv, mat, rnd)
 }
 
 // cryptoSignSignatureWithRnd signs m using the explicit rnd value
@@ -311,41 +366,51 @@ func cryptoSignSignature(sig, m []uint8, ctx []uint8, sk *[CRYPTO_SECRET_KEY_BYT
 // authenticated source for hedged signing. The crypto.Signer wrapper
 // uses this path when the caller supplies an io.Reader.
 func cryptoSignSignatureWithRnd(sig, m []uint8, ctx []uint8, sk *[CRYPTO_SECRET_KEY_BYTES]uint8, rnd [RND_BYTES]uint8) error {
+	priv, mat, err := privateKeyFromSecretKey(sk)
+	if err != nil {
+		return err
+	}
+	defer priv.Zeroize()
+	return cryptoSignSignatureWithKeyAndRnd(sig, m, ctx, priv, &mat, rnd)
+}
+
+func cryptoSignSignatureWithKeyAndRnd(sig, m []uint8, ctx []uint8, priv *PrivateKey, mat *[K]polyVecL, rnd [RND_BYTES]uint8) error {
 	if len(ctx) > 255 {
-		return cryptoerrors.ErrInvalidContext
+		return errors.New("mldsa87: invalid context")
 	}
 	pre := make([]uint8, len(ctx)+2)
 	pre[0] = 0
 	pre[1] = uint8(len(ctx))
 	copy(pre[2:], ctx)
-	return cryptoSignSignatureInternal(sig, m, pre[:], rnd, sk)
+	return cryptoSignSignatureInternal(sig, m, pre[:], rnd, priv, mat)
 }
 
-// attached sig wrappers
-func cryptoSign(msg []uint8, ctx []uint8, sk *[CRYPTO_SECRET_KEY_BYTES]uint8) ([]uint8, error) {
-	sm := make([]uint8, CRYPTO_BYTES+len(msg))
-	copy(sm[CRYPTO_BYTES:], msg)
-	err := cryptoSignSignature(sm[:CRYPTO_BYTES], sm[CRYPTO_BYTES:], ctx, sk)
-	if err != nil {
-		for i := range sm {
-			sm[i] = 0
-		}
+func newPublicKeyFromRaw(pk *[CRYPTO_PUBLIC_KEY_BYTES]uint8) (*PublicKey, error) {
+	if pk == nil {
+		return nil, errors.New("mldsa87: public key is nil")
+	}
+	pub := &PublicKey{raw: *pk}
+	var rho [SEED_BYTES]uint8
+	unpackPk(&rho, &pub.t1, &pub.raw)
+	copy(pub.tr[:], sha3.SumSHAKE256(pub.raw[:], TR_BYTES))
+	if err := polyVecMatrixExpand(&pub.mat, &rho); err != nil {
+		//coverage:ignore
+		//rationale: polyVecMatrixExpand's sha3 operations never return errors
 		return nil, err
 	}
-	return sm, nil
+	polyVecKShiftL(&pub.t1)
+	polyVecKNTT(&pub.t1)
+	return pub, nil
 }
 
-func cryptoSignVerifyInternal(sig [CRYPTO_BYTES]uint8, m []uint8, pre []uint8, pk *[CRYPTO_PUBLIC_KEY_BYTES]uint8) (bool, error) {
+func cryptoSignVerifyInternal(sig [CRYPTO_BYTES]uint8, m []uint8, pre []uint8, pub *PublicKey) (bool, error) {
 	var buf [K * POLY_W1_PACKED_BYTES]uint8
-	var rho [SEED_BYTES]uint8
 	var mu [CRH_BYTES]uint8
 	var c, c2 [C_TILDE_BYTES]uint8
 	var cp poly
-	var mat [K]polyVecL
 	var z polyVecL
-	var t1, w1, h polyVecK
+	var w1, h polyVecK
 
-	unpackPk(&rho, &t1, pk)
 	if unpackSig(&c, &z, &h, sig) != 0 {
 		return false, nil
 	}
@@ -354,10 +419,9 @@ func cryptoSignVerifyInternal(sig [CRYPTO_BYTES]uint8, m []uint8, pre []uint8, p
 	}
 
 	/* Compute CRH(H(rho, t1), pre, msg) */
-	copy(mu[:TR_BYTES], sha3.SumSHAKE256(pk[:CRYPTO_PUBLIC_KEY_BYTES], TR_BYTES))
 	state := getShake256()
 	defer putShake256(state)
-	if _, err := state.Write(mu[:TR_BYTES]); err != nil {
+	if _, err := state.Write(pub.tr[:]); err != nil {
 		//coverage:ignore
 		//rationale: sha3.ShakeHash.Write never returns an error per Go's hash.Hash contract
 		return false, err
@@ -384,18 +448,12 @@ func cryptoSignVerifyInternal(sig [CRYPTO_BYTES]uint8, m []uint8, pre []uint8, p
 		//rationale: polyChallenge's sha3 operations never return errors
 		return false, err
 	}
-	if err := polyVecMatrixExpand(&mat, &rho); err != nil {
-		//coverage:ignore
-		//rationale: polyVecMatrixExpand's sha3 operations never return errors
-		return false, err
-	}
 
 	polyVecLNTT(&z)
-	polyVecMatrixPointWiseMontgomery(&w1, &mat, &z)
+	polyVecMatrixPointWiseMontgomery(&w1, &pub.mat, &z)
 
 	polyNTT(&cp)
-	polyVecKShiftL(&t1)
-	polyVecKNTT(&t1)
+	t1 := pub.t1
 	polyVecKPointWisePolyMontgomery(&t1, &cp, &t1)
 
 	polyVecKSub(&w1, &w1, &t1)
@@ -433,15 +491,15 @@ func cryptoSignVerifyInternal(sig [CRYPTO_BYTES]uint8, m []uint8, pre []uint8, p
 	return subtle.ConstantTimeCompare(c[:], c2[:]) == 1, nil
 }
 
-func cryptoSignVerify(sig [CRYPTO_BYTES]uint8, m []uint8, ctx []uint8, pk *[CRYPTO_PUBLIC_KEY_BYTES]uint8) (bool, error) {
-	// Defense-in-depth nil-check (TOB-QRLLIB-11). The public Verify/Open
-	// wrappers also check, but this internal entry point is reachable
-	// from crypto.Signer (via cryptoSign etc.) and any future caller.
-	if pk == nil {
-		return false, cryptoerrors.ErrPublicKeyNil
+func cryptoSignVerify(sig [CRYPTO_BYTES]uint8, m []uint8, ctx []uint8, pub *PublicKey) (bool, error) {
+	// Defense-in-depth nil-check (TOB-QRLLIB-11). The public Verify wrapper
+	// also checks, but this internal entry point may be reached by future
+	// callers.
+	if pub == nil {
+		return false, errors.New("mldsa87: public key is nil")
 	}
 	if len(ctx) > 255 {
-		return false, cryptoerrors.ErrInvalidContext
+		return false, errors.New("mldsa87: invalid context")
 	}
 
 	pre := make([]uint8, len(ctx)+2)
@@ -449,31 +507,5 @@ func cryptoSignVerify(sig [CRYPTO_BYTES]uint8, m []uint8, ctx []uint8, pk *[CRYP
 	pre[1] = uint8(len(ctx))
 	copy(pre[2:], ctx)
 
-	return cryptoSignVerifyInternal(sig, m, pre[:], pk)
-}
-
-func cryptoSignOpen(sm []uint8, ctx []uint8, pk *[CRYPTO_PUBLIC_KEY_BYTES]uint8) ([]uint8, error) {
-	// Defense-in-depth nil-check (TOB-QRLLIB-11); see cryptoSignVerify.
-	if pk == nil {
-		return nil, cryptoerrors.ErrPublicKeyNil
-	}
-	if len(sm) < CRYPTO_BYTES {
-		return nil, cryptoerrors.ErrInvalidSignatureSize
-	}
-
-	var sig [CRYPTO_BYTES]uint8
-	msg := make([]uint8, len(sm)-CRYPTO_BYTES)
-
-	copy(sig[:], sm)
-	copy(msg, sm[CRYPTO_BYTES:])
-
-	result, err := cryptoSignVerify(sig, msg, ctx, pk)
-	if err != nil {
-		return nil, err
-	}
-	if !result {
-		return nil, cryptoerrors.ErrInvalidSignature
-	}
-
-	return msg, nil
+	return cryptoSignVerifyInternal(sig, m, pre[:], pub)
 }

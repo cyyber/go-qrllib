@@ -119,23 +119,22 @@ randomness, constant-time comparison) comes from the Go standard library
 import "github.com/theQRL/go-qrllib/crypto/mldsa87"
 
 // Generate keypair
-signer, err := mldsa87.New()
+publicKey, privateKey, err := mldsa87.GenerateKey(nil)
 if err != nil {
     log.Fatal(err)
 }
-defer signer.Zeroize() // Clear sensitive data when done
+defer privateKey.Zeroize() // Clear sensitive data when done
 
 // Sign with context (required by FIPS 204)
-ctx := []byte("my-application")
+opts := &mldsa87.Options{Context: []byte("my-application")}
 message := []byte("The sleeper must awaken")
-signature, err := signer.Sign(ctx, message)
+signature, err := privateKey.Sign(nil, message, opts)
 if err != nil {
     log.Fatal(err)
 }
 
 // Verify
-pk := signer.GetPK()
-valid := mldsa87.Verify(ctx, message, signature, &pk)
+valid := mldsa87.Verify(publicKey, message, signature, opts)
 ```
 
 ### SPHINCS+-256s (primitive; wallet path gated)
@@ -186,7 +185,7 @@ address := w.GetAddressStr()              // "Q" + hex(64 bytes)
 pk      := w.GetPK()
 desc    := w.GetDescriptor().ToDescriptor()
 
-sig, err := w.Sign(message)
+sig, err := w.Sign(nil, message)
 if err != nil {
     log.Fatal(err)
 }
@@ -194,12 +193,7 @@ if err != nil {
 ok := mldsa87.Verify(message, sig[:], &pk, desc)
 ```
 
-The same API shape is available at `github.com/theQRL/go-qrllib/wallet/sphincsplus_256s`,
-but note that the QRL wallet layer currently treats SPHINCS+/SLH-DSA as **non-issuable**
-(it remains verifiable, so existing addresses keep working): wallet creation under that
-type is gated until the QRL-adopted SLH-DSA parameter set is finalised. See the SPHINCS+
-notes below and `wallet/common/wallettype/type.go` for the `IsIssuable` / `IsVerifiable`
-split.
+The same API shape is available at `github.com/theQRL/go-qrllib/wallet/sphincsplus_256s`.
 
 ### `crypto.Signer` Interface (ML-DSA-87)
 
@@ -208,22 +202,21 @@ ML-DSA-87 implements Go's `crypto.Signer` interface for interoperability with `c
 ```go
 import "github.com/theQRL/go-qrllib/crypto/mldsa87"
 
-d, err := mldsa87.New()
+_, privateKey, err := mldsa87.GenerateKey(nil)
 if err != nil {
     log.Fatal(err)
 }
-defer d.Zeroize()
+defer privateKey.Zeroize()
 
-signer := mldsa87.NewCryptoSigner(d)
-// signer satisfies crypto.Signer
+var signer crypto.Signer = privateKey
 
-// Sign with FIPS 204 context via SignerOpts
-sig, err := signer.Sign(nil, message, &mldsa87.SignerOpts{
+// Sign with FIPS 204 context via Options
+sig, err := signer.Sign(nil, message, &mldsa87.Options{
     Context: []byte("my-application"),
 })
 ```
 
-The `opts` parameter must be `*mldsa87.SignerOpts` or `nil` (empty context). Passing other `crypto.SignerOpts` types (e.g., `crypto.SHA256`) returns an error.
+Use `*mldsa87.Options` when a FIPS 204 context is needed. `nil` and other `crypto.SignerOpts` values with `HashFunc() == 0` use an empty context; non-zero hash opts (e.g., `crypto.SHA256`) return an error because ML-DSA signs messages directly.
 
 ### Address String Format
 
@@ -252,7 +245,7 @@ across `@theqrl/wallet.js`, `go-qrllib`, and `rust-qrllib`.
 
 | Type | Thread-Safe? | Notes |
 |------|--------------|-------|
-| `mldsa87.MLDSA87` | Read: Yes, Write: No | Safe to call `GetPK()`, `Verify()` concurrently. Do not call `Sign()` concurrently on same instance. |
+| `mldsa87.PrivateKey` | Read: Yes, Write: No | Safe to call `PublicKey()` and package-level `Verify()` concurrently. Do not call `Sign()` concurrently on same instance. |
 | `sphincsplus_256s.SphincsPlus256s` | Read: Yes, Write: No | Same as ML-DSA-87 |
 | `xmss.XMSS` | **No** | NEVER use concurrently. Index management is not thread-safe. |
 | Package-level `Verify()` | Yes | Stateless, safe to call concurrently |
@@ -268,9 +261,9 @@ func signConcurrently(messages [][]byte, seed [32]byte) {
         go func(m []byte) {
             defer wg.Done()
             // Create NEW instance for each goroutine
-            signer, _ := mldsa87.NewMLDSA87FromSeed(seed)
+            signer, _ := mldsa87.NewPrivateKey(seed[:])
             defer signer.Zeroize()
-            signer.Sign(ctx, m)
+            signer.Sign(nil, m, &mldsa87.Options{Context: ctx})
         }(msg)
     }
     wg.Wait()
@@ -287,7 +280,7 @@ func signConcurrently(messages [][]byte, seed [32]byte) {
 | Maximum security, don't trust lattice assumptions | SPHINCS+-256s primitive (wallet path gated, see notes) |
 | QRL blockchain transactions | ML-DSA-87 (via wallet layer) |
 | Legacy QRL address compatibility | XMSS (with extreme care) |
-| Signatures must be deterministic (e.g. RANDAO-style verifiable beacon contributions) | ML-DSA-87 via the `SignDeterministic(ctx, msg)` opt-in helper (FIPS 204 deterministic mode) — `Sign` itself is hedged by default as per FIPS 204. |
+| Signatures must be deterministic (e.g. RANDAO-style verifiable beacon contributions) | ML-DSA-87 via `SignDeterministic(privateKey, msg, opts)` or `Sign` with a deterministic reader — `Sign` itself is hedged by default as per FIPS 204. |
 
 ### Key Sizes
 
@@ -301,11 +294,11 @@ func signConcurrently(messages [][]byte, seed [32]byte) {
 
 ## NIST ACVP Verification
 
-ML-DSA-87 key generation and signing are verified against official [NIST ACVP test vectors](https://github.com/usnistgov/ACVP-Server). These tests run automatically in CI and are guarded by a build tag so they don't run during normal `go test ./...`.
+ML-DSA-87 key generation, deterministic signing, and verification are checked against official [NIST ACVP test vectors](https://github.com/usnistgov/ACVP-Server). These use checked-in compressed fixtures and run inline with `go test ./...` (see [`crypto/internal/mldsa87/acvp_test.go`](crypto/internal/mldsa87/acvp_test.go)).
 
 ML-KEM-1024 key generation, encapsulation, and decapsulation — including the encapsulation- and decapsulation-key validity checks — are likewise verified against NIST ACVP vectors. These run inline with `go test ./...` (see [`crypto/internal/mlkem1024/acvp_test.go`](crypto/internal/mlkem1024/acvp_test.go)).
 
-To run them locally, see [`.github/acvp/README.md`](.github/acvp/README.md).
+To run the ACVP checks locally, use `go test -run TestACVP ./crypto/internal/mldsa87 ./crypto/internal/mlkem1024`.
 
 ---
 

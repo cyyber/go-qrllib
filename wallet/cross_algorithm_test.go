@@ -7,7 +7,7 @@ import (
 	"github.com/theQRL/go-qrllib/wallet/common"
 	"github.com/theQRL/go-qrllib/wallet/common/descriptor"
 	"github.com/theQRL/go-qrllib/wallet/common/wallettype"
-	ml_dsa_wallet "github.com/theQRL/go-qrllib/wallet/mldsa87"
+	mldsaWallet "github.com/theQRL/go-qrllib/wallet/mldsa87"
 	sphincs_wallet "github.com/theQRL/go-qrllib/wallet/sphincsplus_256s"
 )
 
@@ -22,7 +22,7 @@ func TestSeedHashDivergence(t *testing.T) {
 	}
 
 	// Create wallets from same seed
-	mlWallet, err := ml_dsa_wallet.NewWalletFromSeed(seed)
+	mlWallet, err := mldsaWallet.NewWalletFromSeed(seed)
 	if err != nil {
 		t.Fatalf("failed to create ML-DSA-87 wallet: %v", err)
 	}
@@ -66,7 +66,7 @@ func TestCrossAlgorithmVerificationRejection(t *testing.T) {
 	message := []byte("cross-algorithm test message")
 
 	// Create wallets
-	mlWallet, err := ml_dsa_wallet.NewWallet()
+	mlWallet, err := mldsaWallet.NewWallet()
 	if err != nil {
 		t.Fatalf("failed to create ML-DSA-87 wallet: %v", err)
 	}
@@ -77,7 +77,7 @@ func TestCrossAlgorithmVerificationRejection(t *testing.T) {
 	}
 
 	// Sign with ML-DSA-87
-	mlSig, err := mlWallet.Sign(message)
+	mlSig, err := mlWallet.Sign(nil, message)
 	if err != nil {
 		t.Fatalf("ML-DSA-87 signing failed: %v", err)
 	}
@@ -91,7 +91,7 @@ func TestCrossAlgorithmVerificationRejection(t *testing.T) {
 	// Verify ML-DSA signature with ML-DSA verifier (should pass)
 	mlPK := mlWallet.GetPK()
 	mlDesc := mlWallet.GetDescriptor().ToDescriptor()
-	if !ml_dsa_wallet.Verify(message, mlSig[:], &mlPK, mlDesc) {
+	if !mldsaWallet.Verify(message, mlSig[:], &mlPK, mlDesc) {
 		t.Error("ML-DSA signature should verify with ML-DSA verifier")
 	}
 
@@ -109,7 +109,7 @@ func TestCrossAlgorithmVerificationRejection(t *testing.T) {
 	}
 
 	// Cross-verify SPHINCS+ signature with ML-DSA verifier (should fail)
-	if ml_dsa_wallet.Verify(message, sphincsSig[:], &mlPK, sphincsDesc) {
+	if mldsaWallet.Verify(message, sphincsSig[:], &mlPK, sphincsDesc) {
 		t.Error("SPHINCS+ signature should NOT verify with ML-DSA verifier")
 	}
 }
@@ -117,7 +117,7 @@ func TestCrossAlgorithmVerificationRejection(t *testing.T) {
 // TestDescriptorIsolation verifies that descriptors correctly identify and
 // isolate different algorithm types.
 func TestDescriptorIsolation(t *testing.T) {
-	mlWallet, _ := ml_dsa_wallet.NewWallet()
+	mlWallet, _ := mldsaWallet.NewWallet()
 	sphincsWallet, _ := sphincs_wallet.NewWallet()
 
 	mlDesc := mlWallet.GetDescriptor().ToDescriptor()
@@ -160,7 +160,7 @@ func TestDescriptorIsolation(t *testing.T) {
 // identical wallets for each algorithm independently.
 func TestMnemonicRecoveryConsistency(t *testing.T) {
 	t.Run("ML-DSA-87", func(t *testing.T) {
-		original, err := ml_dsa_wallet.NewWallet()
+		original, err := mldsaWallet.NewWallet()
 		if err != nil {
 			t.Fatalf("failed to create wallet: %v", err)
 		}
@@ -170,7 +170,7 @@ func TestMnemonicRecoveryConsistency(t *testing.T) {
 			t.Fatalf("GetMnemonic() error: %v", err)
 		}
 
-		recovered, err := ml_dsa_wallet.NewWalletFromMnemonic(mnemonic)
+		recovered, err := mldsaWallet.NewWalletFromMnemonic(mnemonic)
 		if err != nil {
 			t.Fatalf("failed to recover from mnemonic: %v", err)
 		}
@@ -228,7 +228,7 @@ func TestMnemonicRecoveryConsistency(t *testing.T) {
 // cannot be used to create wallets of another algorithm type.
 func TestMnemonicCrossAlgorithmIsolation(t *testing.T) {
 	// Create ML-DSA wallet and get mnemonic
-	mlWallet, err := ml_dsa_wallet.NewWallet()
+	mlWallet, err := mldsaWallet.NewWallet()
 	if err != nil {
 		t.Fatalf("failed to create ML-DSA wallet: %v", err)
 	}
@@ -255,7 +255,7 @@ func TestMnemonicCrossAlgorithmIsolation(t *testing.T) {
 	}
 
 	// Attempting to recover SPHINCS+ mnemonic as ML-DSA should fail
-	_, err = ml_dsa_wallet.NewWalletFromMnemonic(sphincsMnemonic)
+	_, err = mldsaWallet.NewWalletFromMnemonic(sphincsMnemonic)
 	if err == nil {
 		t.Error("recovering SPHINCS+ mnemonic as ML-DSA should fail")
 	}
@@ -265,39 +265,40 @@ func TestMnemonicCrossAlgorithmIsolation(t *testing.T) {
 // constants for each algorithm.
 func TestKeySizeInvariants(t *testing.T) {
 	t.Run("ML-DSA-87", func(t *testing.T) {
-		wallet, _ := ml_dsa_wallet.NewWallet()
+		wallet, _ := mldsaWallet.NewWallet()
 
 		// Verify actual key sizes match constants
-		if pkLen := len(wallet.GetPK()); pkLen != ml_dsa_wallet.PKSize {
-			t.Errorf("PK size: got %d, want %d", pkLen, ml_dsa_wallet.PKSize)
+		if pkLen := len(wallet.GetPK()); pkLen != mldsaWallet.PKSize {
+			t.Errorf("PK size: got %d, want %d", pkLen, mldsaWallet.PKSize)
 		}
-		if skLen := len(wallet.GetSK()); skLen != ml_dsa_wallet.SKSize {
-			t.Errorf("SK size: got %d, want %d", skLen, ml_dsa_wallet.SKSize)
+		if skLen := len(wallet.GetSK()); skLen != mldsaWallet.SKSize {
+			t.Errorf("SK size: got %d, want %d", skLen, mldsaWallet.SKSize)
 		}
 
 		// Verify signature is produced and has correct size
 		// (sig array type has fixed size, just verify signing succeeds)
-		if _, err := wallet.Sign([]byte("test")); err != nil {
+		if _, err := wallet.Sign(nil, []byte("test")); err != nil {
 			t.Fatalf("Sign failed: %v", err)
 		}
 
-		// Verify expected FIPS 204 ML-DSA-87 sizes
+		// Verify expected ML-DSA-87 wallet sizes. SKSize is the seed-form
+		// private key size exposed by the public crypto package.
 		const (
 			expectedPK  = 2592
-			expectedSK  = 4896
+			expectedSK  = 32
 			expectedSig = 4627
 		)
-		if ml_dsa_wallet.PKSize != expectedPK {
+		if mldsaWallet.PKSize != expectedPK {
 			t.Errorf("ML-DSA-87 PKSize constant: got %d, want %d",
-				ml_dsa_wallet.PKSize, expectedPK)
+				mldsaWallet.PKSize, expectedPK)
 		}
-		if ml_dsa_wallet.SKSize != expectedSK {
+		if mldsaWallet.SKSize != expectedSK {
 			t.Errorf("ML-DSA-87 SKSize constant: got %d, want %d",
-				ml_dsa_wallet.SKSize, expectedSK)
+				mldsaWallet.SKSize, expectedSK)
 		}
-		if ml_dsa_wallet.SigSize != expectedSig {
+		if mldsaWallet.SigSize != expectedSig {
 			t.Errorf("ML-DSA-87 SigSize constant: got %d, want %d",
-				ml_dsa_wallet.SigSize, expectedSig)
+				mldsaWallet.SigSize, expectedSig)
 		}
 	})
 
@@ -342,7 +343,7 @@ func TestKeySizeInvariants(t *testing.T) {
 // TestAddressFormatConsistency verifies that both algorithms produce addresses
 // in the same format (Q + 128 hex chars).
 func TestAddressFormatConsistency(t *testing.T) {
-	mlWallet, _ := ml_dsa_wallet.NewWallet()
+	mlWallet, _ := mldsaWallet.NewWallet()
 	sphincsWallet, _ := sphincs_wallet.NewWallet()
 
 	mlAddr := mlWallet.GetAddressStr()
@@ -382,7 +383,7 @@ func TestAddressFormatConsistency(t *testing.T) {
 // TestExtendedSeedIsolation verifies that extended seeds properly encode
 // algorithm type and prevent cross-algorithm usage.
 func TestExtendedSeedIsolation(t *testing.T) {
-	mlWallet, err := ml_dsa_wallet.NewWallet()
+	mlWallet, err := mldsaWallet.NewWallet()
 	if err != nil {
 		t.Fatalf("failed to create ML-DSA wallet: %v", err)
 	}
@@ -419,7 +420,7 @@ func TestExtendedSeedIsolation(t *testing.T) {
 	}
 
 	// Verify cross-algorithm extended seed recovery fails
-	_, err = ml_dsa_wallet.NewWalletFromExtendedSeed(sphincsExtSeed)
+	_, err = mldsaWallet.NewWalletFromExtendedSeed(sphincsExtSeed)
 	if err == nil {
 		t.Error("ML-DSA wallet from SPHINCS+ extended seed should fail")
 	}
@@ -433,7 +434,7 @@ func TestExtendedSeedIsolation(t *testing.T) {
 // TestHexSeedRoundTrip verifies hex seed encoding/decoding works for both algorithms.
 func TestHexSeedRoundTrip(t *testing.T) {
 	t.Run("ML-DSA-87", func(t *testing.T) {
-		original, err := ml_dsa_wallet.NewWallet()
+		original, err := mldsaWallet.NewWallet()
 		if err != nil {
 			t.Fatalf("failed to create wallet: %v", err)
 		}
@@ -442,7 +443,7 @@ func TestHexSeedRoundTrip(t *testing.T) {
 			t.Fatalf("GetHexSeed() error: %v", err)
 		}
 
-		recovered, err := ml_dsa_wallet.NewWalletFromHexExtendedSeed(hexSeed[2:]) // trim 0x
+		recovered, err := mldsaWallet.NewWalletFromHexExtendedSeed(hexSeed[2:]) // trim 0x
 		if err != nil {
 			t.Fatalf("failed to recover from hex seed: %v", err)
 		}
@@ -479,7 +480,7 @@ func TestSignVerifyRoundTrip(t *testing.T) {
 	messageSizes := []int{0, 1, 32, 256, 1024, 65536}
 
 	t.Run("ML-DSA-87", func(t *testing.T) {
-		wallet, _ := ml_dsa_wallet.NewWallet()
+		wallet, _ := mldsaWallet.NewWallet()
 		pk := wallet.GetPK()
 		desc := wallet.GetDescriptor().ToDescriptor()
 
@@ -489,19 +490,19 @@ func TestSignVerifyRoundTrip(t *testing.T) {
 				msg[i] = byte(i)
 			}
 
-			sig, err := wallet.Sign(msg)
+			sig, err := wallet.Sign(nil, msg)
 			if err != nil {
 				t.Fatalf("sign failed for size %d: %v", size, err)
 			}
 
-			if !ml_dsa_wallet.Verify(msg, sig[:], &pk, desc) {
+			if !mldsaWallet.Verify(msg, sig[:], &pk, desc) {
 				t.Errorf("verify failed for message size %d", size)
 			}
 
 			// Tampered message should fail
 			if size > 0 {
 				msg[0] ^= 0xFF
-				if ml_dsa_wallet.Verify(msg, sig[:], &pk, desc) {
+				if mldsaWallet.Verify(msg, sig[:], &pk, desc) {
 					t.Errorf("tampered message should fail verification (size %d)", size)
 				}
 			}
@@ -551,8 +552,8 @@ func TestDeterministicKeyGeneration(t *testing.T) {
 	}
 
 	t.Run("ML-DSA-87", func(t *testing.T) {
-		wallet1, _ := ml_dsa_wallet.NewWalletFromSeed(seed)
-		wallet2, _ := ml_dsa_wallet.NewWalletFromSeed(seed)
+		wallet1, _ := mldsaWallet.NewWalletFromSeed(seed)
+		wallet2, _ := mldsaWallet.NewWalletFromSeed(seed)
 
 		if wallet1.GetPK() != wallet2.GetPK() {
 			t.Error("same seed should produce same public key")
@@ -621,12 +622,12 @@ func TestSignatureDeterminism(t *testing.T) {
 
 	t.Run("ML-DSA-87_hedged", func(t *testing.T) {
 		var seed common.Seed
-		wallet, _ := ml_dsa_wallet.NewWalletFromSeed(seed)
+		wallet, _ := mldsaWallet.NewWalletFromSeed(seed)
 		pk := wallet.GetPK()
 		desc := wallet.GetDescriptor().ToDescriptor()
 
-		sig1, _ := wallet.Sign(message)
-		sig2, _ := wallet.Sign(message)
+		sig1, _ := wallet.Sign(nil, message)
+		sig2, _ := wallet.Sign(nil, message)
 
 		// ML-DSA-87 hedged signing (TOB-QRLLIB-6, FIPS 204 §3.4): two
 		// signatures over the same (key, message) MUST differ but both
@@ -634,10 +635,10 @@ func TestSignatureDeterminism(t *testing.T) {
 		if sig1 == sig2 {
 			t.Error("ML-DSA-87 hedged signatures should differ for the same input; got identical bytes")
 		}
-		if !ml_dsa_wallet.Verify(message, sig1[:], &pk, desc) {
+		if !mldsaWallet.Verify(message, sig1[:], &pk, desc) {
 			t.Error("first ML-DSA-87 signature should verify")
 		}
-		if !ml_dsa_wallet.Verify(message, sig2[:], &pk, desc) {
+		if !mldsaWallet.Verify(message, sig2[:], &pk, desc) {
 			t.Error("second ML-DSA-87 signature should verify")
 		}
 	})
@@ -669,26 +670,26 @@ func TestSignatureDeterminism(t *testing.T) {
 
 // TestInvalidDescriptorRejection verifies that invalid descriptors are rejected.
 func TestInvalidDescriptorRejection(t *testing.T) {
-	wallet, _ := ml_dsa_wallet.NewWallet()
+	wallet, _ := mldsaWallet.NewWallet()
 	message := []byte("test")
-	sig, _ := wallet.Sign(message)
+	sig, _ := wallet.Sign(nil, message)
 	pk := wallet.GetPK()
 
 	// Valid descriptor should work
 	validDesc := wallet.GetDescriptor().ToDescriptor()
-	if !ml_dsa_wallet.Verify(message, sig[:], &pk, validDesc) {
+	if !mldsaWallet.Verify(message, sig[:], &pk, validDesc) {
 		t.Error("valid descriptor should verify")
 	}
 
 	// Wrong algorithm type in descriptor should fail
 	wrongTypeDesc := descriptor.Descriptor{byte(wallettype.SPHINCSPLUS_256S), 0, 0}
-	if ml_dsa_wallet.Verify(message, sig[:], &pk, wrongTypeDesc) {
+	if mldsaWallet.Verify(message, sig[:], &pk, wrongTypeDesc) {
 		t.Error("wrong descriptor type should fail verification")
 	}
 
 	// Invalid descriptor type should fail
 	invalidDesc := descriptor.Descriptor{255, 0, 0}
-	if ml_dsa_wallet.Verify(message, sig[:], &pk, invalidDesc) {
+	if mldsaWallet.Verify(message, sig[:], &pk, invalidDesc) {
 		t.Error("invalid descriptor should fail verification")
 	}
 }
@@ -696,20 +697,20 @@ func TestInvalidDescriptorRejection(t *testing.T) {
 // TestSignatureSizeRejection verifies that signatures with wrong sizes are rejected.
 func TestSignatureSizeRejection(t *testing.T) {
 	t.Run("ML-DSA-87", func(t *testing.T) {
-		wallet, _ := ml_dsa_wallet.NewWallet()
+		wallet, _ := mldsaWallet.NewWallet()
 		pk := wallet.GetPK()
 		desc := wallet.GetDescriptor().ToDescriptor()
 		message := []byte("test")
 
 		// Too short signature
-		shortSig := make([]byte, ml_dsa_wallet.SigSize-1)
-		if ml_dsa_wallet.Verify(message, shortSig, &pk, desc) {
+		shortSig := make([]byte, mldsaWallet.SigSize-1)
+		if mldsaWallet.Verify(message, shortSig, &pk, desc) {
 			t.Error("short signature should fail")
 		}
 
 		// Too long signature
-		longSig := make([]byte, ml_dsa_wallet.SigSize+1)
-		if ml_dsa_wallet.Verify(message, longSig, &pk, desc) {
+		longSig := make([]byte, mldsaWallet.SigSize+1)
+		if mldsaWallet.Verify(message, longSig, &pk, desc) {
 			t.Error("long signature should fail")
 		}
 	})

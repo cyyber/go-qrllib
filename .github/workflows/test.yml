@@ -62,7 +62,7 @@ jobs:
         run: |
           set -euo pipefail
           # Run each fuzz test for 10 seconds
-          for pkg in ./crypto/xmss ./crypto/sphincsplus_256s ./crypto/ml_dsa_87 ./crypto/internal/mlkem1024 ./wallet/misc; do
+          for pkg in ./crypto/xmss ./crypto/sphincsplus_256s ./crypto/internal/mldsa87 ./crypto/internal/mlkem1024 ./wallet/misc; do
             echo "Fuzzing $pkg..."
             targets=$(go test "$pkg" -list 'Fuzz.*' | grep '^Fuzz' || true)
             if [ -z "$targets" ]; then
@@ -81,7 +81,7 @@ jobs:
         # Runs in ~30s; guarded behind `-tags metamorphic` so it doesn't
         # slow down day-to-day `go test ./...`.
         timeout-minutes: 5
-        run: go test -tags metamorphic -count=1 -run "TestMetamorphic" -timeout 5m ./crypto/ml_dsa_87/ ./crypto/internal/mlkem1024/
+        run: go test -tags metamorphic -count=1 -run "TestMetamorphic" -timeout 5m ./crypto/internal/mldsa87/ ./crypto/internal/mlkem1024/
 
       - name: Upload coverage to Codecov
         if: github.repository == 'theQRL/go-qrllib' && github.event_name == 'push'

@@ -21,7 +21,7 @@ func Example() {
 
 	// Sign a message (context is derived from the wallet's descriptor)
 	message := []byte("transaction data")
-	signature, err := wallet.Sign(message)
+	signature, err := wallet.Sign(nil, message)
 	if err != nil {
 		fmt.Println("Error:", err)
 		return
@@ -86,7 +86,7 @@ func ExampleVerify() {
 	wallet, _ := mldsa87.NewWallet()
 
 	message := []byte("test message")
-	signature, _ := wallet.Sign(message)
+	signature, _ := wallet.Sign(nil, message)
 
 	pk := wallet.GetPK()
 	desc := wallet.GetDescriptor().ToDescriptor()

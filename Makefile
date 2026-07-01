@@ -45,7 +45,7 @@ test:
 # Run fast tests only (excludes slow SPHINCS+ tests)
 test-fast:
 	@echo "Running fast tests (excludes SPHINCS+)..."
-	@go test ./crypto/mldsa87/... ./crypto/xmss/... ./wallet/... ./legacywallet/...
+	@go test ./crypto/mldsa87/... ./crypto/internal/mldsa87/... ./crypto/xmss/... ./wallet/... ./legacywallet/...
 
 # Run tests with race detector
 test-race:
@@ -99,12 +99,12 @@ bench-mldsa:
 # Run KAT (Known Answer Test) tests only
 test-kat:
 	@echo "Running KAT tests..."
-	@go test -v ./crypto/mldsa87/... ./crypto/sphincsplus_256s/... -run 'KAT'
+	@go test -v ./crypto/internal/mldsa87/... ./crypto/sphincsplus_256s/... -run 'KAT'
 
 # Run KAT tests for fast packages only (excludes SPHINCS+)
 test-kat-fast:
 	@echo "Running KAT tests (fast packages only)..."
-	@go test -v ./crypto/mldsa87/... -run 'KAT'
+	@go test -v ./crypto/internal/mldsa87/... -run 'KAT'
 
 # Run edge case tests
 test-edge:
@@ -114,7 +114,7 @@ test-edge:
 # Run edge case tests for fast packages only (excludes SPHINCS+)
 test-edge-fast:
 	@echo "Running edge case tests (fast packages only)..."
-	@go test -v ./crypto/mldsa87/... ./crypto/xmss/... -run 'EdgeCase'
+	@go test -v ./crypto/internal/mldsa87/... ./crypto/xmss/... -run 'EdgeCase'
 
 # Run thread safety tests with race detector
 test-thread:
@@ -134,7 +134,7 @@ fuzz: fuzz-xmss fuzz-mldsa fuzz-mlkem fuzz-sphincs fuzz-mnemonic
 fuzz-quick:
 	@echo "Running quick fuzz tests ($(FUZZ_TIME) each)..."
 	@go test -fuzz=FuzzXMSSVerify -fuzztime=$(FUZZ_TIME) ./crypto/xmss/...
-	@go test -fuzz=FuzzMLDSA87Verify -fuzztime=$(FUZZ_TIME) ./crypto/mldsa87/...
+	@go test -fuzz=FuzzMLDSA87Verify -fuzztime=$(FUZZ_TIME) ./crypto/internal/mldsa87/...
 	@go test -fuzz=FuzzMLKEM1024Decapsulate -fuzztime=$(FUZZ_TIME) ./crypto/internal/mlkem1024/...
 	@go test -fuzz=FuzzMnemonicToBin -fuzztime=$(FUZZ_TIME) ./wallet/misc/...
 
@@ -147,10 +147,10 @@ fuzz-xmss:
 # Fuzz ML-DSA-87 signature operations
 fuzz-mldsa:
 	@echo "Fuzzing ML-DSA-87 ($(FUZZ_TIME) per target)..."
-	@go test -fuzz=FuzzMLDSA87Verify -fuzztime=$(FUZZ_TIME) ./crypto/mldsa87/...
-	@go test -fuzz=FuzzMLDSA87Open -fuzztime=$(FUZZ_TIME) ./crypto/mldsa87/...
-	@go test -fuzz=FuzzMLDSA87ExtractMessage -fuzztime=$(FUZZ_TIME) ./crypto/mldsa87/...
-	@go test -fuzz=FuzzMLDSA87ExtractSignature -fuzztime=$(FUZZ_TIME) ./crypto/mldsa87/...
+	@go test -fuzz=FuzzMLDSA87Verify -fuzztime=$(FUZZ_TIME) ./crypto/internal/mldsa87/...
+	@go test -fuzz=FuzzMLDSA87Open -fuzztime=$(FUZZ_TIME) ./crypto/internal/mldsa87/...
+	@go test -fuzz=FuzzMLDSA87ExtractMessage -fuzztime=$(FUZZ_TIME) ./crypto/internal/mldsa87/...
+	@go test -fuzz=FuzzMLDSA87ExtractSignature -fuzztime=$(FUZZ_TIME) ./crypto/internal/mldsa87/...
 
 # Fuzz ML-KEM-1024 key-encapsulation operations
 fuzz-mlkem:

@@ -1,14 +1,11 @@
-//go:build wycheproof
-
 package mldsa87
 
 import (
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
 	"testing"
+
+	internaltest "github.com/theQRL/go-qrllib/crypto/internal/test"
 )
 
 // Wycheproof ML-DSA-87 test vector verification.
@@ -17,19 +14,6 @@ import (
 // project's edge-case test vectors — covering signature malleability,
 // truncated/extended signatures, public-key edge cases, and similar
 // boundary conditions that complement NIST ACVP's correctness coverage.
-//
-// Guarded by the "wycheproof" build tag so they only run in CI or when
-// explicitly requested. See .github/wycheproof/README.md for setup,
-// local usage, and vector source.
-
-func wycheproofVectorsDir(t *testing.T) string {
-	t.Helper()
-	dir := os.Getenv("WYCHEPROOF_VECTORS_DIR")
-	if dir == "" {
-		t.Skip("WYCHEPROOF_VECTORS_DIR not set; skipping Wycheproof tests. See wycheproof_test.go for instructions.")
-	}
-	return dir
-}
 
 // wycheproofVerifyTestFile mirrors the schema at
 // schemas/mldsa_verify_schema.json in the wycheproof repo. Only the
@@ -62,19 +46,7 @@ type wycheproofVerifyTestFile struct {
 //   - "acceptable": Either outcome is allowed by the spec; we record
 //     what we observed but do not fail.
 func TestWycheproofVerify(t *testing.T) {
-	dir := wycheproofVectorsDir(t)
-
-	path := filepath.Join(dir, "mldsa_87_verify_test.json")
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("read %s: %v", path, err)
-	}
-
-	var file wycheproofVerifyTestFile
-	if err := json.Unmarshal(data, &file); err != nil {
-		t.Fatalf("parse %s: %v", path, err)
-	}
-
+	file := internaltest.ReadWycheproofJSON[wycheproofVerifyTestFile](t, "mldsa_87_verify_test.json")
 	if file.Algorithm != "ML-DSA-87" {
 		t.Fatalf("unexpected algorithm %q (want ML-DSA-87)", file.Algorithm)
 	}
@@ -112,18 +84,9 @@ func TestWycheproofVerify(t *testing.T) {
 		for _, tc := range group.Tests {
 			name := fmt.Sprintf("g%d_tc%d_%s", gi, tc.TcID, sanitize(tc.Comment))
 			t.Run(name, func(t *testing.T) {
-				msg, err := hex.DecodeString(tc.Msg)
-				if err != nil {
-					t.Fatalf("invalid msg hex: %v", err)
-				}
-				sig, err := hex.DecodeString(tc.Sig)
-				if err != nil {
-					t.Fatalf("invalid sig hex: %v", err)
-				}
-				ctx, err := hex.DecodeString(tc.Ctx)
-				if err != nil {
-					t.Fatalf("invalid ctx hex: %v", err)
-				}
+				msg := internaltest.DecodeHex(t, tc.Msg)
+				sig := internaltest.DecodeHex(t, tc.Sig)
+				ctx := internaltest.DecodeHex(t, tc.Ctx)
 
 				var ok bool
 				switch {
@@ -141,7 +104,7 @@ func TestWycheproofVerify(t *testing.T) {
 				default:
 					var sigArr [CRYPTO_BYTES]uint8
 					copy(sigArr[:], sig)
-					ok = Verify(ctx, msg, sigArr, &pk)
+					ok = verifyForTest(ctx, msg, sigArr[:], &pk)
 				}
 
 				switch tc.Result {
