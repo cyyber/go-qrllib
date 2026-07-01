@@ -303,7 +303,7 @@ ML-DSA-87 key generation, deterministic signing, and verification are checked ag
 
 ML-KEM-1024 key generation, encapsulation, and decapsulation — including the encapsulation- and decapsulation-key validity checks — are likewise verified against NIST ACVP vectors. These run inline with `go test ./...` (see [`crypto/internal/mlkem1024/acvp_test.go`](crypto/internal/mlkem1024/acvp_test.go)).
 
-To run them locally, see [`.github/acvp/README.md`](.github/acvp/README.md).
+To run the ACVP checks locally, use `go test -run TestACVP ./crypto/internal/mldsa87 ./crypto/internal/mlkem1024`.
 
 ---
 
