@@ -174,7 +174,7 @@ func TestEdgeCaseMalformedSignatureHints(t *testing.T) {
 		// First, set cumulative count to indicate we have 2 hints in first polynomial
 		malformedSig[hintStart+OMEGA] = 2 // cumulative count for poly 0
 		// Set hint indices: second should be > first, but we make it equal
-		malformedSig[hintStart+0] = 10
+		malformedSig[hintStart] = 10
 		malformedSig[hintStart+1] = 10 // Not strictly increasing!
 
 		if verifyForTest(ctx, msg, malformedSig, &pk) {
@@ -185,7 +185,7 @@ func TestEdgeCaseMalformedSignatureHints(t *testing.T) {
 	t.Run("decreasing_hint_indices", func(t *testing.T) {
 		malformedSig := validSig
 		malformedSig[hintStart+OMEGA] = 2
-		malformedSig[hintStart+0] = 20
+		malformedSig[hintStart] = 20
 		malformedSig[hintStart+1] = 10 // Decreasing!
 
 		if verifyForTest(ctx, msg, malformedSig, &pk) {
@@ -200,7 +200,7 @@ func TestEdgeCaseMalformedSignatureHints(t *testing.T) {
 			malformedSig[hintStart+OMEGA+i] = 0
 		}
 		// But put non-zero data in the hint indices area
-		malformedSig[hintStart+0] = 0xFF // Should be zero if no hints
+		malformedSig[hintStart] = 0xFF // Should be zero if no hints
 
 		if verifyForTest(ctx, msg, malformedSig, &pk) {
 			t.Error("Signature with non-zero hint padding should not verify")
