@@ -216,12 +216,12 @@ defer privateKey.Zeroize()
 var signer crypto.Signer = privateKey
 
 // Sign with FIPS 204 context via Options
-sig, err := signer.Sign(nil, message, &mldsa87.SignerOpts{
+sig, err := signer.Sign(nil, message, &mldsa87.Options{
     Context: []byte("my-application"),
 })
 ```
 
-The `opts` parameter must be `*mldsa87.SignerOpts` or `nil` (empty context). Passing other `crypto.SignerOpts` types (e.g., `crypto.SHA256`) returns an error.
+The `opts` parameter must be `*mldsa87.Options` or `nil` (empty context). Passing other `crypto.SignerOpts` types (e.g., `crypto.SHA256`) returns an error.
 
 ### Address String Format
 

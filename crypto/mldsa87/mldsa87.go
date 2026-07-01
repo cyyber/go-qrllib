@@ -27,7 +27,7 @@ const (
 	PrivateKeySize = SeedSize
 )
 
-var errUnsupportedSignerOpts = errors.New("mldsa87: opts must be *Options, *SignerOpts, or nil")
+var errUnsupportedSignerOpts = errors.New("mldsa87: opts must be *Options or nil")
 
 // Options contains additional options for signing and verifying ML-DSA-87
 // signatures.
@@ -38,10 +38,6 @@ type Options struct {
 }
 
 func (*Options) HashFunc() crypto.Hash { return 0 }
-
-// SignerOpts is an alias retained for code that previously used the
-// crypto/ml_dsa_87 crypto.Signer adapter.
-type SignerOpts = Options
 
 // PublicKey is the type of ML-DSA-87 public keys.
 type PublicKey struct {
