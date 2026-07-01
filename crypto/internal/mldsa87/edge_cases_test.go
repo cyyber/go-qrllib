@@ -3,7 +3,10 @@ package mldsa87
 import (
 	"bytes"
 	"crypto/rand"
+	"errors"
 	"testing"
+
+	cryptoerrors "github.com/theQRL/go-qrllib/crypto/errors"
 )
 
 // Edge case tests for ML-DSA-87 (TST-004)
@@ -331,4 +334,49 @@ func TestEdgeCaseSeedBoundaries(t *testing.T) {
 			t.Error("Failed to verify with max seed keypair")
 		}
 	})
+}
+
+// fixtureSign produces a real signature so tests have well-formed material to
+// feed into Verify. Using real material rules out "Verify returned false
+// because the signature was malformed" as an alternative explanation when
+// asserting the nil-pk refusal path.
+func fixtureSign(t *testing.T) (msg []byte, ctx []byte, sig [CRYPTO_BYTES]uint8) {
+	t.Helper()
+	mldsa, err := GenerateKey(nil)
+	if err != nil {
+		t.Fatalf("setup: New failed: %v", err)
+	}
+	msg = []byte("nil-pk regression test message")
+	ctx = []byte("test-ctx")
+	sig, err = mldsa.Sign(nil, ctx, msg)
+	if err != nil {
+		t.Fatalf("setup: Sign failed: %v", err)
+	}
+	return msg, ctx, sig
+}
+
+func TestVerify_NilPublicKey_ReturnsErrorNoPanic(t *testing.T) {
+	msg, ctx, sig := fixtureSign(t)
+
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("Verify panicked on nil public key: %v", r)
+		}
+	}()
+
+	if err := Verify(nil, msg, sig[:], ctx); !errors.Is(err, errPublicKeyNil) {
+		t.Fatalf("Verify(nil pk) err = %v; want errPublicKeyNil", err)
+	}
+}
+
+func TestCryptoSignVerify_NilPublicKey_ReturnsErrPublicKeyNil(t *testing.T) {
+	msg, ctx, sig := fixtureSign(t)
+
+	ok, err := cryptoSignVerify(sig, msg, ctx, nil)
+	if ok {
+		t.Error("cryptoSignVerify(nil pk) returned ok=true; want false")
+	}
+	if !errors.Is(err, cryptoerrors.ErrPublicKeyNil) {
+		t.Errorf("cryptoSignVerify(nil pk) err = %v; want ErrPublicKeyNil", err)
+	}
 }
