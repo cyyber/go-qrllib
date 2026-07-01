@@ -274,6 +274,8 @@ func TestSignerOptsHandling(t *testing.T) {
 }
 
 func TestAccumulated(t *testing.T) {
+	// These expected hashes match Go's ML-DSA-87 accumulated test in
+	// crypto/internal/fips140test/mldsa_test.go at go1.26.2.
 	t.Run("ML-DSA-87/100", func(t *testing.T) {
 		testAccumulated(t, 100, "8c3ad714777622b8f21ce31bb35f71394f23bc0fcf3c78ace5d608990f3b061b")
 	})
