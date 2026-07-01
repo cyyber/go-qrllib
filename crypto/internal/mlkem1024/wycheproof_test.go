@@ -1,19 +1,14 @@
-//go:build wycheproof
-
 package mlkem1024
 
 // Wycheproof / CCTV ML-KEM-1024 vector verification.
 //
 // This mirrors the ML-DSA-87 harness in crypto/mldsa87/wycheproof_test.go.
-// Vectors are consumed directly from upstream at CI time (never vendored):
+// Vectors are vendored under testdata and run with the normal package tests:
 //
 //   - C2SP/wycheproof  testvectors_v1/mlkem_1024_{keygen_seed,encaps,test}_test.json
-//     via WYCHEPROOF_VECTORS_DIR
+//     under testdata/wycheproof
 //   - C2SP/CCTV         ML-KEM/modulus/ML-KEM-1024.txt.gz
-//     via CCTV_VECTORS_DIR
-//
-// Guarded by the "wycheproof" build tag so they don't run during normal
-// `go test ./...`. See .github/wycheproof/README.md for setup and provenance.
+//     under testdata/cctv
 //
 // The tests live in the internal package because the wycheproof encapsulation
 // vectors are derandomized (they fix the message m), which requires the
@@ -23,57 +18,18 @@ import (
 	"bufio"
 	"bytes"
 	"compress/gzip"
-	"encoding/hex"
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	internaltest "github.com/theQRL/go-qrllib/crypto/internal/test"
 )
-
-func wycheproofDir(t *testing.T) string {
-	t.Helper()
-	dir := os.Getenv("WYCHEPROOF_VECTORS_DIR")
-	if dir == "" {
-		t.Skip("WYCHEPROOF_VECTORS_DIR not set; skipping ML-KEM Wycheproof tests. See .github/wycheproof/README.md.")
-	}
-	return dir
-}
-
-func loadJSON(t *testing.T, path string, v any) {
-	t.Helper()
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("read %s: %v", path, err)
-	}
-	if err := json.Unmarshal(data, v); err != nil {
-		t.Fatalf("parse %s: %v", path, err)
-	}
-}
-
-func mustHex(t *testing.T, s string) []byte {
-	t.Helper()
-	b, err := hex.DecodeString(s)
-	if err != nil {
-		t.Fatalf("invalid hex %q: %v", s, err)
-	}
-	return b
-}
-
-func hasFlag(flags []string, want string) bool {
-	for _, f := range flags {
-		if f == want {
-			return true
-		}
-	}
-	return false
-}
 
 // TestWycheproofMLKEMKeyGen checks seed -> encapsulation-key derivation against
 // mlkem_1024_keygen_seed_test.json.
 func TestWycheproofMLKEMKeyGen(t *testing.T) {
-	dir := wycheproofDir(t)
-	var f struct {
+	f := internaltest.ReadWycheproofJSON[struct {
 		Algorithm  string `json:"algorithm"`
 		TestGroups []struct {
 			ParameterSet string `json:"parameterSet"`
@@ -84,8 +40,7 @@ func TestWycheproofMLKEMKeyGen(t *testing.T) {
 				Result string `json:"result"`
 			} `json:"tests"`
 		} `json:"testGroups"`
-	}
-	loadJSON(t, filepath.Join(dir, "mlkem_1024_keygen_seed_test.json"), &f)
+	}](t, "mlkem_1024_keygen_seed_test.json")
 	if f.Algorithm != "ML-KEM" {
 		t.Fatalf("unexpected algorithm %q (want ML-KEM)", f.Algorithm)
 	}
@@ -97,7 +52,7 @@ func TestWycheproofMLKEMKeyGen(t *testing.T) {
 		}
 		for _, tc := range g.Tests {
 			n++
-			dk, err := NewDecapsulationKey(mustHex(t, tc.Seed))
+			dk, err := NewDecapsulationKey(internaltest.DecodeHex(t, tc.Seed))
 			switch tc.Result {
 			case "valid":
 				if err != nil {
@@ -105,7 +60,7 @@ func TestWycheproofMLKEMKeyGen(t *testing.T) {
 					fail++
 					continue
 				}
-				if !bytes.Equal(dk.EncapsulationKey().Bytes(), mustHex(t, tc.EK)) {
+				if !bytes.Equal(dk.EncapsulationKey().Bytes(), internaltest.DecodeHex(t, tc.EK)) {
 					t.Errorf("tc%d: encapsulation-key mismatch", tc.TcID)
 					fail++
 				} else {
@@ -130,8 +85,7 @@ func TestWycheproofMLKEMKeyGen(t *testing.T) {
 // TestWycheproofMLKEMEncaps checks derandomized encapsulation (ek, m -> c, K)
 // and encapsulation-key validation against mlkem_1024_encaps_test.json.
 func TestWycheproofMLKEMEncaps(t *testing.T) {
-	dir := wycheproofDir(t)
-	var f struct {
+	f := internaltest.ReadWycheproofJSON[struct {
 		Algorithm  string `json:"algorithm"`
 		TestGroups []struct {
 			ParameterSet string `json:"parameterSet"`
@@ -145,8 +99,7 @@ func TestWycheproofMLKEMEncaps(t *testing.T) {
 				Flags  []string `json:"flags"`
 			} `json:"tests"`
 		} `json:"testGroups"`
-	}
-	loadJSON(t, filepath.Join(dir, "mlkem_1024_encaps_test.json"), &f)
+	}](t, "mlkem_1024_encaps_test.json")
 	if f.Algorithm != "ML-KEM" {
 		t.Fatalf("unexpected algorithm %q (want ML-KEM)", f.Algorithm)
 	}
@@ -158,7 +111,7 @@ func TestWycheproofMLKEMEncaps(t *testing.T) {
 		}
 		for _, tc := range g.Tests {
 			n++
-			ek, err := NewEncapsulationKey(mustHex(t, tc.EK))
+			ek, err := NewEncapsulationKey(internaltest.DecodeHex(t, tc.EK))
 			switch tc.Result {
 			case "valid":
 				if err != nil {
@@ -166,7 +119,7 @@ func TestWycheproofMLKEMEncaps(t *testing.T) {
 					fail++
 					continue
 				}
-				mb := mustHex(t, tc.M)
+				mb := internaltest.DecodeHex(t, tc.M)
 				if len(mb) != 32 {
 					t.Errorf("tc%d: message length %d (want 32)", tc.TcID, len(mb))
 					fail++
@@ -175,7 +128,7 @@ func TestWycheproofMLKEMEncaps(t *testing.T) {
 				var m [32]byte
 				copy(m[:], mb)
 				gotK, gotC := EncapsulateInternal(ek, &m)
-				if !bytes.Equal(gotC, mustHex(t, tc.C)) || !bytes.Equal(gotK, mustHex(t, tc.K)) {
+				if !bytes.Equal(gotC, internaltest.DecodeHex(t, tc.C)) || !bytes.Equal(gotK, internaltest.DecodeHex(t, tc.K)) {
 					t.Errorf("tc%d: encapsulation mismatch (flags=%v)", tc.TcID, tc.Flags)
 					fail++
 				} else {
@@ -187,7 +140,7 @@ func TestWycheproofMLKEMEncaps(t *testing.T) {
 					fail++
 				} else {
 					pass++
-					if hasFlag(tc.Flags, "ModulusOverflow") {
+					if internaltest.HasFlag(tc.Flags, "ModulusOverflow") {
 						modulus++
 					}
 				}
@@ -203,8 +156,7 @@ func TestWycheproofMLKEMEncaps(t *testing.T) {
 // TestWycheproofMLKEMDecaps checks decapsulation (seed, c -> K), including the
 // implicit-rejection and Strcmp edge cases, against mlkem_1024_test.json.
 func TestWycheproofMLKEMDecaps(t *testing.T) {
-	dir := wycheproofDir(t)
-	var f struct {
+	f := internaltest.ReadWycheproofJSON[struct {
 		Algorithm  string `json:"algorithm"`
 		TestGroups []struct {
 			ParameterSet string `json:"parameterSet"`
@@ -218,8 +170,7 @@ func TestWycheproofMLKEMDecaps(t *testing.T) {
 				Flags   []string `json:"flags"`
 			} `json:"tests"`
 		} `json:"testGroups"`
-	}
-	loadJSON(t, filepath.Join(dir, "mlkem_1024_test.json"), &f)
+	}](t, "mlkem_1024_test.json")
 	if f.Algorithm != "ML-KEM" {
 		t.Fatalf("unexpected algorithm %q (want ML-KEM)", f.Algorithm)
 	}
@@ -231,8 +182,8 @@ func TestWycheproofMLKEMDecaps(t *testing.T) {
 		}
 		for _, tc := range g.Tests {
 			n++
-			dk, err := NewDecapsulationKey(mustHex(t, tc.Seed))
-			ct := mustHex(t, tc.C)
+			dk, err := NewDecapsulationKey(internaltest.DecodeHex(t, tc.Seed))
+			ct := internaltest.DecodeHex(t, tc.C)
 			switch tc.Result {
 			case "valid":
 				// Includes implicit-rejection cases: a malformed-but-right-length
@@ -250,12 +201,12 @@ func TestWycheproofMLKEMDecaps(t *testing.T) {
 					fail++
 					continue
 				}
-				if !bytes.Equal(gotK, mustHex(t, tc.K)) {
+				if !bytes.Equal(gotK, internaltest.DecodeHex(t, tc.K)) {
 					t.Errorf("tc%d: shared-secret mismatch (comment=%q flags=%v)", tc.TcID, tc.Comment, tc.Flags)
 					fail++
 				} else {
 					pass++
-					if hasFlag(tc.Flags, "Strcmp") {
+					if internaltest.HasFlag(tc.Flags, "Strcmp") {
 						strcmp++
 					}
 				}
@@ -287,10 +238,7 @@ func TestWycheproofMLKEMDecaps(t *testing.T) {
 // in the C2SP/CCTV modulus vectors (one coefficient forced into [q, 2^12-1] at
 // every position) is rejected by NewEncapsulationKey's modulus check.
 func TestCCTVMLKEMModulus(t *testing.T) {
-	dir := os.Getenv("CCTV_VECTORS_DIR")
-	if dir == "" {
-		t.Skip("CCTV_VECTORS_DIR not set; skipping CCTV ML-KEM modulus tests. See .github/wycheproof/README.md.")
-	}
+	dir := internaltest.CCTVDir()
 	path := filepath.Join(dir, "modulus", "ML-KEM-1024.txt.gz")
 	fr, err := os.Open(path)
 	if err != nil {
@@ -312,7 +260,7 @@ func TestCCTVMLKEMModulus(t *testing.T) {
 			continue
 		}
 		n++
-		if _, err := NewEncapsulationKey(mustHex(t, line)); err != nil {
+		if _, err := NewEncapsulationKey(internaltest.DecodeHex(t, line)); err != nil {
 			rejected++
 		} else {
 			t.Errorf("line %d: invalid (out-of-range coefficient) encapsulation key was ACCEPTED", n)
