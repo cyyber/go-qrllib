@@ -6,11 +6,14 @@ import (
 	"crypto/sha3"
 	"encoding/hex"
 	"errors"
+	"flag"
 	"testing"
 
 	internal "github.com/theQRL/go-qrllib/crypto/internal/mldsa87"
 	"github.com/theQRL/go-qrllib/crypto/mldsa87"
 )
+
+var sixtyMillionFlag = flag.Bool("60million", false, "run 60M-iterations accumulated test")
 
 type zeroReader struct{}
 
@@ -271,15 +274,30 @@ func TestSignerOptsHandling(t *testing.T) {
 }
 
 func TestAccumulated(t *testing.T) {
-	const expected = "5d76cd68e6caf971cf25b6f39b5eb9b9ba626dabb3c58231a8607e8efbc1950b"
+	t.Run("ML-DSA-87/100", func(t *testing.T) {
+		testAccumulated(t, 100, "8c3ad714777622b8f21ce31bb35f71394f23bc0fcf3c78ace5d608990f3b061b")
+	})
+	if !testing.Short() {
+		t.Run("ML-DSA-87/10k", func(t *testing.T) {
+			t.Parallel()
+			testAccumulated(t, 10000, "80a8cf39317f7d0be0e24972c51ac152bd2a3e09bc0c32ce29dd82c4e7385e60")
+		})
+	}
+	if *sixtyMillionFlag {
+		t.Run("ML-DSA-87/60M", func(t *testing.T) {
+			t.Parallel()
+			testAccumulated(t, 60000000, "011166e9d5032c9bdc5c9bbb5dbb6c86df1c3d9bf3570b65ebae942dd9830057")
+		})
+	}
+}
 
+func testAccumulated(t *testing.T, n int, expected string) {
 	s := sha3.NewSHAKE128()
 	o := sha3.NewSHAKE128()
 	seed := make([]byte, mldsa87.SeedSize)
-	signSeed := make([]byte, mldsa87.SeedSize)
-	var message [32]byte
+	message := make([]byte, 0)
 
-	for range 16 {
+	for range n {
 		_, _ = s.Read(seed)
 		private, err := mldsa87.NewPrivateKey(seed)
 		if err != nil {
@@ -287,18 +305,22 @@ func TestAccumulated(t *testing.T) {
 		}
 		public := private.Public().(*mldsa87.PublicKey)
 		_, _ = o.Write(public.Bytes())
-		_, _ = o.Write(private.Bytes())
-
-		_, _ = s.Read(message[:])
-		_, _ = s.Read(signSeed)
-		signature, err := mldsa87.Sign(bytes.NewReader(signSeed), private, message[:], nil)
+		signature, err := mldsa87.SignDeterministic(private, message, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !mldsa87.Verify(public, message[:], signature, nil) {
+
+		_, _ = o.Write(signature)
+		reparsed, err := mldsa87.NewPublicKey(public.Bytes())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reparsed.Equal(public) {
+			t.Fatal("public key mismatch")
+		}
+		if !mldsa87.Verify(public, message, signature, nil) {
 			t.Fatal("valid signature rejected")
 		}
-		_, _ = o.Write(signature)
 	}
 
 	var digest [32]byte
