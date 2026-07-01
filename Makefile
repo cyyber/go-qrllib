@@ -89,12 +89,12 @@ bench:
 # Run fast benchmarks (excludes SPHINCS+)
 bench-fast:
 	@echo "Running benchmarks (excludes SPHINCS+)..."
-	@go test -bench=. -benchmem ./crypto/mldsa87/... ./crypto/internal/mldsa87/... ./crypto/xmss/...
+	@go test -bench=. -benchmem ./crypto/mldsa87/... ./crypto/xmss/...
 
 # Run benchmarks for a specific package
 bench-mldsa:
 	@echo "Running ML-DSA-87 benchmarks..."
-	@go test -bench=. -benchmem ./crypto/mldsa87/... ./crypto/internal/mldsa87/...
+	@go test -bench=. -benchmem ./crypto/mldsa87/...
 
 # Run KAT (Known Answer Test) tests only
 test-kat:
