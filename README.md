@@ -299,7 +299,7 @@ func signConcurrently(messages [][]byte, seed [32]byte) {
 
 ## NIST ACVP Verification
 
-ML-DSA-87 key generation and signing are verified against official [NIST ACVP test vectors](https://github.com/usnistgov/ACVP-Server). These tests run automatically in CI and are guarded by a build tag so they don't run during normal `go test ./...`.
+ML-DSA-87 key generation, deterministic signing, and verification are checked against official [NIST ACVP test vectors](https://github.com/usnistgov/ACVP-Server). These use checked-in compressed fixtures and run inline with `go test ./...` (see [`crypto/internal/mldsa87/acvp_test.go`](crypto/internal/mldsa87/acvp_test.go)).
 
 ML-KEM-1024 key generation, encapsulation, and decapsulation — including the encapsulation- and decapsulation-key validity checks — are likewise verified against NIST ACVP vectors. These run inline with `go test ./...` (see [`crypto/internal/mlkem1024/acvp_test.go`](crypto/internal/mlkem1024/acvp_test.go)).
 
