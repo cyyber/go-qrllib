@@ -300,7 +300,7 @@ func TestWallet_SignCallerSuppliedRand(t *testing.T) {
 		t.Fatal("Sign did not use caller-supplied rand deterministically")
 	}
 
-	deterministicSig, err := cryptomldsa87.SignDeterministic(w.d, msg, &cryptomldsa87.Options{
+	deterministicSig, err := cryptomldsa87.SignDeterministic(w.privateKey, msg, &cryptomldsa87.Options{
 		Context: common.SigningContext(w.desc.ToDescriptor()),
 	})
 	if err != nil {

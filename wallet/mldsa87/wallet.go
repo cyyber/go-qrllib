@@ -15,9 +15,9 @@ import (
 )
 
 type Wallet struct {
-	desc Descriptor
-	d    *mldsa87.PrivateKey
-	seed common.Seed
+	desc       Descriptor
+	privateKey *mldsa87.PrivateKey
+	seed       common.Seed
 }
 
 func NewWallet() (*Wallet, error) {
@@ -39,7 +39,7 @@ func NewWalletFromSeed(seed common.Seed) (*Wallet, error) {
 		return nil, fmt.Errorf("failed to create descriptor: %w", err)
 	}
 	keySeed := seed.HashSHA256()
-	d, err := mldsa87.NewPrivateKey(keySeed[:])
+	privateKey, err := mldsa87.NewPrivateKey(keySeed[:])
 	if err != nil {
 		//coverage:ignore
 		//rationale: keypair generation only fails if buffer sizes wrong, Go's type system guarantees correct sizes
@@ -47,9 +47,9 @@ func NewWalletFromSeed(seed common.Seed) (*Wallet, error) {
 	}
 
 	return &Wallet{
-		desc,
-		d,
-		seed,
+		desc:       desc,
+		privateKey: privateKey,
+		seed:       seed,
 	}, nil
 }
 
@@ -83,7 +83,7 @@ func NewWalletFromExtendedSeed(extendedSeed common.ExtendedSeed) (*Wallet, error
 	}
 
 	keySeed := seed.HashSHA256()
-	d, err := mldsa87.NewPrivateKey(keySeed[:])
+	privateKey, err := mldsa87.NewPrivateKey(keySeed[:])
 	if err != nil {
 		//coverage:ignore
 		//rationale: keypair generation only fails if buffer sizes wrong, Go's type system guarantees correct sizes
@@ -91,9 +91,9 @@ func NewWalletFromExtendedSeed(extendedSeed common.ExtendedSeed) (*Wallet, error
 	}
 
 	return &Wallet{
-		desc,
-		d,
-		seed,
+		desc:       desc,
+		privateKey: privateKey,
+		seed:       seed,
 	}, nil
 }
 
@@ -163,13 +163,13 @@ func (w *Wallet) GetMnemonic() (string, error) {
 
 func (w *Wallet) GetPK() PK {
 	var pk PK
-	copy(pk[:], w.d.PublicKey().Bytes())
+	copy(pk[:], w.privateKey.PublicKey().Bytes())
 	return pk
 }
 
 func (w *Wallet) GetSK() [SKSize]uint8 {
 	var sk [SKSize]uint8
-	copy(sk[:], w.d.Bytes())
+	copy(sk[:], w.privateKey.Bytes())
 	return sk
 }
 
@@ -203,7 +203,7 @@ func (w *Wallet) GetChecksumAddressStr() string {
 // pass a deterministic reader.
 func (w *Wallet) Sign(random io.Reader, message []uint8) ([SigSize]uint8, error) {
 	var signature [SigSize]uint8
-	sig, err := mldsa87.Sign(random, w.d, message, &mldsa87.Options{
+	sig, err := mldsa87.Sign(random, w.privateKey, message, &mldsa87.Options{
 		Context: common.SigningContext(w.desc.ToDescriptor()),
 	})
 	if err != nil {
@@ -219,7 +219,7 @@ func (w *Wallet) Zeroize() {
 	for i := range w.seed {
 		w.seed[i] = 0
 	}
-	w.d.Zeroize()
+	w.privateKey.Zeroize()
 }
 
 // Verify reports whether the signature is a valid ML-DSA-87 signature
