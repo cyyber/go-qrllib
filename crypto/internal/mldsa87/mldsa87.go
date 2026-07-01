@@ -194,8 +194,8 @@ func SignDeterministic(privateKey *PrivateKey, message, ctx []byte) ([]byte, err
 	return bytes.Clone(signature[:]), nil
 }
 
-// VerifySignature verifies sig over message with ctx.
-func VerifySignature(publicKey *PublicKey, message, sig, ctx []byte) error {
+// Verify verifies sig over message with ctx.
+func Verify(publicKey *PublicKey, message, sig, ctx []byte) error {
 	if publicKey == nil {
 		return errPublicKeyNil
 	}
@@ -204,22 +204,12 @@ func VerifySignature(publicKey *PublicKey, message, sig, ctx []byte) error {
 	}
 	var signature [CRYPTO_BYTES]uint8
 	copy(signature[:], sig)
-	if !Verify(ctx, message, signature, &publicKey.key) {
+	result, err := cryptoSignVerify(signature, message, ctx, &publicKey.key)
+	if err != nil {
+		return err
+	}
+	if !result {
 		return cryptoerrors.ErrInvalidSignature
 	}
 	return nil
-}
-
-// Verify checks the signature against the message and public key with the given context.
-// The ctx parameter must match the context used during signing (FIPS 204 requirement).
-// Returns false if pk is nil rather than panicking. (TOB-QRLLIB-11)
-func Verify(ctx, message []uint8, signature [CRYPTO_BYTES]uint8, pk *[CRYPTO_PUBLIC_KEY_BYTES]uint8) bool {
-	if pk == nil {
-		return false
-	}
-	result, err := cryptoSignVerify(signature, message, ctx, pk)
-	if err != nil {
-		return false
-	}
-	return result
 }

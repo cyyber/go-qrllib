@@ -212,7 +212,7 @@ func TestACVPSigGen(t *testing.T) {
 
 			var sigArr [CRYPTO_BYTES]uint8
 			copy(sigArr[:], sig)
-			if !Verify(ctx, msg, sigArr, &pk) {
+			if !verifyForTest(ctx, msg, sigArr, &pk) {
 				t.Error("Generated signature failed verification")
 			}
 		})

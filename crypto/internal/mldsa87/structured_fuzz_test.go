@@ -117,7 +117,7 @@ func FuzzPrivateKeySignVerifyRoundTripMutate(f *testing.F) {
 		}
 
 		pk := mldsa.PublicKey().key
-		if !Verify(ctx, message, sig, &pk) {
+		if !verifyForTest(ctx, message, sig, &pk) {
 			t.Fatal("Valid signature failed verification")
 		}
 
@@ -125,7 +125,7 @@ func FuzzPrivateKeySignVerifyRoundTripMutate(f *testing.F) {
 		if bytes.Equal(mutatedCtx, ctx) {
 			t.Fatal("Context mutation did not change the input")
 		}
-		if Verify(mutatedCtx, message, sig, &pk) {
+		if verifyForTest(mutatedCtx, message, sig, &pk) {
 			t.Fatal("Signature verified with mutated context")
 		}
 
@@ -133,17 +133,17 @@ func FuzzPrivateKeySignVerifyRoundTripMutate(f *testing.F) {
 		if bytes.Equal(mutatedMsg, message) {
 			t.Fatal("Message mutation did not change the input")
 		}
-		if Verify(ctx, mutatedMsg, sig, &pk) {
+		if verifyForTest(ctx, mutatedMsg, sig, &pk) {
 			t.Fatal("Signature verified with mutated message")
 		}
 
 		mutatedSig := mutateSignature(sig, mutation)
-		if Verify(ctx, message, mutatedSig, &pk) {
+		if verifyForTest(ctx, message, mutatedSig, &pk) {
 			t.Fatal("Mutated signature verified")
 		}
 
 		mutatedPK := mutatePublicKey(pk, mutation)
-		if Verify(ctx, message, sig, &mutatedPK) {
+		if verifyForTest(ctx, message, sig, &mutatedPK) {
 			t.Fatal("Signature verified with mutated public key")
 		}
 	})
@@ -184,7 +184,7 @@ func FuzzPrivateKeyFromSeedSignVerify(f *testing.F) {
 		}
 
 		pk := mldsa.PublicKey().key
-		if !Verify(ctx, digest, sig, &pk) {
+		if !verifyForTest(ctx, digest, sig, &pk) {
 			t.Fatal("PrivateKey.Sign produced a signature that does not verify")
 		}
 	})

@@ -72,7 +72,7 @@ func FuzzMetamorphicVerifyRejectsMauledPublicKey(f *testing.F) {
 		}
 
 		pk := mldsa.PublicKey().key
-		if !Verify(ctx, msg, sig, &pk) {
+		if !verifyForTest(ctx, msg, sig, &pk) {
 			t.Fatal("baseline signature failed verification")
 		}
 
@@ -80,7 +80,7 @@ func FuzzMetamorphicVerifyRejectsMauledPublicKey(f *testing.F) {
 		var mauledPK [CRYPTO_PUBLIC_KEY_BYTES]uint8
 		copy(mauledPK[:], mauledBytes)
 
-		if Verify(ctx, msg, sig, &mauledPK) {
+		if verifyForTest(ctx, msg, sig, &mauledPK) {
 			t.Fatalf("single-bit mauled public key verified (bitIndex=%d)", bitIndex)
 		}
 	})
@@ -101,7 +101,7 @@ func FuzzMetamorphicVerifyRejectsMauledMessage(f *testing.F) {
 		}
 
 		pk := mldsa.PublicKey().key
-		if !Verify(ctx, msg, sig, &pk) {
+		if !verifyForTest(ctx, msg, sig, &pk) {
 			t.Fatal("baseline signature failed verification")
 		}
 
@@ -109,7 +109,7 @@ func FuzzMetamorphicVerifyRejectsMauledMessage(f *testing.F) {
 		if bytes.Equal(mauledMsg, msg) {
 			t.Fatal("message maul did not change the input")
 		}
-		if Verify(ctx, mauledMsg, sig, &pk) {
+		if verifyForTest(ctx, mauledMsg, sig, &pk) {
 			t.Fatalf("single-bit mauled message verified (bitIndex=%d)", bitIndex)
 		}
 	})
@@ -130,7 +130,7 @@ func FuzzMetamorphicVerifyRejectsMauledSignature(f *testing.F) {
 		}
 
 		pk := mldsa.PublicKey().key
-		if !Verify(ctx, msg, sig, &pk) {
+		if !verifyForTest(ctx, msg, sig, &pk) {
 			t.Fatal("baseline signature failed verification")
 		}
 
@@ -138,7 +138,7 @@ func FuzzMetamorphicVerifyRejectsMauledSignature(f *testing.F) {
 		var mauledSig [CRYPTO_BYTES]uint8
 		copy(mauledSig[:], mauledBytes)
 
-		if Verify(ctx, msg, mauledSig, &pk) {
+		if verifyForTest(ctx, msg, mauledSig, &pk) {
 			t.Fatalf("single-bit mauled signature verified (bitIndex=%d)", bitIndex)
 		}
 	})

@@ -134,7 +134,7 @@ func TestSignUsesCallerSuppliedRand(t *testing.T) {
 	}
 
 	pk := d.PublicKey().key
-	if !Verify(ctx, msg, sig1, &pk) {
+	if !verifyForTest(ctx, msg, sig1, &pk) {
 		t.Fatal("caller-rand signature did not verify")
 	}
 
@@ -152,7 +152,7 @@ func TestSignUsesCallerSuppliedRand(t *testing.T) {
 	if sig3 == sig1 {
 		t.Fatal("Sign with non-zero fixed reader matched zeroReader output")
 	}
-	if !Verify(ctx, msg, sig3, &pk) {
+	if !verifyForTest(ctx, msg, sig3, &pk) {
 		t.Fatal("fixed-rand signature did not verify")
 	}
 
@@ -275,7 +275,7 @@ func TestPrivateKey_Sign(t *testing.T) {
 	// Hedged signing (TOB-QRLLIB-6) means signatures are not pinable;
 	// verify the produced signature under the matching public key.
 	pk := d.PublicKey().key
-	if !Verify(ctx, msg, signature, &pk) {
+	if !verifyForTest(ctx, msg, signature, &pk) {
 		t.Error("Sign produced a signature that did not verify under its own public key")
 	}
 }
@@ -292,7 +292,7 @@ func TestPrivateKey_Verify(t *testing.T) {
 
 	// Hedged signing (TOB-QRLLIB-6): no fixed-hex pin; verify only.
 	pk := d.PublicKey().key
-	if !Verify(ctx, msg, signature, &pk) {
+	if !verifyForTest(ctx, msg, signature, &pk) {
 		t.Error("Signature Verification failed")
 	}
 }

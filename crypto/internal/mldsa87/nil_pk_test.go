@@ -36,7 +36,7 @@ func fixtureSign(t *testing.T) (msg []byte, ctx []byte, sig [CRYPTO_BYTES]uint8)
 	return msg, ctx, sig
 }
 
-func TestVerify_NilPublicKey_ReturnsFalseNoPanic(t *testing.T) {
+func TestVerify_NilPublicKey_ReturnsErrorNoPanic(t *testing.T) {
 	msg, ctx, sig := fixtureSign(t)
 
 	defer func() {
@@ -45,8 +45,8 @@ func TestVerify_NilPublicKey_ReturnsFalseNoPanic(t *testing.T) {
 		}
 	}()
 
-	if Verify(ctx, msg, sig, nil) {
-		t.Fatal("Verify(nil pk) returned true; want false")
+	if err := Verify(nil, msg, sig[:], ctx); !errors.Is(err, errPublicKeyNil) {
+		t.Fatalf("Verify(nil pk) err = %v; want errPublicKeyNil", err)
 	}
 }
 

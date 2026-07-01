@@ -146,10 +146,10 @@ func TestKATHedgedSignature(t *testing.T) {
 
 			// Both signatures MUST verify under the same public key.
 			pk := mldsa.PublicKey().key
-			if !Verify(ctx, msg, sig1, &pk) {
+			if !verifyForTest(ctx, msg, sig1, &pk) {
 				t.Error("First signature failed verification")
 			}
-			if !Verify(ctx, msg, sig2, &pk) {
+			if !verifyForTest(ctx, msg, sig2, &pk) {
 				t.Error("Second signature failed verification")
 			}
 		})
@@ -202,7 +202,7 @@ func TestKATSignDeterministic(t *testing.T) {
 
 			// The signature MUST verify under the public key.
 			pk := mldsa.PublicKey().key
-			if !Verify(ctx, msg, sig1, &pk) {
+			if !verifyForTest(ctx, msg, sig1, &pk) {
 				t.Error("SignDeterministic produced a signature that did not verify")
 			}
 
@@ -298,7 +298,7 @@ func TestKATDeterministicSignatureViaInternalAPI(t *testing.T) {
 			pk := mldsa.PublicKey().key
 			var sigArr [CRYPTO_BYTES]uint8
 			copy(sigArr[:], sig1)
-			if !Verify(ctx, msg, sigArr, &pk) {
+			if !verifyForTest(ctx, msg, sigArr, &pk) {
 				t.Error("Deterministic signature failed verification")
 			}
 		})
@@ -340,7 +340,7 @@ func TestKATSignVerifyRoundTrip(t *testing.T) {
 
 			// Verify with correct public key
 			pk := mldsa.PublicKey().key
-			if !Verify(ctx, msg, sig, &pk) {
+			if !verifyForTest(ctx, msg, sig, &pk) {
 				t.Error("Signature verification failed with correct key")
 			}
 
@@ -350,7 +350,7 @@ func TestKATSignVerifyRoundTrip(t *testing.T) {
 				t.Fatalf("Failed to create random PrivateKey: %v", err)
 			}
 			wrongPk := wrongMldsa.PublicKey().key
-			if Verify(ctx, msg, sig, &wrongPk) {
+			if verifyForTest(ctx, msg, sig, &wrongPk) {
 				t.Error("Signature verification should fail with wrong key")
 			}
 
@@ -361,7 +361,7 @@ func TestKATSignVerifyRoundTrip(t *testing.T) {
 			} else {
 				wrongMsg = []byte{0x42}
 			}
-			if Verify(ctx, wrongMsg, sig, &pk) {
+			if verifyForTest(ctx, wrongMsg, sig, &pk) {
 				t.Error("Signature verification should fail with wrong message")
 			}
 
@@ -369,7 +369,7 @@ func TestKATSignVerifyRoundTrip(t *testing.T) {
 			if len(ctx) > 0 {
 				wrongCtx := append([]byte{}, ctx...)
 				wrongCtx[0] ^= 0xFF
-				if Verify(wrongCtx, msg, sig, &pk) {
+				if verifyForTest(wrongCtx, msg, sig, &pk) {
 					t.Error("Signature verification should fail with wrong context")
 				}
 			}

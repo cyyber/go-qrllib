@@ -20,6 +20,6 @@ func FuzzPrivateKeyVerify(f *testing.F) {
 		copy(pk[:], pkBytes)
 
 		// This should never panic, regardless of input
-		_ = Verify(ctx, message, sig, &pk)
+		_ = verifyForTest(ctx, message, sig, &pk)
 	})
 }

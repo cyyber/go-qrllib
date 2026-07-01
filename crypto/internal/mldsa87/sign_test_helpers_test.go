@@ -25,3 +25,10 @@ func (r fixedByteReader) Read(p []byte) (int, error) {
 type errReader struct{ err error }
 
 func (e errReader) Read(_ []byte) (int, error) { return 0, e.err }
+
+func verifyForTest(ctx, message []byte, signature [CRYPTO_BYTES]uint8, pk *[CRYPTO_PUBLIC_KEY_BYTES]uint8) bool {
+	if pk == nil {
+		return Verify(nil, message, signature[:], ctx) == nil
+	}
+	return Verify(&PublicKey{key: *pk}, message, signature[:], ctx) == nil
+}

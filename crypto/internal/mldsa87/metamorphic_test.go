@@ -112,7 +112,7 @@ func TestMetamorphicVerifyRejectsBitMauledPublicKeys(t *testing.T) {
 			sig := mustSign(t, mldsa, tc.ctx, tc.message)
 			pk := mldsa.PublicKey().key
 
-			if !Verify(tc.ctx, tc.message, sig, &pk) {
+			if !verifyForTest(tc.ctx, tc.message, sig, &pk) {
 				t.Fatal("baseline signature failed verification")
 			}
 
@@ -121,7 +121,7 @@ func TestMetamorphicVerifyRejectsBitMauledPublicKeys(t *testing.T) {
 				var mauledPK [CRYPTO_PUBLIC_KEY_BYTES]uint8
 				copy(mauledPK[:], mutated)
 
-				if Verify(tc.ctx, tc.message, sig, &mauledPK) {
+				if verifyForTest(tc.ctx, tc.message, sig, &mauledPK) {
 					t.Fatalf("single-bit mauled public key verified at bit %d", bit)
 				}
 			}
@@ -136,13 +136,13 @@ func TestMetamorphicVerifyRejectsBitMauledMessages(t *testing.T) {
 			sig := mustSign(t, mldsa, tc.ctx, tc.message)
 			pk := mldsa.PublicKey().key
 
-			if !Verify(tc.ctx, tc.message, sig, &pk) {
+			if !verifyForTest(tc.ctx, tc.message, sig, &pk) {
 				t.Fatal("baseline signature failed verification")
 			}
 
 			for bit := 0; bit < len(tc.message)*8; bit++ {
 				mauledMsg := flipSingleBit(tc.message, bit)
-				if Verify(tc.ctx, mauledMsg, sig, &pk) {
+				if verifyForTest(tc.ctx, mauledMsg, sig, &pk) {
 					t.Fatalf("single-bit mauled message verified at bit %d", bit)
 				}
 			}
@@ -157,7 +157,7 @@ func TestMetamorphicVerifyRejectsBitMauledSignatures(t *testing.T) {
 			sig := mustSign(t, mldsa, tc.ctx, tc.message)
 			pk := mldsa.PublicKey().key
 
-			if !Verify(tc.ctx, tc.message, sig, &pk) {
+			if !verifyForTest(tc.ctx, tc.message, sig, &pk) {
 				t.Fatal("baseline signature failed verification")
 			}
 
@@ -166,7 +166,7 @@ func TestMetamorphicVerifyRejectsBitMauledSignatures(t *testing.T) {
 				var mauledSig [CRYPTO_BYTES]uint8
 				copy(mauledSig[:], mutated)
 
-				if Verify(tc.ctx, tc.message, mauledSig, &pk) {
+				if verifyForTest(tc.ctx, tc.message, mauledSig, &pk) {
 					t.Fatalf("single-bit mauled signature verified at bit %d", bit)
 				}
 			}
@@ -243,7 +243,7 @@ func TestMetamorphicSecretKeyMaulingFeatureScan(t *testing.T) {
 					if sig == baseSig {
 						sameSigCount++
 					}
-					if Verify(tc.ctx, tc.message, sig, &pk) {
+					if verifyForTest(tc.ctx, tc.message, sig, &pk) {
 						validCount++
 					}
 				}

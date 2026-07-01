@@ -26,7 +26,7 @@ func Example() {
 	}
 
 	// Verify the signature.
-	valid := mldsa87.VerifySignature(m.PublicKey(), message, signature[:], ctx) == nil
+	valid := mldsa87.Verify(m.PublicKey(), message, signature[:], ctx) == nil
 	fmt.Println("Signature valid:", valid)
 	// Output: Signature valid: true
 }
@@ -94,12 +94,12 @@ func ExampleVerify() {
 	signature, _ := m.Sign(nil, ctx, message)
 
 	// Verify requires the same context used during signing
-	valid := mldsa87.VerifySignature(m.PublicKey(), message, signature[:], ctx) == nil
+	valid := mldsa87.Verify(m.PublicKey(), message, signature[:], ctx) == nil
 	fmt.Println("Valid signature:", valid)
 
 	// Wrong context fails verification
 	wrongCtx := []byte("wrong-context")
-	valid = mldsa87.VerifySignature(m.PublicKey(), message, signature[:], wrongCtx) == nil
+	valid = mldsa87.Verify(m.PublicKey(), message, signature[:], wrongCtx) == nil
 	fmt.Println("Wrong context:", valid)
 	// Output:
 	// Valid signature: true

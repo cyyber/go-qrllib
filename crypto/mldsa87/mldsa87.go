@@ -184,7 +184,7 @@ func Verify(publicKey *PublicKey, message, sig []byte, opts crypto.SignerOpts) b
 	if err != nil || publicKey == nil || publicKey.key == nil {
 		return false
 	}
-	return internal.VerifySignature(publicKey.key, message, sig, ctx) == nil
+	return internal.Verify(publicKey.key, message, sig, ctx) == nil
 }
 
 func contextFromOptions(opts crypto.SignerOpts) ([]byte, error) {
