@@ -5,8 +5,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"testing"
-
-	cryptoerrors "github.com/theQRL/go-qrllib/crypto/errors"
 )
 
 const (
@@ -174,8 +172,8 @@ func TestSignInvalidContextBeforeRandRead(t *testing.T) {
 
 	randErr := errors.New("rand should not be read")
 	longCtx := bytes.Repeat([]byte{0x42}, 256)
-	if _, err := Sign(errReader{err: randErr}, d, []byte("msg"), longCtx); !errors.Is(err, cryptoerrors.ErrInvalidContext) {
-		t.Fatalf("Sign returned %v, want ErrInvalidContext", err)
+	if _, err := Sign(errReader{err: randErr}, d, []byte("msg"), longCtx); err == nil || err.Error() != "mldsa87: invalid context" {
+		t.Fatalf("Sign returned %v, want mldsa87: invalid context", err)
 	}
 }
 

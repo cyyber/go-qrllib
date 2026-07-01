@@ -57,5 +57,9 @@ func verifyForTest(ctx, message, signature []byte, pk *[CRYPTO_PUBLIC_KEY_BYTES]
 	if pk == nil {
 		return Verify(nil, message, signature, ctx) == nil
 	}
-	return Verify(&PublicKey{raw: *pk}, message, signature, ctx) == nil
+	pub, err := newPublicKeyFromRaw(pk)
+	if err != nil {
+		return false
+	}
+	return Verify(pub, message, signature, ctx) == nil
 }

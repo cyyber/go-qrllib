@@ -13,7 +13,7 @@ import (
 // NOTE: These are self-generated test vectors using known seeds. For
 // full NIST FIPS 204 compliance, official ACVP test vectors should be
 // obtained from: https://github.com/usnistgov/ACVP-Server (exercised
-// in CI by acvp_test.go).
+// by acvp_test.go).
 //
 // The test vectors below verify:
 //  1. Deterministic keypair generation from seed.

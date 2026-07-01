@@ -4,11 +4,10 @@ import (
 	"crypto/rand"
 	"crypto/sha3"
 	"crypto/subtle"
+	"errors"
 	"io"
 	"runtime"
 	"sync"
-
-	cryptoerrors "github.com/theQRL/go-qrllib/crypto/errors"
 )
 
 // shake256Pool provides pooled SHAKE256 hashers to reduce allocations
@@ -99,7 +98,7 @@ func cryptoSignKeypair(seed *[SEED_BYTES]uint8, pk *[CRYPTO_PUBLIC_KEY_BYTES]uin
 		if err != nil {
 			//coverage:ignore
 			//rationale: crypto/rand.Read only fails if system entropy source is broken
-			return nil, cryptoerrors.ErrSeedGeneration
+			return nil, errors.New("mldsa87: seed generation failed")
 		}
 	}
 	/* Expand 32 bytes of randomness into rho, rhoprime and key */
@@ -186,7 +185,6 @@ func cryptoSignKeypair(seed *[SEED_BYTES]uint8, pk *[CRYPTO_PUBLIC_KEY_BYTES]uin
 		pub.t1 = t1
 		polyVecKShiftL(&pub.t1)
 		polyVecKNTT(&pub.t1)
-		pub.cached = true
 	}
 
 	return seed, nil
@@ -348,7 +346,7 @@ rej:
 // rnd=zero) call [cryptoSignSignatureWithRnd] directly.
 func cryptoSignSignature(random io.Reader, sig, m []uint8, ctx []uint8, priv *PrivateKey, mat *[K]polyVecL) error {
 	if len(ctx) > 255 {
-		return cryptoerrors.ErrInvalidContext
+		return errors.New("mldsa87: invalid context")
 	}
 	if random == nil {
 		random = rand.Reader
@@ -378,7 +376,7 @@ func cryptoSignSignatureWithRnd(sig, m []uint8, ctx []uint8, sk *[CRYPTO_SECRET_
 
 func cryptoSignSignatureWithKeyAndRnd(sig, m []uint8, ctx []uint8, priv *PrivateKey, mat *[K]polyVecL, rnd [RND_BYTES]uint8) error {
 	if len(ctx) > 255 {
-		return cryptoerrors.ErrInvalidContext
+		return errors.New("mldsa87: invalid context")
 	}
 	pre := make([]uint8, len(ctx)+2)
 	pre[0] = 0
@@ -389,7 +387,7 @@ func cryptoSignSignatureWithKeyAndRnd(sig, m []uint8, ctx []uint8, priv *Private
 
 func newPublicKeyFromRaw(pk *[CRYPTO_PUBLIC_KEY_BYTES]uint8) (*PublicKey, error) {
 	if pk == nil {
-		return nil, errPublicKeyNil
+		return nil, errors.New("mldsa87: public key is nil")
 	}
 	pub := &PublicKey{raw: *pk}
 	var rho [SEED_BYTES]uint8
@@ -402,18 +400,7 @@ func newPublicKeyFromRaw(pk *[CRYPTO_PUBLIC_KEY_BYTES]uint8) (*PublicKey, error)
 	}
 	polyVecKShiftL(&pub.t1)
 	polyVecKNTT(&pub.t1)
-	pub.cached = true
 	return pub, nil
-}
-
-func cachedPublicKey(pub *PublicKey) (*PublicKey, error) {
-	if pub == nil {
-		return nil, errPublicKeyNil
-	}
-	if pub.cached {
-		return pub, nil
-	}
-	return newPublicKeyFromRaw(&pub.raw)
 }
 
 func cryptoSignVerifyInternal(sig [CRYPTO_BYTES]uint8, m []uint8, pre []uint8, pub *PublicKey) (bool, error) {
@@ -508,15 +495,11 @@ func cryptoSignVerify(sig [CRYPTO_BYTES]uint8, m []uint8, ctx []uint8, pub *Publ
 	// Defense-in-depth nil-check (TOB-QRLLIB-11). The public Verify wrapper
 	// also checks, but this internal entry point may be reached by future
 	// callers.
-	pub, err := cachedPublicKey(pub)
-	if err != nil {
-		if err == errPublicKeyNil {
-			return false, cryptoerrors.ErrPublicKeyNil
-		}
-		return false, err
+	if pub == nil {
+		return false, errors.New("mldsa87: public key is nil")
 	}
 	if len(ctx) > 255 {
-		return false, cryptoerrors.ErrInvalidContext
+		return false, errors.New("mldsa87: invalid context")
 	}
 
 	pre := make([]uint8, len(ctx)+2)

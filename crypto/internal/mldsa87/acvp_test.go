@@ -252,5 +252,9 @@ func publicKeyFromSecretKey(t *testing.T, sk *[CRYPTO_SECRET_KEY_BYTES]uint8) *P
 
 	var pk [CRYPTO_PUBLIC_KEY_BYTES]uint8
 	packPk(&pk, rho, &t1)
-	return &PublicKey{raw: pk}
+	publicKey, err := newPublicKeyFromRaw(&pk)
+	if err != nil {
+		t.Fatalf("parse ACVP public key: %v", err)
+	}
+	return publicKey
 }

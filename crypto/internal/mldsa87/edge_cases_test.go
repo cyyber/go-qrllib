@@ -3,10 +3,7 @@ package mldsa87
 import (
 	"bytes"
 	"crypto/rand"
-	"errors"
 	"testing"
-
-	cryptoerrors "github.com/theQRL/go-qrllib/crypto/errors"
 )
 
 // Edge case tests for ML-DSA-87 (TST-004)
@@ -365,8 +362,8 @@ func TestVerify_NilPublicKey_ReturnsErrorNoPanic(t *testing.T) {
 		}
 	}()
 
-	if err := Verify(nil, msg, sig[:], ctx); !errors.Is(err, errPublicKeyNil) {
-		t.Fatalf("Verify(nil pk) err = %v; want errPublicKeyNil", err)
+	if err := Verify(nil, msg, sig[:], ctx); err == nil || err.Error() != "mldsa87: public key is nil" {
+		t.Fatalf("Verify(nil pk) err = %v; want mldsa87: public key is nil", err)
 	}
 }
 
@@ -377,7 +374,7 @@ func TestCryptoSignVerify_NilPublicKey_ReturnsErrPublicKeyNil(t *testing.T) {
 	if ok {
 		t.Error("cryptoSignVerify(nil pk) returned ok=true; want false")
 	}
-	if !errors.Is(err, cryptoerrors.ErrPublicKeyNil) {
-		t.Errorf("cryptoSignVerify(nil pk) err = %v; want ErrPublicKeyNil", err)
+	if err == nil || err.Error() != "mldsa87: public key is nil" {
+		t.Errorf("cryptoSignVerify(nil pk) err = %v; want mldsa87: public key is nil", err)
 	}
 }

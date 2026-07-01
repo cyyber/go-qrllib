@@ -1,6 +1,6 @@
 package mldsa87
 
-import cryptoerrors "github.com/theQRL/go-qrllib/crypto/errors"
+import "errors"
 
 func packPk(pkb *[CRYPTO_PUBLIC_KEY_BYTES]uint8, rho [SEED_BYTES]uint8, t1 *polyVecK) {
 	pk := pkb[:]
@@ -82,7 +82,7 @@ func packSig(sigb []uint8, c [C_TILDE_BYTES]uint8, z *polyVecL, h *polyVecK) err
 	if len(sigb) != CRYPTO_BYTES {
 		//coverage:ignore
 		//rationale: internal callers always pass correctly sized buffers
-		return cryptoerrors.ErrInvalidSignatureSize
+		return errors.New("mldsa87: invalid signature size")
 	}
 	sig := sigb[:]
 

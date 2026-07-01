@@ -5,15 +5,6 @@ import (
 	"crypto/subtle"
 	"errors"
 	"io"
-
-	cryptoerrors "github.com/theQRL/go-qrllib/crypto/errors"
-)
-
-var (
-	errInvalidSeedLength      = errors.New("mldsa87: invalid seed length")
-	errInvalidPublicKeyLength = errors.New("mldsa87: invalid public key length")
-	errPrivateKeyNil          = errors.New("mldsa87: private key is nil")
-	errPublicKeyNil           = errors.New("mldsa87: public key is nil")
 )
 
 // PrivateKey is an in-memory ML-DSA-87 private key.
@@ -47,7 +38,7 @@ func GenerateKey(random io.Reader) (*PrivateKey, error) {
 // NewPrivateKey returns the private key deterministically generated from seed.
 func NewPrivateKey(seed []byte) (*PrivateKey, error) {
 	if len(seed) != SEED_BYTES {
-		return nil, errInvalidSeedLength
+		return nil, errors.New("mldsa87: invalid seed length")
 	}
 	var fixedSeed [SEED_BYTES]uint8
 	defer zeroBytes(fixedSeed[:])
@@ -108,17 +99,16 @@ func (priv *PrivateKey) Zeroize() {
 
 // PublicKey is an encoded ML-DSA-87 public key.
 type PublicKey struct {
-	raw    [CRYPTO_PUBLIC_KEY_BYTES]uint8
-	tr     [TR_BYTES]uint8
-	mat    [K]polyVecL
-	t1     polyVecK // NTT(t1 * 2^D)
-	cached bool
+	raw [CRYPTO_PUBLIC_KEY_BYTES]uint8
+	tr  [TR_BYTES]uint8
+	mat [K]polyVecL
+	t1  polyVecK // NTT(t1 * 2^D)
 }
 
 // NewPublicKey constructs a public key from its encoded form.
 func NewPublicKey(publicKey []byte) (*PublicKey, error) {
 	if len(publicKey) != CRYPTO_PUBLIC_KEY_BYTES {
-		return nil, errInvalidPublicKeyLength
+		return nil, errors.New("mldsa87: invalid public key length")
 	}
 	var raw [CRYPTO_PUBLIC_KEY_BYTES]uint8
 	copy(raw[:], publicKey)
@@ -135,6 +125,8 @@ func (pub *PublicKey) Bytes() []byte {
 func (pub *PublicKey) Equal(x *PublicKey) bool {
 	return subtle.ConstantTimeCompare(pub.raw[:], x.raw[:]) == 1
 }
+
+var errPrivateKeyNil = errors.New("mldsa87: private key is nil")
 
 // Sign signs message using ctx and the randomness from random.
 //
@@ -167,10 +159,10 @@ func SignDeterministic(privateKey *PrivateKey, message, ctx []byte) ([]byte, err
 // Verify verifies sig over message with ctx.
 func Verify(publicKey *PublicKey, message, sig, ctx []byte) error {
 	if publicKey == nil {
-		return errPublicKeyNil
+		return errors.New("mldsa87: public key is nil")
 	}
 	if len(sig) != CRYPTO_BYTES {
-		return cryptoerrors.ErrInvalidSignatureSize
+		return errors.New("mldsa87: invalid signature size")
 	}
 	var signature [CRYPTO_BYTES]uint8
 	copy(signature[:], sig)
@@ -179,7 +171,7 @@ func Verify(publicKey *PublicKey, message, sig, ctx []byte) error {
 		return err
 	}
 	if !result {
-		return cryptoerrors.ErrInvalidSignature
+		return errors.New("mldsa87: invalid signature")
 	}
 	return nil
 }
