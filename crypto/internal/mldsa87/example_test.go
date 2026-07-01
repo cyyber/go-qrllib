@@ -8,8 +8,8 @@ import (
 
 // Example demonstrates basic ML-DSA-87 signature operations.
 func Example() {
-	// Create a new ML-DSA-87 instance with random seed
-	m, err := mldsa87.New(nil)
+	// Generate a new ML-DSA-87 private key.
+	m, err := mldsa87.GenerateKey(nil)
 	if err != nil {
 		fmt.Println("Error:", err)
 		return
@@ -25,34 +25,33 @@ func Example() {
 		return
 	}
 
-	// Verify the signature
-	pk := m.GetPK()
-	valid := mldsa87.Verify(ctx, message, signature, &pk)
+	// Verify the signature.
+	valid := mldsa87.VerifySignature(m.PublicKey(), message, signature[:], ctx) == nil
 	fmt.Println("Signature valid:", valid)
 	// Output: Signature valid: true
 }
 
-// ExampleNew demonstrates creating an ML-DSA-87 instance.
-func ExampleNew() {
-	// Create with random seed
-	m, err := mldsa87.New(nil)
+// ExampleGenerateKey demonstrates creating an ML-DSA-87 private key.
+func ExampleGenerateKey() {
+	// Generate with random seed.
+	m, err := mldsa87.GenerateKey(nil)
 	if err != nil {
 		fmt.Println("Error:", err)
 		return
 	}
 	defer m.Zeroize()
 
-	fmt.Println("Public key size:", len(m.GetPK()))
+	fmt.Println("Public key size:", len(m.PublicKey().Bytes()))
 	// Output: Public key size: 2592
 }
 
-// ExampleNewMLDSA87FromSeed demonstrates deterministic key generation.
-func ExampleNewMLDSA87FromSeed() {
+// ExampleNewPrivateKey demonstrates deterministic key generation.
+func ExampleNewPrivateKey() {
 	// Create from a specific seed for reproducible keys
 	var seed [mldsa87.SEED_BYTES]uint8
 	copy(seed[:], []byte("my-32-byte-seed-for-testing!"))
 
-	m, err := mldsa87.NewMLDSA87FromSeed(seed)
+	m, err := mldsa87.NewPrivateKey(seed[:])
 	if err != nil {
 		fmt.Println("Error:", err)
 		return
@@ -60,14 +59,14 @@ func ExampleNewMLDSA87FromSeed() {
 	defer m.Zeroize()
 
 	// Same seed always produces same keys
-	pk := m.GetPK()
+	pk := m.PublicKey().Bytes()
 	fmt.Println("Public key generated:", len(pk) == mldsa87.CRYPTO_PUBLIC_KEY_BYTES)
 	// Output: Public key generated: true
 }
 
-// ExampleMLDSA87_Sign demonstrates signing with context.
-func ExampleMLDSA87_Sign() {
-	m, _ := mldsa87.New(nil)
+// ExamplePrivateKey_Sign demonstrates signing with context.
+func ExamplePrivateKey_Sign() {
+	m, _ := mldsa87.GenerateKey(nil)
 	defer m.Zeroize()
 
 	// FIPS 204 requires a context parameter for domain separation
@@ -87,70 +86,22 @@ func ExampleMLDSA87_Sign() {
 
 // ExampleVerify demonstrates signature verification with context.
 func ExampleVerify() {
-	m, _ := mldsa87.New(nil)
+	m, _ := mldsa87.GenerateKey(nil)
 	defer m.Zeroize()
 
 	ctx := []byte("test-context")
 	message := []byte("verify me")
 	signature, _ := m.Sign(nil, ctx, message)
 
-	pk := m.GetPK()
-
 	// Verify requires the same context used during signing
-	valid := mldsa87.Verify(ctx, message, signature, &pk)
+	valid := mldsa87.VerifySignature(m.PublicKey(), message, signature[:], ctx) == nil
 	fmt.Println("Valid signature:", valid)
 
 	// Wrong context fails verification
 	wrongCtx := []byte("wrong-context")
-	valid = mldsa87.Verify(wrongCtx, message, signature, &pk)
+	valid = mldsa87.VerifySignature(m.PublicKey(), message, signature[:], wrongCtx) == nil
 	fmt.Println("Wrong context:", valid)
 	// Output:
 	// Valid signature: true
 	// Wrong context: false
-}
-
-// ExampleMLDSA87_SignAttached demonstrates the attached-signature
-// variant: the returned byte string is `signature || message`. Use this
-// when you want a single self-contained payload rather than the
-// detached signature returned by Sign. There is no confidentiality —
-// the message bytes are embedded in the result in the clear.
-func ExampleMLDSA87_SignAttached() {
-	m, _ := mldsa87.New(nil)
-	defer m.Zeroize()
-
-	ctx := []byte("example-context")
-	message := []byte("example transaction payload")
-
-	// SignAttached returns signature || message in a single buffer.
-	signed, err := m.SignAttached(nil, ctx, message)
-	if err != nil {
-		fmt.Println("Error:", err)
-		return
-	}
-
-	fmt.Printf("Signed length: %d (signature: %d + message: %d)\n",
-		len(signed), mldsa87.CRYPTO_BYTES, len(message))
-	// Output: Signed length: 4654 (signature: 4627 + message: 27)
-}
-
-// ExampleOpen demonstrates verifying an attached-signature byte string
-// (produced by SignAttached) and recovering the plaintext message.
-func ExampleOpen() {
-	m, _ := mldsa87.New(nil)
-	defer m.Zeroize()
-
-	ctx := []byte("open-context")
-	original := []byte("example transaction payload")
-	signed, _ := m.SignAttached(nil, ctx, original)
-
-	// Open verifies and returns the recovered message
-	pk := m.GetPK()
-	message, err := mldsa87.Open(ctx, signed, &pk)
-	if err != nil {
-		fmt.Println("Verification failed:", err)
-		return
-	}
-
-	fmt.Println("Recovered:", string(message))
-	// Output: Recovered: example transaction payload
 }

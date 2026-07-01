@@ -15,14 +15,14 @@ import (
 
 // TestCanonicalityTruncatedSignatures tests that truncated signatures are rejected.
 func TestCanonicalityTruncatedSignatures(t *testing.T) {
-	mldsa, err := New(nil)
+	mldsa, err := GenerateKey(nil)
 	if err != nil {
-		t.Fatalf("Failed to create MLDSA87: %v", err)
+		t.Fatalf("Failed to create PrivateKey: %v", err)
 	}
 
 	msg := []byte("test message for canonicality")
 	ctx := []byte{}
-	pk := mldsa.GetPK()
+	pub := mldsa.PublicKey()
 
 	validSig, err := mldsa.Sign(nil, ctx, msg)
 	if err != nil {
@@ -51,14 +51,12 @@ func TestCanonicalityTruncatedSignatures(t *testing.T) {
 				t.Skip("Not a truncation test")
 			}
 
-			// Create truncated signature by copying to smaller fixed array
-			// Note: Verify expects [CRYPTO_BYTES]uint8, so we test via Open
+			// Verify takes [CRYPTO_BYTES]uint8, so use VerifySignature for
+			// variable-length truncated signatures.
 			truncated := make([]byte, tc.length)
 			copy(truncated, validSig[:tc.length])
 
-			// Use Open which handles variable-length attached-signature messages
-			sealed := append(truncated, msg...)
-			if recovered, _ := Open(ctx, sealed, &pk); recovered != nil {
+			if err := VerifySignature(pub, msg, truncated, ctx); err == nil {
 				t.Errorf("Truncated signature at %d bytes should not verify", tc.length)
 			}
 		})
@@ -68,14 +66,14 @@ func TestCanonicalityTruncatedSignatures(t *testing.T) {
 // TestCanonicalityExtendedSignatures tests that signatures with extra trailing bytes are handled.
 // Note: The API uses fixed-size arrays, but we verify behavior is correct.
 func TestCanonicalityExtendedSignatures(t *testing.T) {
-	mldsa, err := New(nil)
+	mldsa, err := GenerateKey(nil)
 	if err != nil {
-		t.Fatalf("Failed to create MLDSA87: %v", err)
+		t.Fatalf("Failed to create PrivateKey: %v", err)
 	}
 
 	msg := []byte("test message for canonicality")
 	ctx := []byte{}
-	pk := mldsa.GetPK()
+	pk := mldsa.PublicKey().key
 
 	validSig, err := mldsa.Sign(nil, ctx, msg)
 	if err != nil {
@@ -100,14 +98,14 @@ func TestCanonicalityExtendedSignatures(t *testing.T) {
 
 // TestCanonicalityHintIndexOutOfBounds tests that hint indices >= N are rejected.
 func TestCanonicalityHintIndexOutOfBounds(t *testing.T) {
-	mldsa, err := New(nil)
+	mldsa, err := GenerateKey(nil)
 	if err != nil {
-		t.Fatalf("Failed to create MLDSA87: %v", err)
+		t.Fatalf("Failed to create PrivateKey: %v", err)
 	}
 
 	msg := []byte("test message")
 	ctx := []byte{}
-	pk := mldsa.GetPK()
+	pk := mldsa.PublicKey().key
 
 	validSig, err := mldsa.Sign(nil, ctx, msg)
 	if err != nil {
@@ -138,14 +136,14 @@ func TestCanonicalityHintIndexOutOfBounds(t *testing.T) {
 
 // TestCanonicalityCumulativeCountDecreasing tests that decreasing cumulative counts are rejected.
 func TestCanonicalityCumulativeCountDecreasing(t *testing.T) {
-	mldsa, err := New(nil)
+	mldsa, err := GenerateKey(nil)
 	if err != nil {
-		t.Fatalf("Failed to create MLDSA87: %v", err)
+		t.Fatalf("Failed to create PrivateKey: %v", err)
 	}
 
 	msg := []byte("test message")
 	ctx := []byte{}
-	pk := mldsa.GetPK()
+	pk := mldsa.PublicKey().key
 
 	validSig, err := mldsa.Sign(nil, ctx, msg)
 	if err != nil {
@@ -190,14 +188,14 @@ func TestCanonicalityCumulativeCountDecreasing(t *testing.T) {
 
 // TestCanonicalityCumulativeCountExceedsOmega tests that cumulative counts > OMEGA are rejected.
 func TestCanonicalityCumulativeCountExceedsOmega(t *testing.T) {
-	mldsa, err := New(nil)
+	mldsa, err := GenerateKey(nil)
 	if err != nil {
-		t.Fatalf("Failed to create MLDSA87: %v", err)
+		t.Fatalf("Failed to create PrivateKey: %v", err)
 	}
 
 	msg := []byte("test message")
 	ctx := []byte{}
-	pk := mldsa.GetPK()
+	pk := mldsa.PublicKey().key
 
 	validSig, err := mldsa.Sign(nil, ctx, msg)
 	if err != nil {
@@ -230,14 +228,14 @@ func TestCanonicalityCumulativeCountExceedsOmega(t *testing.T) {
 
 // TestCanonicalityHintIndicesNotStrictlyIncreasing tests various non-canonical hint orderings.
 func TestCanonicalityHintIndicesNotStrictlyIncreasing(t *testing.T) {
-	mldsa, err := New(nil)
+	mldsa, err := GenerateKey(nil)
 	if err != nil {
-		t.Fatalf("Failed to create MLDSA87: %v", err)
+		t.Fatalf("Failed to create PrivateKey: %v", err)
 	}
 
 	msg := []byte("test message")
 	ctx := []byte{}
-	pk := mldsa.GetPK()
+	pk := mldsa.PublicKey().key
 
 	validSig, err := mldsa.Sign(nil, ctx, msg)
 	if err != nil {
@@ -285,14 +283,14 @@ func TestCanonicalityHintIndicesNotStrictlyIncreasing(t *testing.T) {
 
 // TestCanonicalityNonZeroPadding tests that non-zero bytes in padding area are rejected.
 func TestCanonicalityNonZeroPadding(t *testing.T) {
-	mldsa, err := New(nil)
+	mldsa, err := GenerateKey(nil)
 	if err != nil {
-		t.Fatalf("Failed to create MLDSA87: %v", err)
+		t.Fatalf("Failed to create PrivateKey: %v", err)
 	}
 
 	msg := []byte("test message")
 	ctx := []byte{}
-	pk := mldsa.GetPK()
+	pk := mldsa.PublicKey().key
 
 	validSig, err := mldsa.Sign(nil, ctx, msg)
 	if err != nil {
@@ -331,14 +329,14 @@ func TestCanonicalityNonZeroPadding(t *testing.T) {
 
 // TestCanonicalityChallengeMalformation tests that corrupted challenge bytes are rejected.
 func TestCanonicalityChallengeMalformation(t *testing.T) {
-	mldsa, err := New(nil)
+	mldsa, err := GenerateKey(nil)
 	if err != nil {
-		t.Fatalf("Failed to create MLDSA87: %v", err)
+		t.Fatalf("Failed to create PrivateKey: %v", err)
 	}
 
 	msg := []byte("test message")
 	ctx := []byte{}
-	pk := mldsa.GetPK()
+	pk := mldsa.PublicKey().key
 
 	validSig, err := mldsa.Sign(nil, ctx, msg)
 	if err != nil {
@@ -362,14 +360,14 @@ func TestCanonicalityChallengeMalformation(t *testing.T) {
 
 // TestCanonicalityZVectorCorruption tests that corrupted z-vector bytes are rejected.
 func TestCanonicalityZVectorCorruption(t *testing.T) {
-	mldsa, err := New(nil)
+	mldsa, err := GenerateKey(nil)
 	if err != nil {
-		t.Fatalf("Failed to create MLDSA87: %v", err)
+		t.Fatalf("Failed to create PrivateKey: %v", err)
 	}
 
 	msg := []byte("test message")
 	ctx := []byte{}
-	pk := mldsa.GetPK()
+	pk := mldsa.PublicKey().key
 
 	validSig, err := mldsa.Sign(nil, ctx, msg)
 	if err != nil {
@@ -401,14 +399,14 @@ func TestCanonicalityZVectorCorruption(t *testing.T) {
 
 // TestCanonicalityAllZeroSignature tests that an all-zero signature is rejected.
 func TestCanonicalityAllZeroSignature(t *testing.T) {
-	mldsa, err := New(nil)
+	mldsa, err := GenerateKey(nil)
 	if err != nil {
-		t.Fatalf("Failed to create MLDSA87: %v", err)
+		t.Fatalf("Failed to create PrivateKey: %v", err)
 	}
 
 	msg := []byte("test message")
 	ctx := []byte{}
-	pk := mldsa.GetPK()
+	pk := mldsa.PublicKey().key
 
 	var zeroSig [CRYPTO_BYTES]uint8
 
@@ -419,14 +417,14 @@ func TestCanonicalityAllZeroSignature(t *testing.T) {
 
 // TestCanonicalityAllOnesSignature tests that an all-ones signature is rejected.
 func TestCanonicalityAllOnesSignature(t *testing.T) {
-	mldsa, err := New(nil)
+	mldsa, err := GenerateKey(nil)
 	if err != nil {
-		t.Fatalf("Failed to create MLDSA87: %v", err)
+		t.Fatalf("Failed to create PrivateKey: %v", err)
 	}
 
 	msg := []byte("test message")
 	ctx := []byte{}
-	pk := mldsa.GetPK()
+	pk := mldsa.PublicKey().key
 
 	var onesSig [CRYPTO_BYTES]uint8
 	for i := range onesSig {
@@ -440,14 +438,14 @@ func TestCanonicalityAllOnesSignature(t *testing.T) {
 
 // TestCanonicalityRandomSignatures tests that random signatures don't verify.
 func TestCanonicalityRandomSignatures(t *testing.T) {
-	mldsa, err := New(nil)
+	mldsa, err := GenerateKey(nil)
 	if err != nil {
-		t.Fatalf("Failed to create MLDSA87: %v", err)
+		t.Fatalf("Failed to create PrivateKey: %v", err)
 	}
 
 	msg := []byte("test message")
 	ctx := []byte{}
-	pk := mldsa.GetPK()
+	pk := mldsa.PublicKey().key
 
 	// Test multiple random signatures
 	for i := 0; i < 100; i++ {
@@ -462,9 +460,9 @@ func TestCanonicalityRandomSignatures(t *testing.T) {
 
 // TestCanonicalityValidSignatureVerifies ensures valid signatures still work.
 func TestCanonicalityValidSignatureVerifies(t *testing.T) {
-	mldsa, err := New(nil)
+	mldsa, err := GenerateKey(nil)
 	if err != nil {
-		t.Fatalf("Failed to create MLDSA87: %v", err)
+		t.Fatalf("Failed to create PrivateKey: %v", err)
 	}
 
 	messages := [][]byte{
@@ -486,7 +484,7 @@ func TestCanonicalityValidSignatureVerifies(t *testing.T) {
 			t.Fatalf("Failed to sign message %d: %v", i, err)
 		}
 
-		pk := mldsa.GetPK()
+		pk := mldsa.PublicKey().key
 		if !Verify(ctx, msg, sig, &pk) {
 			t.Errorf("Valid signature for message %d should verify", i)
 		}
@@ -499,14 +497,14 @@ func TestCanonicalityValidSignatureVerifies(t *testing.T) {
 // the FIPS 204 §3.4 hedged-signing default — TOB-QRLLIB-6 retired the
 // deterministic-by-default path. See also TestKATHedgedSignature.
 func TestCanonicalitySignatureUniqueness(t *testing.T) {
-	mldsa, err := New(nil)
+	mldsa, err := GenerateKey(nil)
 	if err != nil {
-		t.Fatalf("Failed to create MLDSA87: %v", err)
+		t.Fatalf("Failed to create PrivateKey: %v", err)
 	}
 
 	msg := []byte("test message")
 	ctx := []byte{}
-	pk := mldsa.GetPK()
+	pk := mldsa.PublicKey().key
 
 	sig1, err := mldsa.Sign(nil, ctx, msg)
 	if err != nil {

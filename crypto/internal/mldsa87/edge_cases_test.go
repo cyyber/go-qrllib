@@ -12,9 +12,9 @@ import (
 
 // TestEdgeCaseZeroLengthMessage tests signing and verifying empty messages
 func TestEdgeCaseZeroLengthMessage(t *testing.T) {
-	mldsa, err := New(nil)
+	mldsa, err := GenerateKey(nil)
 	if err != nil {
-		t.Fatalf("Failed to create MLDSA87: %v", err)
+		t.Fatalf("Failed to create PrivateKey: %v", err)
 	}
 
 	emptyMsg := []byte{}
@@ -27,34 +27,18 @@ func TestEdgeCaseZeroLengthMessage(t *testing.T) {
 	}
 
 	// Verify empty message
-	pk := mldsa.GetPK()
+	pk := mldsa.PublicKey().key
 	if !Verify(ctx, emptyMsg, sig, &pk) {
 		t.Error("Failed to verify signature on empty message")
 	}
 
-	// SignAttached/Open empty message
-	sealed, err := mldsa.SignAttached(nil, ctx, emptyMsg)
-	if err != nil {
-		t.Fatalf("Failed to sign attached empty message: %v", err)
-	}
-
-	opened, err := Open(ctx, sealed, &pk)
-	if err != nil {
-		t.Errorf("Open returned error: %v", err)
-	}
-	if opened == nil {
-		t.Error("Failed to open sealed empty message")
-	}
-	if len(opened) != 0 {
-		t.Errorf("Opened message should be empty, got %d bytes", len(opened))
-	}
 }
 
 // TestEdgeCaseNilMessage tests handling of nil messages
 func TestEdgeCaseNilMessage(t *testing.T) {
-	mldsa, err := New(nil)
+	mldsa, err := GenerateKey(nil)
 	if err != nil {
-		t.Fatalf("Failed to create MLDSA87: %v", err)
+		t.Fatalf("Failed to create PrivateKey: %v", err)
 	}
 
 	var nilMsg []byte = nil
@@ -67,7 +51,7 @@ func TestEdgeCaseNilMessage(t *testing.T) {
 	}
 
 	// Verify nil message
-	pk := mldsa.GetPK()
+	pk := mldsa.PublicKey().key
 	if !Verify(ctx, nilMsg, sig, &pk) {
 		t.Error("Failed to verify signature on nil message")
 	}
@@ -75,9 +59,9 @@ func TestEdgeCaseNilMessage(t *testing.T) {
 
 // TestEdgeCaseLargeMessage tests signing large messages
 func TestEdgeCaseLargeMessage(t *testing.T) {
-	mldsa, err := New(nil)
+	mldsa, err := GenerateKey(nil)
 	if err != nil {
-		t.Fatalf("Failed to create MLDSA87: %v", err)
+		t.Fatalf("Failed to create PrivateKey: %v", err)
 	}
 
 	// Test various large message sizes
@@ -101,7 +85,7 @@ func TestEdgeCaseLargeMessage(t *testing.T) {
 				t.Fatalf("Failed to sign %d byte message: %v", size, err)
 			}
 
-			pk := mldsa.GetPK()
+			pk := mldsa.PublicKey().key
 			if !Verify(ctx, largeMsg, sig, &pk) {
 				t.Errorf("Failed to verify signature on %d byte message", size)
 			}
@@ -111,14 +95,14 @@ func TestEdgeCaseLargeMessage(t *testing.T) {
 
 // TestEdgeCaseInvalidSignature tests various invalid signature scenarios
 func TestEdgeCaseInvalidSignature(t *testing.T) {
-	mldsa, err := New(nil)
+	mldsa, err := GenerateKey(nil)
 	if err != nil {
-		t.Fatalf("Failed to create MLDSA87: %v", err)
+		t.Fatalf("Failed to create PrivateKey: %v", err)
 	}
 
 	msg := []byte("test message")
 	ctx := []byte{}
-	pk := mldsa.GetPK()
+	pk := mldsa.PublicKey().key
 
 	t.Run("all_zeros_signature", func(t *testing.T) {
 		var zeroSig [CRYPTO_BYTES]uint8
@@ -164,14 +148,14 @@ func TestEdgeCaseInvalidSignature(t *testing.T) {
 
 // TestEdgeCaseMalformedSignatureHints tests signature hint encoding validation
 func TestEdgeCaseMalformedSignatureHints(t *testing.T) {
-	mldsa, err := New(nil)
+	mldsa, err := GenerateKey(nil)
 	if err != nil {
-		t.Fatalf("Failed to create MLDSA87: %v", err)
+		t.Fatalf("Failed to create PrivateKey: %v", err)
 	}
 
 	msg := []byte("test message")
 	ctx := []byte{}
-	pk := mldsa.GetPK()
+	pk := mldsa.PublicKey().key
 
 	// Get a valid signature to use as base
 	validSig, err := mldsa.Sign(nil, ctx, msg)
@@ -226,9 +210,9 @@ func TestEdgeCaseMalformedSignatureHints(t *testing.T) {
 
 // TestEdgeCaseInvalidPublicKey tests verification with invalid public keys
 func TestEdgeCaseInvalidPublicKey(t *testing.T) {
-	mldsa, err := New(nil)
+	mldsa, err := GenerateKey(nil)
 	if err != nil {
-		t.Fatalf("Failed to create MLDSA87: %v", err)
+		t.Fatalf("Failed to create PrivateKey: %v", err)
 	}
 
 	msg := []byte("test message")
@@ -256,13 +240,13 @@ func TestEdgeCaseInvalidPublicKey(t *testing.T) {
 
 // TestEdgeCaseContextVariations tests various context scenarios
 func TestEdgeCaseContextVariations(t *testing.T) {
-	mldsa, err := New(nil)
+	mldsa, err := GenerateKey(nil)
 	if err != nil {
-		t.Fatalf("Failed to create MLDSA87: %v", err)
+		t.Fatalf("Failed to create PrivateKey: %v", err)
 	}
 
 	msg := []byte("test message")
-	pk := mldsa.GetPK()
+	pk := mldsa.PublicKey().key
 
 	contexts := [][]byte{
 		nil,
@@ -300,91 +284,6 @@ func TestEdgeCaseContextVariations(t *testing.T) {
 			t.Error("Sign should fail with context > 255 bytes")
 		}
 
-		_, err = mldsa.SignAttached(nil, longCtx, msg)
-		if err == nil {
-			t.Error("SignAttached should fail with context > 255 bytes")
-		}
-	})
-}
-
-// TestEdgeCaseExtractFunctions tests Extract functions with edge cases
-func TestEdgeCaseExtractFunctions(t *testing.T) {
-	t.Run("nil_input", func(t *testing.T) {
-		if ExtractMessage(nil) != nil {
-			t.Error("ExtractMessage(nil) should return nil")
-		}
-		if ExtractSignature(nil) != nil {
-			t.Error("ExtractSignature(nil) should return nil")
-		}
-	})
-
-	t.Run("empty_input", func(t *testing.T) {
-		if ExtractMessage([]byte{}) != nil {
-			t.Error("ExtractMessage([]) should return nil")
-		}
-		if ExtractSignature([]byte{}) != nil {
-			t.Error("ExtractSignature([]) should return nil")
-		}
-	})
-
-	t.Run("too_short_input", func(t *testing.T) {
-		short := make([]byte, CRYPTO_BYTES-1)
-		if ExtractMessage(short) != nil {
-			t.Error("ExtractMessage(short) should return nil")
-		}
-		if ExtractSignature(short) != nil {
-			t.Error("ExtractSignature(short) should return nil")
-		}
-	})
-
-	t.Run("exact_signature_size", func(t *testing.T) {
-		exact := make([]byte, CRYPTO_BYTES)
-		msg := ExtractMessage(exact)
-		if msg == nil || len(msg) != 0 {
-			t.Error("ExtractMessage should return empty slice for exact size")
-		}
-		sig := ExtractSignature(exact)
-		if sig == nil || len(sig) != CRYPTO_BYTES {
-			t.Error("ExtractSignature should return full signature for exact size")
-		}
-	})
-}
-
-// TestEdgeCaseOpenFunction tests Open function with edge cases
-func TestEdgeCaseOpenFunction(t *testing.T) {
-	mldsa, err := New(nil)
-	if err != nil {
-		t.Fatalf("Failed to create MLDSA87: %v", err)
-	}
-	pk := mldsa.GetPK()
-	ctx := []byte{}
-
-	t.Run("nil_input", func(t *testing.T) {
-		if msg, _ := Open(ctx, nil, &pk); msg != nil {
-			t.Error("Open(nil) should return nil")
-		}
-	})
-
-	t.Run("empty_input", func(t *testing.T) {
-		if msg, _ := Open(ctx, []byte{}, &pk); msg != nil {
-			t.Error("Open([]) should return nil")
-		}
-	})
-
-	t.Run("too_short_input", func(t *testing.T) {
-		short := make([]byte, CRYPTO_BYTES-1)
-		if msg, _ := Open(ctx, short, &pk); msg != nil {
-			t.Error("Open(short) should return nil")
-		}
-	})
-
-	t.Run("invalid_signature_in_sealed", func(t *testing.T) {
-		// Create a attached-signature message with invalid signature
-		invalidSealed := make([]byte, CRYPTO_BYTES+10)
-		_, _ = rand.Read(invalidSealed)
-		if msg, _ := Open(ctx, invalidSealed, &pk); msg != nil {
-			t.Error("Open with invalid signature should return nil")
-		}
 	})
 }
 
@@ -392,7 +291,7 @@ func TestEdgeCaseOpenFunction(t *testing.T) {
 func TestEdgeCaseSeedBoundaries(t *testing.T) {
 	t.Run("zero_seed", func(t *testing.T) {
 		var zeroSeed [SEED_BYTES]uint8
-		mldsa, err := NewMLDSA87FromSeed(zeroSeed)
+		mldsa, err := NewPrivateKey(zeroSeed[:])
 		if err != nil {
 			t.Fatalf("Failed to create from zero seed: %v", err)
 		}
@@ -404,7 +303,7 @@ func TestEdgeCaseSeedBoundaries(t *testing.T) {
 			t.Fatalf("Failed to sign with zero seed: %v", err)
 		}
 
-		pk := mldsa.GetPK()
+		pk := mldsa.PublicKey().key
 		if !Verify(ctx, msg, sig, &pk) {
 			t.Error("Failed to verify with zero seed keypair")
 		}
@@ -415,7 +314,7 @@ func TestEdgeCaseSeedBoundaries(t *testing.T) {
 		for i := range maxSeed {
 			maxSeed[i] = 0xFF
 		}
-		mldsa, err := NewMLDSA87FromSeed(maxSeed)
+		mldsa, err := NewPrivateKey(maxSeed[:])
 		if err != nil {
 			t.Fatalf("Failed to create from max seed: %v", err)
 		}
@@ -427,48 +326,9 @@ func TestEdgeCaseSeedBoundaries(t *testing.T) {
 			t.Fatalf("Failed to sign with max seed: %v", err)
 		}
 
-		pk := mldsa.GetPK()
+		pk := mldsa.PublicKey().key
 		if !Verify(ctx, msg, sig, &pk) {
 			t.Error("Failed to verify with max seed keypair")
-		}
-	})
-}
-
-// TestEdgeCaseHexSeedParsing tests hex seed parsing edge cases
-func TestEdgeCaseHexSeedParsing(t *testing.T) {
-	t.Run("empty_hex", func(t *testing.T) {
-		_, err := NewMLDSA87FromHexSeed("")
-		if err == nil {
-			t.Error("Empty hex seed should return error")
-		}
-	})
-
-	t.Run("short_hex", func(t *testing.T) {
-		_, err := NewMLDSA87FromHexSeed("0102030405")
-		if err == nil {
-			t.Error("Short hex seed should return error")
-		}
-	})
-
-	t.Run("invalid_hex_chars", func(t *testing.T) {
-		_, err := NewMLDSA87FromHexSeed("xyz123")
-		if err == nil {
-			t.Error("Invalid hex characters should return error")
-		}
-	})
-
-	t.Run("odd_length_hex", func(t *testing.T) {
-		_, err := NewMLDSA87FromHexSeed("123") // Odd length
-		if err == nil {
-			t.Error("Odd length hex should return error")
-		}
-	})
-
-	t.Run("valid_hex_with_prefix", func(t *testing.T) {
-		validSeed := "0102030405060708091011121314151617181920212223242526272829303132"
-		_, err := NewMLDSA87FromHexSeed("0x" + validSeed)
-		if err != nil {
-			t.Fatalf("Valid hex seed with 0x prefix should work: %v", err)
 		}
 	})
 }

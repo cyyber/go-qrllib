@@ -221,7 +221,7 @@ sig, err := signer.Sign(nil, message, &mldsa87.Options{
 })
 ```
 
-The `opts` parameter must be `*mldsa87.Options` or `nil` (empty context). Passing other `crypto.SignerOpts` types (e.g., `crypto.SHA256`) returns an error.
+Use `*mldsa87.Options` when a FIPS 204 context is needed. `nil` and other `crypto.SignerOpts` values with `HashFunc() == 0` use an empty context; non-zero hash opts (e.g., `crypto.SHA256`) return an error because ML-DSA signs messages directly.
 
 ### Address String Format
 

@@ -1,8 +1,6 @@
 // Structured fuzz tests for ML-DSA-87, contributed by Trail of Bits
 // during the audit engagement (TOB-QRLLIB). Light adaptations applied
 // for current go-qrllib API surface (post TOB-6 / TOB-12 / TOB-14):
-//   - attached-signature API renamed to `SignAttached`
-//   - `Open` now returns `([]byte, error)`
 //   - the `randomized bool` parameter was removed from
 //     `cryptoSignSignature` (hedged is now the default)
 
@@ -10,8 +8,6 @@ package mldsa87
 
 import (
 	"bytes"
-	"crypto"
-	"strings"
 	"testing"
 )
 
@@ -93,7 +89,7 @@ func mutatePublicKey(pk [CRYPTO_PUBLIC_KEY_BYTES]uint8, mutation []byte) [CRYPTO
 	return mutated
 }
 
-func FuzzMLDSA87SignVerifyRoundTripMutate(f *testing.F) {
+func FuzzPrivateKeySignVerifyRoundTripMutate(f *testing.F) {
 	f.Add(bytes.Repeat([]byte{0x00}, SEED_BYTES), []byte("ctx"), []byte("message"), []byte{0, 1})
 	f.Add(bytes.Repeat([]byte{0xFF}, SEED_BYTES), bytes.Repeat([]byte{0x41}, 255), []byte{}, []byte{17, 0x80})
 	f.Add([]byte("seed"), bytes.Repeat([]byte{0x42}, 256), bytes.Repeat([]byte("m"), 128), []byte{3, 7})
@@ -103,9 +99,10 @@ func FuzzMLDSA87SignVerifyRoundTripMutate(f *testing.F) {
 		message = limitFuzzBytes(message, fuzzMaxMessageLen)
 		mutation = limitFuzzBytes(mutation, fuzzMaxMutationLen)
 
-		mldsa, err := NewMLDSA87FromSeed(fuzzSeed32(seedBytes))
+		seed := fuzzSeed32(seedBytes)
+		mldsa, err := NewPrivateKey(seed[:])
 		if err != nil {
-			t.Fatalf("NewMLDSA87FromSeed failed: %v", err)
+			t.Fatalf("NewPrivateKey failed: %v", err)
 		}
 
 		sig, err := mldsa.Sign(nil, ctx, message)
@@ -119,7 +116,7 @@ func FuzzMLDSA87SignVerifyRoundTripMutate(f *testing.F) {
 			t.Fatalf("Sign failed: %v", err)
 		}
 
-		pk := mldsa.GetPK()
+		pk := mldsa.PublicKey().key
 		if !Verify(ctx, message, sig, &pk) {
 			t.Fatal("Valid signature failed verification")
 		}
@@ -152,105 +149,43 @@ func FuzzMLDSA87SignVerifyRoundTripMutate(f *testing.F) {
 	})
 }
 
-func FuzzMLDSA87SignAttachedOpenRoundTripMutate(f *testing.F) {
-	f.Add(bytes.Repeat([]byte{0x00}, SEED_BYTES), []byte("ctx"), []byte("message"), []byte{0, 1})
-	f.Add(bytes.Repeat([]byte{0xFF}, SEED_BYTES), bytes.Repeat([]byte{0x41}, 255), []byte{}, []byte{9, 0x40})
-	f.Add([]byte("seed"), bytes.Repeat([]byte{0x42}, 256), bytes.Repeat([]byte("m"), 512), []byte{5, 7})
+func FuzzPrivateKeyFromSeedSignVerify(f *testing.F) {
+	f.Add(bytes.Repeat([]byte{0x00}, SEED_BYTES), []byte("ctx"), []byte("digest"))
+	f.Add(bytes.Repeat([]byte{0xFF}, SEED_BYTES), bytes.Repeat([]byte{0x41}, 255), []byte{})
+	f.Add([]byte("seed"), bytes.Repeat([]byte{0x42}, 256), bytes.Repeat([]byte("d"), 128))
 
-	f.Fuzz(func(t *testing.T, seedBytes, ctx, message, mutation []byte) {
-		ctx = limitFuzzBytes(ctx, fuzzMaxContextLen)
-		message = limitFuzzBytes(message, fuzzMaxMessageLen)
-		mutation = limitFuzzBytes(mutation, fuzzMaxMutationLen)
-
-		mldsa, err := NewMLDSA87FromSeed(fuzzSeed32(seedBytes))
-		if err != nil {
-			t.Fatalf("NewMLDSA87FromSeed failed: %v", err)
-		}
-
-		sealed, err := mldsa.SignAttached(nil, ctx, message)
-		if len(ctx) > 255 {
-			if err == nil {
-				t.Fatal("SignAttached succeeded with oversized context")
-			}
-			return
-		}
-		if err != nil {
-			t.Fatalf("SignAttached failed: %v", err)
-		}
-
-		pk := mldsa.GetPK()
-		opened, err := Open(ctx, sealed, &pk)
-		if err != nil {
-			t.Fatalf("Open returned an error for a valid attached-signature message: %v", err)
-		}
-		if !bytes.Equal(opened, message) {
-			t.Fatal("Open did not recover the original message")
-		}
-
-		mutatedCtx := mutateSlice(ctx, mutation)
-		if _, err := Open(mutatedCtx, sealed, &pk); err == nil {
-			t.Fatal("Open succeeded with mutated context")
-		}
-
-		mutatedSealed := mutateSlice(sealed, mutation)
-		if _, err := Open(ctx, mutatedSealed, &pk); err == nil {
-			t.Fatal("Open succeeded with mutated attached-signature message")
-		}
-
-		mutatedPK := mutatePublicKey(pk, mutation)
-		if _, err := Open(ctx, sealed, &mutatedPK); err == nil {
-			t.Fatal("Open succeeded with mutated public key")
-		}
-	})
-}
-
-func FuzzMLDSA87FromHexSeedAndSigner(f *testing.F) {
-	validHexSeed := strings.Repeat("00", SEED_BYTES)
-	f.Add(validHexSeed, []byte("ctx"), []byte("digest"))
-	f.Add("0x"+validHexSeed, bytes.Repeat([]byte{0x41}, 255), []byte{})
-	f.Add("abc", bytes.Repeat([]byte{0x42}, 256), bytes.Repeat([]byte("d"), 128))
-
-	f.Fuzz(func(t *testing.T, hexSeed string, ctx, digest []byte) {
+	f.Fuzz(func(t *testing.T, seedBytes, ctx, digest []byte) {
 		ctx = limitFuzzBytes(ctx, fuzzMaxContextLen)
 		digest = limitFuzzBytes(digest, fuzzMaxMessageLen)
 
-		mldsa, err := NewMLDSA87FromHexSeed(hexSeed)
+		seed := fuzzSeed32(seedBytes)
+		mldsa, err := NewPrivateKey(seed[:])
 		if err != nil {
-			return
+			t.Fatalf("NewPrivateKey failed: %v", err)
 		}
 
-		roundTrip, err := NewMLDSA87FromHexSeed(mldsa.GetHexSeed())
+		roundTrip, err := NewPrivateKey(mldsa.Bytes())
 		if err != nil {
-			t.Fatalf("Round-trip seed decode failed: %v", err)
+			t.Fatalf("Round-trip seed failed: %v", err)
 		}
-		if mldsa.GetPK() != roundTrip.GetPK() {
-			t.Fatal("Hex seed round-trip changed the derived public key")
+		if mldsa.PublicKey().key != roundTrip.PublicKey().key {
+			t.Fatal("Seed round-trip changed the derived public key")
 		}
 
-		signer := NewCryptoSigner(mldsa)
-		sigBytes, err := signer.Sign(nil, digest, &SignerOpts{Context: ctx})
+		sig, err := mldsa.Sign(nil, ctx, digest)
 		if len(ctx) > 255 {
 			if err == nil {
-				t.Fatal("CryptoSigner.Sign succeeded with oversized context")
+				t.Fatal("PrivateKey.Sign succeeded with oversized context")
 			}
 			return
 		}
 		if err != nil {
-			t.Fatalf("CryptoSigner.Sign failed: %v", err)
-		}
-		if len(sigBytes) != CRYPTO_BYTES {
-			t.Fatalf("Unexpected signature length %d", len(sigBytes))
+			t.Fatalf("PrivateKey.Sign failed: %v", err)
 		}
 
-		var sig [CRYPTO_BYTES]uint8
-		copy(sig[:], sigBytes)
-		pk := mldsa.GetPK()
+		pk := mldsa.PublicKey().key
 		if !Verify(ctx, digest, sig, &pk) {
-			t.Fatal("CryptoSigner produced a signature that does not verify")
-		}
-
-		if _, err := signer.Sign(nil, digest, crypto.SHA256); err == nil {
-			t.Fatal("CryptoSigner accepted unsupported signer opts")
+			t.Fatal("PrivateKey.Sign produced a signature that does not verify")
 		}
 	})
 }

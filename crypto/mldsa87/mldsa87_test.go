@@ -2,6 +2,7 @@ package mldsa87_test
 
 import (
 	"bytes"
+	"crypto"
 	"crypto/sha3"
 	"encoding/hex"
 	"errors"
@@ -229,6 +230,43 @@ func TestInvalidInputs(t *testing.T) {
 	wantErr := errors.New("random failed")
 	if _, _, err := mldsa87.GenerateKey(errReader{err: wantErr}); !errors.Is(err, wantErr) {
 		t.Fatalf("GenerateKey returned %v, want %v", err, wantErr)
+	}
+}
+
+func TestSignerOptsHandling(t *testing.T) {
+	public, private, err := mldsa87.GenerateKey(zeroReader{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	message := []byte("signer opts handling")
+
+	signature, err := mldsa87.Sign(zeroReader{}, private, message, crypto.Hash(0))
+	if err != nil {
+		t.Fatalf("Sign with crypto.Hash(0) failed: %v", err)
+	}
+	if !mldsa87.Verify(public, message, signature, crypto.Hash(0)) {
+		t.Fatal("Verify rejected signature with crypto.Hash(0)")
+	}
+
+	deterministic, err := mldsa87.SignDeterministic(private, message, crypto.Hash(0))
+	if err != nil {
+		t.Fatalf("SignDeterministic with crypto.Hash(0) failed: %v", err)
+	}
+	if !bytes.Equal(signature, deterministic) {
+		t.Fatal("zeroReader signature did not match SignDeterministic with crypto.Hash(0)")
+	}
+
+	if _, err := private.Sign(zeroReader{}, message, crypto.SHA256); err == nil {
+		t.Fatal("PrivateKey.Sign accepted non-zero hash opts")
+	}
+	if _, err := mldsa87.Sign(zeroReader{}, private, message, crypto.SHA256); err == nil {
+		t.Fatal("Sign accepted non-zero hash opts")
+	}
+	if _, err := mldsa87.SignDeterministic(private, message, crypto.SHA256); err == nil {
+		t.Fatal("SignDeterministic accepted non-zero hash opts")
+	}
+	if mldsa87.Verify(public, message, signature, crypto.SHA256) {
+		t.Fatal("Verify accepted non-zero hash opts")
 	}
 }
 

@@ -1,10 +1,9 @@
-// Package mldsa implements the post-quantum ML-DSA signature scheme specified
+// Package mldsa87 implements the post-quantum ML-DSA signature scheme specified
 // in FIPS 204.
 package mldsa87
 
 import (
 	"crypto"
-	"crypto/rand"
 	"errors"
 	"io"
 
@@ -27,7 +26,7 @@ const (
 	PrivateKeySize = SeedSize
 )
 
-var errUnsupportedSignerOpts = errors.New("mldsa87: opts must be *Options or nil")
+var errUnsupportedSignerOpts = errors.New("mldsa87: opts hash must be zero; use *Options for context")
 
 // Options contains additional options for signing and verifying ML-DSA-87
 // signatures.
@@ -145,18 +144,11 @@ func (priv *PrivateKey) Zeroize() {
 // GenerateKey generates a public/private key pair using entropy from random.
 // If random is nil, GenerateKey uses crypto/rand.Reader.
 func GenerateKey(random io.Reader) (*PublicKey, *PrivateKey, error) {
-	if random == nil {
-		random = rand.Reader
-	}
-	var seed [SeedSize]byte
-	defer clear(seed[:])
-	if _, err := io.ReadFull(random, seed[:]); err != nil {
-		return nil, nil, err
-	}
-	priv, err := NewPrivateKey(seed[:])
+	key, err := internal.GenerateKey(random)
 	if err != nil {
 		return nil, nil, err
 	}
+	priv := &PrivateKey{key: key}
 	return priv.PublicKey(), priv, nil
 }
 
@@ -196,15 +188,14 @@ func Verify(publicKey *PublicKey, message, sig []byte, opts crypto.SignerOpts) b
 }
 
 func contextFromOptions(opts crypto.SignerOpts) ([]byte, error) {
-	switch o := opts.(type) {
-	case nil:
+	if opts == nil {
 		return nil, nil
-	case *Options:
-		if o == nil {
-			return nil, nil
-		}
-		return o.Context, nil
-	default:
+	}
+	if opts.HashFunc() != crypto.Hash(0) {
 		return nil, errUnsupportedSignerOpts
 	}
+	if o, ok := opts.(*Options); ok && o != nil {
+		return o.Context, nil
+	}
+	return nil, nil
 }

@@ -53,7 +53,7 @@ func cryptoSignKeypair(seed *[SEED_BYTES]uint8, pk *[CRYPTO_PUBLIC_KEY_BYTES]uin
 	// paths handle their unpacked secret material consistently. Go's GC
 	// may copy values before zeroization executes, so this is a
 	// best-effort reduction of the in-memory exposure window rather than
-	// a guarantee — see SECURITY.md and MLDSA87.Zeroize for the exact
+	// a guarantee — see SECURITY.md and PrivateKey.Zeroize for the exact
 	// boundary. (TOB-QRLLIB-10)
 	defer func() {
 		zeroBytes(key[:])
@@ -66,7 +66,7 @@ func cryptoSignKeypair(seed *[SEED_BYTES]uint8, pk *[CRYPTO_PUBLIC_KEY_BYTES]uin
 
 	if seed == nil {
 		//coverage:ignore
-		//rationale: all public API callers (New, NewMLDSA87FromSeed) always provide a seed
+		//rationale: all public API callers (GenerateKey, NewPrivateKey) always provide a seed
 		seed = new([SEED_BYTES]uint8)
 		_, err := rand.Read(seed[:])
 		if err != nil {
@@ -327,20 +327,6 @@ func cryptoSignSignatureWithRnd(sig, m []uint8, ctx []uint8, sk *[CRYPTO_SECRET_
 	return cryptoSignSignatureInternal(sig, m, pre[:], rnd, sk)
 }
 
-// attached sig wrappers
-func cryptoSign(random io.Reader, msg []uint8, ctx []uint8, sk *[CRYPTO_SECRET_KEY_BYTES]uint8) ([]uint8, error) {
-	sm := make([]uint8, CRYPTO_BYTES+len(msg))
-	copy(sm[CRYPTO_BYTES:], msg)
-	err := cryptoSignSignature(random, sm[:CRYPTO_BYTES], sm[CRYPTO_BYTES:], ctx, sk)
-	if err != nil {
-		for i := range sm {
-			sm[i] = 0
-		}
-		return nil, err
-	}
-	return sm, nil
-}
-
 func cryptoSignVerifyInternal(sig [CRYPTO_BYTES]uint8, m []uint8, pre []uint8, pk *[CRYPTO_PUBLIC_KEY_BYTES]uint8) (bool, error) {
 	var buf [K * POLY_W1_PACKED_BYTES]uint8
 	var rho [SEED_BYTES]uint8
@@ -440,9 +426,9 @@ func cryptoSignVerifyInternal(sig [CRYPTO_BYTES]uint8, m []uint8, pre []uint8, p
 }
 
 func cryptoSignVerify(sig [CRYPTO_BYTES]uint8, m []uint8, ctx []uint8, pk *[CRYPTO_PUBLIC_KEY_BYTES]uint8) (bool, error) {
-	// Defense-in-depth nil-check (TOB-QRLLIB-11). The public Verify/Open
-	// wrappers also check, but this internal entry point is reachable
-	// from crypto.Signer (via cryptoSign etc.) and any future caller.
+	// Defense-in-depth nil-check (TOB-QRLLIB-11). The public Verify wrapper
+	// also checks, but this internal entry point may be reached by future
+	// callers.
 	if pk == nil {
 		return false, cryptoerrors.ErrPublicKeyNil
 	}
@@ -456,30 +442,4 @@ func cryptoSignVerify(sig [CRYPTO_BYTES]uint8, m []uint8, ctx []uint8, pk *[CRYP
 	copy(pre[2:], ctx)
 
 	return cryptoSignVerifyInternal(sig, m, pre[:], pk)
-}
-
-func cryptoSignOpen(sm []uint8, ctx []uint8, pk *[CRYPTO_PUBLIC_KEY_BYTES]uint8) ([]uint8, error) {
-	// Defense-in-depth nil-check (TOB-QRLLIB-11); see cryptoSignVerify.
-	if pk == nil {
-		return nil, cryptoerrors.ErrPublicKeyNil
-	}
-	if len(sm) < CRYPTO_BYTES {
-		return nil, cryptoerrors.ErrInvalidSignatureSize
-	}
-
-	var sig [CRYPTO_BYTES]uint8
-	msg := make([]uint8, len(sm)-CRYPTO_BYTES)
-
-	copy(sig[:], sm)
-	copy(msg, sm[CRYPTO_BYTES:])
-
-	result, err := cryptoSignVerify(sig, msg, ctx, pk)
-	if err != nil {
-		return nil, err
-	}
-	if !result {
-		return nil, cryptoerrors.ErrInvalidSignature
-	}
-
-	return msg, nil
 }

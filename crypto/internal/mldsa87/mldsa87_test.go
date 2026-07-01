@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/hex"
 	"errors"
-	"reflect"
 	"testing"
 
 	cryptoerrors "github.com/theQRL/go-qrllib/crypto/errors"
@@ -42,7 +41,7 @@ func TestNew(t *testing.T) {
 			t.Error("Panic while creating ml-dsa-87", err)
 		}
 	}()
-	if _, err := New(nil); err != nil {
+	if _, err := GenerateKey(nil); err != nil {
 		t.Error("failed to generate new ml-dsa-87", err.Error())
 	}
 }
@@ -53,45 +52,45 @@ func TestNewUsesCallerSuppliedRand(t *testing.T) {
 		seed[i] = byte(i + 1)
 	}
 
-	got, err := New(bytes.NewReader(seed[:]))
+	got, err := GenerateKey(bytes.NewReader(seed[:]))
 	if err != nil {
 		t.Fatalf("New with caller rand failed: %v", err)
 	}
 	defer got.Zeroize()
 
-	want, err := NewMLDSA87FromSeed(seed)
+	want, err := NewPrivateKey(seed[:])
 	if err != nil {
-		t.Fatalf("NewMLDSA87FromSeed failed: %v", err)
+		t.Fatalf("NewPrivateKey failed: %v", err)
 	}
 	defer want.Zeroize()
 
-	if got.GetSeed() != seed {
-		t.Fatal("New did not store the caller-supplied seed")
+	if !bytes.Equal(got.Bytes(), seed[:]) {
+		t.Fatal("GenerateKey did not store the caller-supplied seed")
 	}
-	if got.GetPK() != want.GetPK() {
-		t.Fatal("New did not derive the public key from caller-supplied rand")
+	if got.PublicKey().key != want.PublicKey().key {
+		t.Fatal("GenerateKey did not derive the public key from caller-supplied rand")
 	}
-	if got.GetSK() != want.GetSK() {
-		t.Fatal("New did not derive the secret key from caller-supplied rand")
+	if got.sk != want.sk {
+		t.Fatal("GenerateKey did not derive the secret key from caller-supplied rand")
 	}
 
 	var zeroSeed [SEED_BYTES]uint8
-	gotZero, err := New(zeroReader{})
+	gotZero, err := GenerateKey(zeroReader{})
 	if err != nil {
 		t.Fatalf("New with zeroReader failed: %v", err)
 	}
 	defer gotZero.Zeroize()
 
-	wantZero, err := NewMLDSA87FromSeed(zeroSeed)
+	wantZero, err := NewPrivateKey(zeroSeed[:])
 	if err != nil {
-		t.Fatalf("NewMLDSA87FromSeed with zero seed failed: %v", err)
+		t.Fatalf("NewPrivateKey with zero seed failed: %v", err)
 	}
 	defer wantZero.Zeroize()
 
-	if gotZero.GetPK() != wantZero.GetPK() {
-		t.Fatal("New with zeroReader did not match NewMLDSA87FromSeed with zero seed")
+	if gotZero.PublicKey().key != wantZero.PublicKey().key {
+		t.Fatal("GenerateKey with zeroReader did not match NewPrivateKey with zero seed")
 	}
-	if gotZero.GetSK() != wantZero.GetSK() {
+	if gotZero.sk != wantZero.sk {
 		t.Fatal("New with zeroReader did not derive the expected zero-seed secret key")
 	}
 }
@@ -99,7 +98,7 @@ func TestNewUsesCallerSuppliedRand(t *testing.T) {
 func TestNewRandReaderError(t *testing.T) {
 	wantErr := errors.New("new rand failure")
 
-	_, err := New(errReader{err: wantErr})
+	_, err := GenerateKey(errReader{err: wantErr})
 	if err == nil {
 		t.Fatal("expected New to fail when caller rand fails")
 	}
@@ -109,10 +108,7 @@ func TestNewRandReaderError(t *testing.T) {
 }
 
 func TestSignUsesCallerSuppliedRand(t *testing.T) {
-	d, err := NewMLDSA87FromHexSeed(HexSeed)
-	if err != nil {
-		t.Fatalf("NewMLDSA87FromHexSeed failed: %v", err)
-	}
+	d := newPrivateKeyFromSeed(t, HexSeed)
 	defer d.Zeroize()
 
 	ctx := []byte("caller-rand")
@@ -137,7 +133,7 @@ func TestSignUsesCallerSuppliedRand(t *testing.T) {
 		t.Fatal("Sign with zeroReader did not match SignDeterministic")
 	}
 
-	pk := d.GetPK()
+	pk := d.PublicKey().key
 	if !Verify(ctx, msg, sig1, &pk) {
 		t.Fatal("caller-rand signature did not verify")
 	}
@@ -160,57 +156,20 @@ func TestSignUsesCallerSuppliedRand(t *testing.T) {
 		t.Fatal("fixed-rand signature did not verify")
 	}
 
-	sealed1, err := d.SignAttached(zeroReader{}, ctx, msg)
-	if err != nil {
-		t.Fatalf("first SignAttached with caller rand failed: %v", err)
-	}
-	sealed2, err := d.SignAttached(zeroReader{}, ctx, msg)
-	if err != nil {
-		t.Fatalf("second SignAttached with caller rand failed: %v", err)
-	}
-	if !bytes.Equal(sealed1, sealed2) {
-		t.Fatal("SignAttached did not use caller-supplied rand deterministically")
-	}
-	if !bytes.Equal(sealed1[:CRYPTO_BYTES], deterministicSig[:]) {
-		t.Fatal("SignAttached with zeroReader did not contain the deterministic signature")
-	}
-	sealed3, err := d.SignAttached(fixedByteReader(0x42), ctx, msg)
-	if err != nil {
-		t.Fatalf("SignAttached with fixedByteReader failed: %v", err)
-	}
-	if bytes.Equal(sealed3[:CRYPTO_BYTES], sealed1[:CRYPTO_BYTES]) {
-		t.Fatal("SignAttached with non-zero fixed reader matched zeroReader output")
-	}
-	opened, err := Open(ctx, sealed1, &pk)
-	if err != nil {
-		t.Fatalf("Open failed for caller-rand attached signature: %v", err)
-	}
-	if !bytes.Equal(opened, msg) {
-		t.Fatalf("Open returned %q, want %q", opened, msg)
-	}
 }
 
 func TestSignRandReaderError(t *testing.T) {
-	d, err := NewMLDSA87FromHexSeed(HexSeed)
-	if err != nil {
-		t.Fatalf("NewMLDSA87FromHexSeed failed: %v", err)
-	}
+	d := newPrivateKeyFromSeed(t, HexSeed)
 	defer d.Zeroize()
 
 	wantErr := errors.New("sign rand failure")
 	if _, err := d.Sign(errReader{err: wantErr}, []byte("ctx"), []byte("msg")); err != wantErr {
 		t.Fatalf("Sign returned %v, want %v", err, wantErr)
 	}
-	if _, err := d.SignAttached(errReader{err: wantErr}, []byte("ctx"), []byte("msg")); err != wantErr {
-		t.Fatalf("SignAttached returned %v, want %v", err, wantErr)
-	}
 }
 
 func TestSignInvalidContextBeforeRandRead(t *testing.T) {
-	d, err := NewMLDSA87FromHexSeed(HexSeed)
-	if err != nil {
-		t.Fatalf("NewMLDSA87FromHexSeed failed: %v", err)
-	}
+	d := newPrivateKeyFromSeed(t, HexSeed)
 	defer d.Zeroize()
 
 	randErr := errors.New("rand should not be read")
@@ -218,12 +177,9 @@ func TestSignInvalidContextBeforeRandRead(t *testing.T) {
 	if _, err := d.Sign(errReader{err: randErr}, longCtx, []byte("msg")); !errors.Is(err, cryptoerrors.ErrInvalidContext) {
 		t.Fatalf("Sign returned %v, want ErrInvalidContext", err)
 	}
-	if _, err := d.SignAttached(errReader{err: randErr}, longCtx, []byte("msg")); !errors.Is(err, cryptoerrors.ErrInvalidContext) {
-		t.Fatalf("SignAttached returned %v, want ErrInvalidContext", err)
-	}
 }
 
-func TestNewMLDSA87FromSeed(t *testing.T) {
+func TestNewPrivateKey(t *testing.T) {
 	defer func() {
 		if err := recover(); err != nil {
 			t.Error("Panic while creating ml-dsa-87", err)
@@ -236,7 +192,7 @@ func TestNewMLDSA87FromSeed(t *testing.T) {
 	}
 	var binSeed [SEED_BYTES]uint8
 	copy(binSeed[:], binUnsizeSeed)
-	d, err := NewMLDSA87FromSeed(binSeed)
+	d, err := NewPrivateKey(binSeed[:])
 	if err != nil {
 		t.Fatal("failed to generate new ml-dsa-87 from seed", err.Error())
 	}
@@ -244,8 +200,8 @@ func TestNewMLDSA87FromSeed(t *testing.T) {
 		t.Fatal("ml-dsa-87 is nil")
 	}
 
-	pk := d.GetPK()
-	sk := d.GetSK()
+	pk := d.PublicKey().key
+	sk := d.sk
 	strPK := hex.EncodeToString(pk[:])
 	strSK := hex.EncodeToString(sk[:])
 
@@ -257,145 +213,60 @@ func TestNewMLDSA87FromSeed(t *testing.T) {
 		t.Errorf("sk mismatch\nExpected: %s\nFound: %s", SK, strSK)
 	}
 
-	if "0x"+HexSeed != d.GetHexSeed() {
-		t.Errorf("hexseed mismatch\nExpected: %s\nFound: %s", HexSeed, d.GetHexSeed())
+	gotHexSeed := "0x" + hex.EncodeToString(d.Bytes())
+	if "0x"+HexSeed != gotHexSeed {
+		t.Errorf("hexseed mismatch\nExpected: 0x%s\nFound: %s", HexSeed, gotHexSeed)
 	}
 }
 
-func TestNewMLDSA87FromHexSeed(t *testing.T) {
-	defer func() {
-		if err := recover(); err != nil {
-			t.Error("Panic while creating ml-dsa-87", err)
-		}
-	}()
-	d, err := NewMLDSA87FromHexSeed(HexSeed)
-	if err != nil {
-		t.Error("failed to generate new ml-dsa-87 from hex seed", err.Error())
-	}
-	if d == nil {
-		t.Fatal("ml-dsa-87 is nil")
-	}
-
-	pk := d.GetPK()
-	sk := d.GetSK()
-	strPK := hex.EncodeToString(pk[:])
-	strSK := hex.EncodeToString(sk[:])
-
-	if PK != strPK {
-		t.Errorf("pk mismatch\nExpected: %s\nFound: %s", PK, strPK)
-	}
-
-	if SK != strSK {
-		t.Errorf("sk mismatch\nExpected: %s\nFound: %s", SK, strSK)
-	}
-
-	if "0x"+HexSeed != d.GetHexSeed() {
-		t.Errorf("hexseed mismatch\nExpected: %s\nFound: %s", HexSeed, d.GetHexSeed())
-	}
-}
-
-func TestNewMLDSA87FromHexSeedWithPrefix(t *testing.T) {
-	d, err := NewMLDSA87FromHexSeed("0x" + HexSeed)
-	if err != nil {
-		t.Fatalf("failed to generate new ml-dsa-87 from prefixed hex seed: %v", err)
-	}
-	if d == nil {
-		t.Fatal("ml-dsa-87 is nil")
-	}
-}
-
-func TestMLDSA87_GetPK(t *testing.T) {
+func TestPrivateKey_PublicKey(t *testing.T) {
 	pk := PKHStrToBin(PK)
 
-	d := newMLDSA87FromSeed(t, HexSeed)
-	if !reflect.DeepEqual(pk, d.GetPK()) {
-		t.Errorf("PK mismatch\nExpected: %x\nFound: %x", pk, d.GetPK())
+	d := newPrivateKeyFromSeed(t, HexSeed)
+	if pk != d.PublicKey().key {
+		t.Errorf("PK mismatch\nExpected: %x\nFound: %x", pk, d.PublicKey().key)
 	}
 }
 
-func TestMLDSA87_GetSK(t *testing.T) {
+func TestPrivateKey_ExpandedSecretKey(t *testing.T) {
 	sk := SKHStrToBin(SK)
 
-	d := newMLDSA87FromSeed(t, HexSeed)
-	if !reflect.DeepEqual(sk, d.GetSK()) {
-		t.Errorf("SK mismatch\nExpected: %x\nFound: %x", sk, d.GetSK())
+	d := newPrivateKeyFromSeed(t, HexSeed)
+	if sk != d.sk {
+		t.Errorf("SK mismatch\nExpected: %x\nFound: %x", sk, d.sk)
 	}
 }
 
-func TestMLDSA87_GetSeed(t *testing.T) {
+func TestPrivateKey_Bytes(t *testing.T) {
 	binUnsizeSeed, err := hex.DecodeString(HexSeed)
 	if err != nil {
 		t.Error("failed to decode hexseed", err.Error())
 	}
 	var binSeed [SEED_BYTES]uint8
 	copy(binSeed[:], binUnsizeSeed)
-	d, err := NewMLDSA87FromSeed(binSeed)
+	d, err := NewPrivateKey(binSeed[:])
 	if err != nil {
 		t.Error("failed to generate new ml-dsa-87 from seed", err.Error())
 	}
 
-	if !reflect.DeepEqual(binSeed, d.GetSeed()) {
+	if !bytes.Equal(binSeed[:], d.Bytes()) {
 		t.Error("Seed Mismatch")
 	}
 }
 
-func TestMLDSA87_GetHexSeed(t *testing.T) {
-	d := newMLDSA87FromSeed(t, HexSeed)
-	if "0x"+HexSeed != d.GetHexSeed() {
-		t.Errorf("HexSeed mismatch\nExpected: 0x%s\nFound: %s", HexSeed, d.GetHexSeed())
+func TestPrivateKey_BytesHex(t *testing.T) {
+	d := newPrivateKeyFromSeed(t, HexSeed)
+	gotHexSeed := "0x" + hex.EncodeToString(d.Bytes())
+	if "0x"+HexSeed != gotHexSeed {
+		t.Errorf("HexSeed mismatch\nExpected: 0x%s\nFound: %s", HexSeed, gotHexSeed)
 	}
 }
 
-func TestMLDSA87_SignAttached(t *testing.T) {
+func TestPrivateKey_Sign(t *testing.T) {
 	ctx := []uint8("randomContext")
 	msg := []uint8{0, 1, 2, 4, 6, 9, 1}
 
-	d := newMLDSA87FromSeed(t, HexSeed)
-	signatureMessage, err := d.SignAttached(nil, ctx, msg)
-	if err != nil {
-		t.Fatal("failed to seal", err.Error())
-	}
-
-	// Hedged signing (TOB-QRLLIB-6) means we cannot pin a specific
-	// signature byte string; instead, assert the round-trip via Open.
-	pk := d.GetPK()
-	opened, err := Open(ctx, signatureMessage, &pk)
-	if err != nil {
-		t.Fatalf("Open returned error: %v", err)
-	}
-	if !bytes.Equal(opened, msg) {
-		t.Error("attached signature did not round-trip via Open")
-	}
-}
-
-func TestMLDSA87_Open(t *testing.T) {
-	ctx := []uint8("randomContext")
-	msg := []uint8{0, 1, 2, 4, 6, 9, 1}
-
-	d := newMLDSA87FromSeed(t, HexSeed)
-	signatureMessage, err := d.SignAttached(nil, ctx, msg)
-	if err != nil {
-		t.Fatal("failed to seal", err.Error())
-	}
-
-	// Hedged signing (TOB-QRLLIB-6): the previous fixed-hex assertion
-	// cannot survive the per-signature randomness; round-trip via Open
-	// remains the meaningful check.
-	pk := d.GetPK()
-	opened, err := Open(ctx, signatureMessage, &pk)
-	if err != nil {
-		t.Errorf("Open returned error: %v", err)
-	}
-	if !bytes.Equal(opened, msg) {
-		t.Error("SignatureMessage Verification failed")
-	}
-}
-
-func TestMLDSA87_Sign(t *testing.T) {
-	ctx := []uint8("randomContext")
-	msg := []uint8{0, 1, 2, 4, 6, 9, 1}
-
-	d := newMLDSA87FromSeed(t, HexSeed)
+	d := newPrivateKeyFromSeed(t, HexSeed)
 	signature, err := d.Sign(nil, ctx, msg)
 	if err != nil {
 		t.Fatal("failed to sign", err.Error())
@@ -403,62 +274,30 @@ func TestMLDSA87_Sign(t *testing.T) {
 
 	// Hedged signing (TOB-QRLLIB-6) means signatures are not pinable;
 	// verify the produced signature under the matching public key.
-	pk := d.GetPK()
+	pk := d.PublicKey().key
 	if !Verify(ctx, msg, signature, &pk) {
 		t.Error("Sign produced a signature that did not verify under its own public key")
 	}
 }
 
-func TestMLDSA87_Verify(t *testing.T) {
+func TestPrivateKey_Verify(t *testing.T) {
 	ctx := []uint8("randomContext")
 	msg := []uint8{0, 1, 2, 4, 6, 9, 1}
 
-	d := newMLDSA87FromSeed(t, HexSeed)
+	d := newPrivateKeyFromSeed(t, HexSeed)
 	signature, err := d.Sign(nil, ctx, msg)
 	if err != nil {
 		t.Fatal("failed to sign", err.Error())
 	}
 
 	// Hedged signing (TOB-QRLLIB-6): no fixed-hex pin; verify only.
-	pk := d.GetPK()
+	pk := d.PublicKey().key
 	if !Verify(ctx, msg, signature, &pk) {
 		t.Error("Signature Verification failed")
 	}
 }
 
-func TestExtractMessage(t *testing.T) {
-	ctx := []uint8("randomContext")
-	msg := []uint8{0, 1, 2, 4, 6, 9, 1}
-	d := newMLDSA87FromSeed(t, HexSeed)
-
-	signatureMessage, err := d.SignAttached(nil, ctx, msg)
-	if err != nil {
-		t.Fatal("failed to seal message: ", err.Error())
-	}
-
-	extractedMessage := ExtractMessage(signatureMessage)
-	if !bytes.Equal(msg, extractedMessage) {
-		t.Error("ExtractedMessage mismatch")
-	}
-}
-
-func TestExtractSignature(t *testing.T) {
-	ctx := []uint8("randomContext")
-	msg := []uint8{0, 1, 2, 4, 6, 9, 1}
-	d := newMLDSA87FromSeed(t, HexSeed)
-
-	signatureMessage, err := d.SignAttached(nil, ctx, msg)
-	if err != nil {
-		t.Fatal("failed to seal message: ", err.Error())
-	}
-
-	extractedSignature := ExtractSignature(signatureMessage)
-	if !bytes.Equal(signatureMessage[:CRYPTO_BYTES], extractedSignature) {
-		t.Errorf("ExtractedSignature mismatch\nExpected: %x\nFound: %x", signatureMessage[:CRYPTO_BYTES], extractedSignature)
-	}
-}
-
-func newMLDSA87FromSeed(t *testing.T, hexSeed string) *MLDSA87 {
+func newPrivateKeyFromSeed(t *testing.T, hexSeed string) *PrivateKey {
 	t.Helper()
 
 	binUnsizeSeed, err := hex.DecodeString(hexSeed)
@@ -469,7 +308,7 @@ func newMLDSA87FromSeed(t *testing.T, hexSeed string) *MLDSA87 {
 	var binSeed [SEED_BYTES]uint8
 	copy(binSeed[:], binUnsizeSeed)
 
-	d, err := NewMLDSA87FromSeed(binSeed)
+	d, err := NewPrivateKey(binSeed[:])
 	if err != nil {
 		t.Fatal("failed to generate new ml-dsa-87 from seed", err.Error())
 	}
