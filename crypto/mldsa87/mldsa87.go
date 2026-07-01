@@ -55,9 +55,6 @@ func NewPublicKey(publicKey []byte) (*PublicKey, error) {
 
 // Bytes returns the PublicKeySize-byte encoded form of pub.
 func (pub *PublicKey) Bytes() []byte {
-	if pub == nil || pub.key == nil {
-		return nil
-	}
 	return pub.key.Bytes()
 }
 
@@ -66,12 +63,6 @@ func (pub *PublicKey) Equal(x crypto.PublicKey) bool {
 	xx, ok := x.(*PublicKey)
 	if !ok {
 		return false
-	}
-	if pub == nil || xx == nil {
-		return pub == xx
-	}
-	if pub.key == nil || xx.key == nil {
-		return pub.key == xx.key
 	}
 	return pub.key.Equal(xx.key)
 }
@@ -93,17 +84,11 @@ func NewPrivateKey(seed []byte) (*PrivateKey, error) {
 
 // Bytes returns the SeedSize-byte private key seed.
 func (priv *PrivateKey) Bytes() []byte {
-	if priv == nil || priv.key == nil {
-		return nil
-	}
 	return priv.key.Bytes()
 }
 
 // PublicKey returns the public key corresponding to priv.
 func (priv *PrivateKey) PublicKey() *PublicKey {
-	if priv == nil || priv.key == nil {
-		return nil
-	}
 	return &PublicKey{key: priv.key.PublicKey()}
 }
 
@@ -118,12 +103,6 @@ func (priv *PrivateKey) Equal(x crypto.PrivateKey) bool {
 	if !ok {
 		return false
 	}
-	if priv == nil || xx == nil {
-		return priv == xx
-	}
-	if priv.key == nil || xx.key == nil {
-		return priv.key == xx.key
-	}
 	return priv.key.Equal(xx.key)
 }
 
@@ -131,6 +110,11 @@ func (priv *PrivateKey) Equal(x crypto.PrivateKey) bool {
 // If random is nil, Sign uses crypto/rand.Reader.
 func (priv *PrivateKey) Sign(random io.Reader, message []byte, opts crypto.SignerOpts) ([]byte, error) {
 	return Sign(random, priv, message, opts)
+}
+
+// SignDeterministic signs message using FIPS 204 deterministic RND_BYTES.
+func (priv *PrivateKey) SignDeterministic(message []byte, opts crypto.SignerOpts) ([]byte, error) {
+	return SignDeterministic(priv, message, opts)
 }
 
 // Zeroize clears sensitive key material from memory.

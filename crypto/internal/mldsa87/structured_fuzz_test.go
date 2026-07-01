@@ -55,8 +55,8 @@ func mutateSlice(base []byte, mutation []byte) []byte {
 	return out
 }
 
-func mutateSignature(sig [CRYPTO_BYTES]uint8, mutation []byte) [CRYPTO_BYTES]uint8 {
-	mutated := sig
+func mutateSignature(sig []byte, mutation []byte) []byte {
+	mutated := append([]byte(nil), sig...)
 	idx := 0
 	mask := byte(0x01)
 	if len(mutation) > 0 {
@@ -105,7 +105,7 @@ func FuzzPrivateKeySignVerifyRoundTripMutate(f *testing.F) {
 			t.Fatalf("NewPrivateKey failed: %v", err)
 		}
 
-		sig, err := mldsa.Sign(nil, ctx, message)
+		sig, err := Sign(nil, mldsa, message, ctx)
 		if len(ctx) > 255 {
 			if err == nil {
 				t.Fatal("Sign succeeded with oversized context")
@@ -172,20 +172,20 @@ func FuzzPrivateKeyFromSeedSignVerify(f *testing.F) {
 			t.Fatal("Seed round-trip changed the derived public key")
 		}
 
-		sig, err := mldsa.Sign(nil, ctx, digest)
+		sig, err := Sign(nil, mldsa, digest, ctx)
 		if len(ctx) > 255 {
 			if err == nil {
-				t.Fatal("PrivateKey.Sign succeeded with oversized context")
+				t.Fatal("Sign succeeded with oversized context")
 			}
 			return
 		}
 		if err != nil {
-			t.Fatalf("PrivateKey.Sign failed: %v", err)
+			t.Fatalf("Sign failed: %v", err)
 		}
 
 		pk := mldsa.PublicKey().raw
 		if !verifyForTest(ctx, digest, sig, &pk) {
-			t.Fatal("PrivateKey.Sign produced a signature that does not verify")
+			t.Fatal("Sign produced a signature that does not verify")
 		}
 	})
 }
@@ -204,6 +204,6 @@ func FuzzPrivateKeyVerify(f *testing.F) {
 		copy(sig[:], sigBytes)
 		copy(pk[:], pkBytes)
 
-		_ = verifyForTest(ctx, message, sig, &pk)
+		_ = verifyForTest(ctx, message, sig[:], &pk)
 	})
 }

@@ -24,7 +24,7 @@ func TestCanonicalityTruncatedSignatures(t *testing.T) {
 	ctx := []byte{}
 	pub := mldsa.PublicKey()
 
-	validSig, err := mldsa.Sign(nil, ctx, msg)
+	validSig, err := Sign(nil, mldsa, msg, ctx)
 	if err != nil {
 		t.Fatalf("Failed to sign: %v", err)
 	}
@@ -75,7 +75,7 @@ func TestCanonicalityExtendedSignatures(t *testing.T) {
 	ctx := []byte{}
 	pk := mldsa.PublicKey().raw
 
-	validSig, err := mldsa.Sign(nil, ctx, msg)
+	validSig, err := Sign(nil, mldsa, msg, ctx)
 	if err != nil {
 		t.Fatalf("Failed to sign: %v", err)
 	}
@@ -107,7 +107,7 @@ func TestCanonicalityHintIndexOutOfBounds(t *testing.T) {
 	ctx := []byte{}
 	pk := mldsa.PublicKey().raw
 
-	validSig, err := mldsa.Sign(nil, ctx, msg)
+	validSig, err := Sign(nil, mldsa, msg, ctx)
 	if err != nil {
 		t.Fatalf("Failed to sign: %v", err)
 	}
@@ -145,7 +145,7 @@ func TestCanonicalityCumulativeCountDecreasing(t *testing.T) {
 	ctx := []byte{}
 	pk := mldsa.PublicKey().raw
 
-	validSig, err := mldsa.Sign(nil, ctx, msg)
+	validSig, err := Sign(nil, mldsa, msg, ctx)
 	if err != nil {
 		t.Fatalf("Failed to sign: %v", err)
 	}
@@ -197,7 +197,7 @@ func TestCanonicalityCumulativeCountExceedsOmega(t *testing.T) {
 	ctx := []byte{}
 	pk := mldsa.PublicKey().raw
 
-	validSig, err := mldsa.Sign(nil, ctx, msg)
+	validSig, err := Sign(nil, mldsa, msg, ctx)
 	if err != nil {
 		t.Fatalf("Failed to sign: %v", err)
 	}
@@ -237,7 +237,7 @@ func TestCanonicalityHintIndicesNotStrictlyIncreasing(t *testing.T) {
 	ctx := []byte{}
 	pk := mldsa.PublicKey().raw
 
-	validSig, err := mldsa.Sign(nil, ctx, msg)
+	validSig, err := Sign(nil, mldsa, msg, ctx)
 	if err != nil {
 		t.Fatalf("Failed to sign: %v", err)
 	}
@@ -292,7 +292,7 @@ func TestCanonicalityNonZeroPadding(t *testing.T) {
 	ctx := []byte{}
 	pk := mldsa.PublicKey().raw
 
-	validSig, err := mldsa.Sign(nil, ctx, msg)
+	validSig, err := Sign(nil, mldsa, msg, ctx)
 	if err != nil {
 		t.Fatalf("Failed to sign: %v", err)
 	}
@@ -338,7 +338,7 @@ func TestCanonicalityChallengeMalformation(t *testing.T) {
 	ctx := []byte{}
 	pk := mldsa.PublicKey().raw
 
-	validSig, err := mldsa.Sign(nil, ctx, msg)
+	validSig, err := Sign(nil, mldsa, msg, ctx)
 	if err != nil {
 		t.Fatalf("Failed to sign: %v", err)
 	}
@@ -369,7 +369,7 @@ func TestCanonicalityZVectorCorruption(t *testing.T) {
 	ctx := []byte{}
 	pk := mldsa.PublicKey().raw
 
-	validSig, err := mldsa.Sign(nil, ctx, msg)
+	validSig, err := Sign(nil, mldsa, msg, ctx)
 	if err != nil {
 		t.Fatalf("Failed to sign: %v", err)
 	}
@@ -410,7 +410,7 @@ func TestCanonicalityAllZeroSignature(t *testing.T) {
 
 	var zeroSig [CRYPTO_BYTES]uint8
 
-	if verifyForTest(ctx, msg, zeroSig, &pk) {
+	if verifyForTest(ctx, msg, zeroSig[:], &pk) {
 		t.Error("All-zero signature should not verify")
 	}
 }
@@ -431,7 +431,7 @@ func TestCanonicalityAllOnesSignature(t *testing.T) {
 		onesSig[i] = 0xFF
 	}
 
-	if verifyForTest(ctx, msg, onesSig, &pk) {
+	if verifyForTest(ctx, msg, onesSig[:], &pk) {
 		t.Error("All-ones signature should not verify")
 	}
 }
@@ -452,7 +452,7 @@ func TestCanonicalityRandomSignatures(t *testing.T) {
 		var randomSig [CRYPTO_BYTES]uint8
 		_, _ = rand.Read(randomSig[:])
 
-		if verifyForTest(ctx, msg, randomSig, &pk) {
+		if verifyForTest(ctx, msg, randomSig[:], &pk) {
 			t.Errorf("Random signature %d should not verify", i)
 		}
 	}
@@ -479,7 +479,7 @@ func TestCanonicalityValidSignatureVerifies(t *testing.T) {
 		}
 
 		ctx := []byte{}
-		sig, err := mldsa.Sign(nil, ctx, msg)
+		sig, err := Sign(nil, mldsa, msg, ctx)
 		if err != nil {
 			t.Fatalf("Failed to sign message %d: %v", i, err)
 		}
@@ -506,12 +506,12 @@ func TestCanonicalitySignatureUniqueness(t *testing.T) {
 	ctx := []byte{}
 	pk := mldsa.PublicKey().raw
 
-	sig1, err := mldsa.Sign(nil, ctx, msg)
+	sig1, err := Sign(nil, mldsa, msg, ctx)
 	if err != nil {
 		t.Fatalf("Failed to sign: %v", err)
 	}
 
-	sig2, err := mldsa.Sign(nil, ctx, msg)
+	sig2, err := Sign(nil, mldsa, msg, ctx)
 	if err != nil {
 		t.Fatalf("Failed to sign: %v", err)
 	}

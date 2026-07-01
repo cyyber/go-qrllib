@@ -141,7 +141,7 @@ func TestWycheproofVerify(t *testing.T) {
 				default:
 					var sigArr [CRYPTO_BYTES]uint8
 					copy(sigArr[:], sig)
-					ok = verifyForTest(ctx, msg, sigArr, &pk)
+					ok = verifyForTest(ctx, msg, sigArr[:], &pk)
 				}
 
 				switch tc.Result {

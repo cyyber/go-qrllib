@@ -129,12 +129,12 @@ func TestKATHedgedSignature(t *testing.T) {
 			}
 
 			// Sign the same message twice with the same key.
-			sig1, err := mldsa.Sign(nil, ctx, msg)
+			sig1, err := Sign(nil, mldsa, msg, ctx)
 			if err != nil {
 				t.Fatalf("Failed to sign (1): %v", err)
 			}
 
-			sig2, err := mldsa.Sign(nil, ctx, msg)
+			sig2, err := Sign(nil, mldsa, msg, ctx)
 			if err != nil {
 				t.Fatalf("Failed to sign (2): %v", err)
 			}
@@ -157,7 +157,7 @@ func TestKATHedgedSignature(t *testing.T) {
 }
 
 // TestKATSignDeterministic verifies the public-API
-// [PrivateKey.SignDeterministic] helper produces FIPS-204-deterministic
+// [SignDeterministic] helper produces FIPS-204-deterministic
 // signatures: two calls with the same (key, ctx, message) yield
 // byte-identical bytes, the result verifies under the public key, and
 // the bytes match what the unexported deterministic-rnd path produces
@@ -188,11 +188,11 @@ func TestKATSignDeterministic(t *testing.T) {
 			}
 
 			// Two deterministic signs MUST produce identical bytes.
-			sig1, err := mldsa.SignDeterministic(ctx, msg)
+			sig1, err := SignDeterministic(mldsa, msg, ctx)
 			if err != nil {
 				t.Fatalf("SignDeterministic (1): %v", err)
 			}
-			sig2, err := mldsa.SignDeterministic(ctx, msg)
+			sig2, err := SignDeterministic(mldsa, msg, ctx)
 			if err != nil {
 				t.Fatalf("SignDeterministic (2): %v", err)
 			}
@@ -222,7 +222,7 @@ func TestKATSignDeterministic(t *testing.T) {
 			// Hedged Sign over the same input MUST differ from the
 			// deterministic output (defends against any future
 			// regression that wires Sign to the deterministic path).
-			hedgedSig, err := mldsa.Sign(nil, ctx, msg)
+			hedgedSig, err := Sign(nil, mldsa, msg, ctx)
 			if err != nil {
 				t.Fatalf("Sign: %v", err)
 			}
@@ -245,7 +245,7 @@ func TestKATSignDeterministicContextTooLong(t *testing.T) {
 	defer mldsa.Zeroize()
 
 	longCtx := make([]byte, 256) // max is 255
-	_, err = mldsa.SignDeterministic(longCtx, []byte("msg"))
+	_, err = SignDeterministic(mldsa, []byte("msg"), longCtx)
 	if err == nil {
 		t.Error("expected SignDeterministic to return an error for context > 255 bytes")
 	}
@@ -298,7 +298,7 @@ func TestKATDeterministicSignatureViaInternalAPI(t *testing.T) {
 			pk := mldsa.PublicKey().raw
 			var sigArr [CRYPTO_BYTES]uint8
 			copy(sigArr[:], sig1)
-			if !verifyForTest(ctx, msg, sigArr, &pk) {
+			if !verifyForTest(ctx, msg, sigArr[:], &pk) {
 				t.Error("Deterministic signature failed verification")
 			}
 		})
@@ -333,7 +333,7 @@ func TestKATSignVerifyRoundTrip(t *testing.T) {
 			}
 
 			// Sign
-			sig, err := mldsa.Sign(nil, ctx, msg)
+			sig, err := Sign(nil, mldsa, msg, ctx)
 			if err != nil {
 				t.Fatalf("Failed to sign: %v", err)
 			}

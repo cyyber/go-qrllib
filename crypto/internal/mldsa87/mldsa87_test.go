@@ -114,22 +114,22 @@ func TestSignUsesCallerSuppliedRand(t *testing.T) {
 	ctx := []byte("caller-rand")
 	msg := []byte("message")
 
-	sig1, err := d.Sign(zeroReader{}, ctx, msg)
+	sig1, err := Sign(zeroReader{}, d, msg, ctx)
 	if err != nil {
 		t.Fatalf("first Sign with caller rand failed: %v", err)
 	}
-	sig2, err := d.Sign(zeroReader{}, ctx, msg)
+	sig2, err := Sign(zeroReader{}, d, msg, ctx)
 	if err != nil {
 		t.Fatalf("second Sign with caller rand failed: %v", err)
 	}
-	if sig1 != sig2 {
+	if !bytes.Equal(sig1, sig2) {
 		t.Fatal("Sign did not use caller-supplied rand deterministically")
 	}
-	deterministicSig, err := d.SignDeterministic(ctx, msg)
+	deterministicSig, err := SignDeterministic(d, msg, ctx)
 	if err != nil {
 		t.Fatalf("SignDeterministic failed: %v", err)
 	}
-	if sig1 != deterministicSig {
+	if !bytes.Equal(sig1, deterministicSig) {
 		t.Fatal("Sign with zeroReader did not match SignDeterministic")
 	}
 
@@ -138,18 +138,18 @@ func TestSignUsesCallerSuppliedRand(t *testing.T) {
 		t.Fatal("caller-rand signature did not verify")
 	}
 
-	sig3, err := d.Sign(fixedByteReader(0x42), ctx, msg)
+	sig3, err := Sign(fixedByteReader(0x42), d, msg, ctx)
 	if err != nil {
 		t.Fatalf("first Sign with fixedByteReader failed: %v", err)
 	}
-	sig4, err := d.Sign(fixedByteReader(0x42), ctx, msg)
+	sig4, err := Sign(fixedByteReader(0x42), d, msg, ctx)
 	if err != nil {
 		t.Fatalf("second Sign with fixedByteReader failed: %v", err)
 	}
-	if sig3 != sig4 {
+	if !bytes.Equal(sig3, sig4) {
 		t.Fatal("Sign with the same fixed reader should be deterministic")
 	}
-	if sig3 == sig1 {
+	if bytes.Equal(sig3, sig1) {
 		t.Fatal("Sign with non-zero fixed reader matched zeroReader output")
 	}
 	if !verifyForTest(ctx, msg, sig3, &pk) {
@@ -163,7 +163,7 @@ func TestSignRandReaderError(t *testing.T) {
 	defer d.Zeroize()
 
 	wantErr := errors.New("sign rand failure")
-	if _, err := d.Sign(errReader{err: wantErr}, []byte("ctx"), []byte("msg")); err != wantErr {
+	if _, err := Sign(errReader{err: wantErr}, d, []byte("msg"), []byte("ctx")); err != wantErr {
 		t.Fatalf("Sign returned %v, want %v", err, wantErr)
 	}
 }
@@ -174,7 +174,7 @@ func TestSignInvalidContextBeforeRandRead(t *testing.T) {
 
 	randErr := errors.New("rand should not be read")
 	longCtx := bytes.Repeat([]byte{0x42}, 256)
-	if _, err := d.Sign(errReader{err: randErr}, longCtx, []byte("msg")); !errors.Is(err, cryptoerrors.ErrInvalidContext) {
+	if _, err := Sign(errReader{err: randErr}, d, []byte("msg"), longCtx); !errors.Is(err, cryptoerrors.ErrInvalidContext) {
 		t.Fatalf("Sign returned %v, want ErrInvalidContext", err)
 	}
 }
@@ -262,12 +262,12 @@ func TestPrivateKey_BytesHex(t *testing.T) {
 	}
 }
 
-func TestPrivateKey_Sign(t *testing.T) {
+func TestSign(t *testing.T) {
 	ctx := []uint8("randomContext")
 	msg := []uint8{0, 1, 2, 4, 6, 9, 1}
 
 	d := newPrivateKeyFromSeed(t, HexSeed)
-	signature, err := d.Sign(nil, ctx, msg)
+	signature, err := Sign(nil, d, msg, ctx)
 	if err != nil {
 		t.Fatal("failed to sign", err.Error())
 	}
@@ -280,12 +280,12 @@ func TestPrivateKey_Sign(t *testing.T) {
 	}
 }
 
-func TestPrivateKey_Verify(t *testing.T) {
+func TestVerify(t *testing.T) {
 	ctx := []uint8("randomContext")
 	msg := []uint8{0, 1, 2, 4, 6, 9, 1}
 
 	d := newPrivateKeyFromSeed(t, HexSeed)
-	signature, err := d.Sign(nil, ctx, msg)
+	signature, err := Sign(nil, d, msg, ctx)
 	if err != nil {
 		t.Fatal("failed to sign", err.Error())
 	}
@@ -295,26 +295,4 @@ func TestPrivateKey_Verify(t *testing.T) {
 	if !verifyForTest(ctx, msg, signature, &pk) {
 		t.Error("Signature Verification failed")
 	}
-}
-
-func newPrivateKeyFromSeed(t *testing.T, hexSeed string) *PrivateKey {
-	t.Helper()
-
-	binUnsizeSeed, err := hex.DecodeString(hexSeed)
-	if err != nil {
-		t.Fatal("failed to decode hexseed", err.Error())
-	}
-
-	var binSeed [SEED_BYTES]uint8
-	copy(binSeed[:], binUnsizeSeed)
-
-	d, err := NewPrivateKey(binSeed[:])
-	if err != nil {
-		t.Fatal("failed to generate new ml-dsa-87 from seed", err.Error())
-	}
-	if d == nil {
-		t.Fatal("ml-dsa-87 is nil")
-	}
-
-	return d
 }

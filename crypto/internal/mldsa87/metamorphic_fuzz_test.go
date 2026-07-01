@@ -3,7 +3,7 @@
 // for current go-qrllib API surface (post TOB-6 / TOB-12 / TOB-14):
 //   - `Sign` is hedged-by-default; tests that assert "different message
 //     → different signature" as a property of *deterministic* signing
-//     route through [PrivateKey.SignDeterministic] so the assertion is
+//     route through [SignDeterministic] so the assertion is
 //     genuinely testing the metamorphic property rather than trivially
 //     observing per-call freshness.
 
@@ -66,7 +66,7 @@ func FuzzMetamorphicVerifyRejectsMauledPublicKey(f *testing.F) {
 		msg = fuzzableMsg(msg)
 
 		mldsa := mustMetamorphicSigner(t, seedBytes)
-		sig, err := mldsa.Sign(nil, ctx, msg)
+		sig, err := Sign(nil, mldsa, msg, ctx)
 		if err != nil {
 			t.Fatalf("Sign failed: %v", err)
 		}
@@ -95,7 +95,7 @@ func FuzzMetamorphicVerifyRejectsMauledMessage(f *testing.F) {
 		msg = fuzzableMsg(msg)
 
 		mldsa := mustMetamorphicSigner(t, seedBytes)
-		sig, err := mldsa.Sign(nil, ctx, msg)
+		sig, err := Sign(nil, mldsa, msg, ctx)
 		if err != nil {
 			t.Fatalf("Sign failed: %v", err)
 		}
@@ -124,7 +124,7 @@ func FuzzMetamorphicVerifyRejectsMauledSignature(f *testing.F) {
 		msg = fuzzableMsg(msg)
 
 		mldsa := mustMetamorphicSigner(t, seedBytes)
-		sig, err := mldsa.Sign(nil, ctx, msg)
+		sig, err := Sign(nil, mldsa, msg, ctx)
 		if err != nil {
 			t.Fatalf("Sign failed: %v", err)
 		}
@@ -138,7 +138,7 @@ func FuzzMetamorphicVerifyRejectsMauledSignature(f *testing.F) {
 		var mauledSig [CRYPTO_BYTES]uint8
 		copy(mauledSig[:], mauledBytes)
 
-		if verifyForTest(ctx, msg, mauledSig, &pk) {
+		if verifyForTest(ctx, msg, mauledSig[:], &pk) {
 			t.Fatalf("single-bit mauled signature verified (bitIndex=%d)", bitIndex)
 		}
 	})
@@ -148,7 +148,7 @@ func FuzzMetamorphicVerifyRejectsMauledSignature(f *testing.F) {
 // metamorphic property "same key, same ctx, different msg → different
 // signature bytes" for deterministic signing. Under hedged signing this
 // property holds trivially (every call uses fresh randomness so any two
-// signs differ); routing through [PrivateKey.SignDeterministic] makes the
+// signs differ); routing through [SignDeterministic] makes the
 // assertion genuinely test that the message *content* influences the
 // signature bytes.
 func FuzzMetamorphicDeterministicSigningChangesOnMauledMessage(f *testing.F) {
@@ -160,18 +160,18 @@ func FuzzMetamorphicDeterministicSigningChangesOnMauledMessage(f *testing.F) {
 		msg = fuzzableMsg(msg)
 
 		mldsa := mustMetamorphicSigner(t, seedBytes)
-		baseSig, err := mldsa.SignDeterministic(ctx, msg)
+		baseSig, err := SignDeterministic(mldsa, msg, ctx)
 		if err != nil {
 			t.Fatalf("SignDeterministic failed: %v", err)
 		}
 
 		mauledMsg := metamorphicMaulSingleBit(msg, bitIndex)
-		mauledSig, err := mldsa.SignDeterministic(ctx, mauledMsg)
+		mauledSig, err := SignDeterministic(mldsa, mauledMsg, ctx)
 		if err != nil {
 			t.Fatalf("SignDeterministic on mauled message failed: %v", err)
 		}
 
-		if mauledSig == baseSig {
+		if bytes.Equal(mauledSig, baseSig) {
 			t.Fatalf("deterministic signing collision after single-bit message maul (bitIndex=%d)", bitIndex)
 		}
 	})

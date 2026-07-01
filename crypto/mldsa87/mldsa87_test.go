@@ -178,6 +178,13 @@ func TestRoundTrip(t *testing.T) {
 	if !bytes.Equal(signature, deterministic) {
 		t.Fatal("zeroReader signature did not match SignDeterministic")
 	}
+	methodDeterministic, err := private.SignDeterministic(message, opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(deterministic, methodDeterministic) {
+		t.Fatal("PrivateKey.SignDeterministic did not match SignDeterministic")
+	}
 }
 
 func testSeed() []byte {
@@ -258,6 +265,13 @@ func TestSignerOptsHandling(t *testing.T) {
 	if !bytes.Equal(signature, deterministic) {
 		t.Fatal("zeroReader signature did not match SignDeterministic with crypto.Hash(0)")
 	}
+	methodDeterministic, err := private.SignDeterministic(message, crypto.Hash(0))
+	if err != nil {
+		t.Fatalf("PrivateKey.SignDeterministic with crypto.Hash(0) failed: %v", err)
+	}
+	if !bytes.Equal(deterministic, methodDeterministic) {
+		t.Fatal("PrivateKey.SignDeterministic did not match SignDeterministic with crypto.Hash(0)")
+	}
 
 	if _, err := private.Sign(zeroReader{}, message, crypto.SHA256); err == nil {
 		t.Fatal("PrivateKey.Sign accepted non-zero hash opts")
@@ -267,6 +281,9 @@ func TestSignerOptsHandling(t *testing.T) {
 	}
 	if _, err := mldsa87.SignDeterministic(private, message, crypto.SHA256); err == nil {
 		t.Fatal("SignDeterministic accepted non-zero hash opts")
+	}
+	if _, err := private.SignDeterministic(message, crypto.SHA256); err == nil {
+		t.Fatal("PrivateKey.SignDeterministic accepted non-zero hash opts")
 	}
 	if mldsa87.Verify(public, message, signature, crypto.SHA256) {
 		t.Fatal("Verify accepted non-zero hash opts")

@@ -65,19 +65,8 @@ func zeroPolyVecK(v *polyVecK) {
 	}
 }
 
-func (key *signingKey) zeroize() {
-	if key == nil {
-		return
-	}
-	zeroBytes(key.tr[:])
-	zeroBytes(key.key[:])
-	zeroPolyVecL(&key.s1)
-	zeroPolyVecK(&key.s2)
-	zeroPolyVecK(&key.t0)
-}
-
 // Take a random seed, and compute sk/pk pair.
-func cryptoSignKeypair(seed *[SEED_BYTES]uint8, pk *[CRYPTO_PUBLIC_KEY_BYTES]uint8, sk *[CRYPTO_SECRET_KEY_BYTES]uint8, signing *signingKey, pub *PublicKey) (*[SEED_BYTES]uint8, error) {
+func cryptoSignKeypair(seed *[SEED_BYTES]uint8, pk *[CRYPTO_PUBLIC_KEY_BYTES]uint8, sk *[CRYPTO_SECRET_KEY_BYTES]uint8, priv *PrivateKey, pub *PublicKey) (*[SEED_BYTES]uint8, error) {
 	var tr [TR_BYTES]uint8
 	var rho, key [SEED_BYTES]uint8
 	var rhoPrime [CRH_BYTES]uint8
@@ -181,14 +170,14 @@ func cryptoSignKeypair(seed *[SEED_BYTES]uint8, pk *[CRYPTO_PUBLIC_KEY_BYTES]uin
 	copy(tr[:], sha3.SumSHAKE256(pk[:], TR_BYTES))
 	packSk(sk, rho, tr, key, &t0, &s1, &s2)
 
-	if signing != nil {
-		signing.tr = tr
-		signing.key = key
-		signing.s1 = s1hat
-		signing.s2 = s2
-		polyVecKNTT(&signing.s2)
-		signing.t0 = t0
-		polyVecKNTT(&signing.t0)
+	if priv != nil {
+		priv.tr = tr
+		priv.key = key
+		priv.s1 = s1hat
+		priv.s2 = s2
+		polyVecKNTT(&priv.s2)
+		priv.t0 = t0
+		polyVecKNTT(&priv.t0)
 	}
 	if pub != nil {
 		pub.raw = *pk
@@ -203,28 +192,29 @@ func cryptoSignKeypair(seed *[SEED_BYTES]uint8, pk *[CRYPTO_PUBLIC_KEY_BYTES]uin
 	return seed, nil
 }
 
-func signingKeyFromSecretKey(sk *[CRYPTO_SECRET_KEY_BYTES]uint8) (signingKey, [K]polyVecL, error) {
+func privateKeyFromSecretKey(sk *[CRYPTO_SECRET_KEY_BYTES]uint8) (*PrivateKey, [K]polyVecL, error) {
 	var rho [SEED_BYTES]uint8
-	var signing signingKey
 	var mat [K]polyVecL
 
 	if sk == nil {
-		return signing, mat, errPrivateKeyNil
+		return nil, mat, errPrivateKeyNil
 	}
-	unpackSk(&rho, &signing.tr, &signing.key, &signing.t0, &signing.s1, &signing.s2, sk)
+	priv := new(PrivateKey)
+	unpackSk(&rho, &priv.tr, &priv.key, &priv.t0, &priv.s1, &priv.s2, sk)
 	if err := polyVecMatrixExpand(&mat, &rho); err != nil {
 		//coverage:ignore
 		//rationale: polyVecMatrixExpand's sha3 operations never return errors
-		return signing, mat, err
+		priv.Zeroize()
+		return nil, mat, err
 	}
-	polyVecLNTT(&signing.s1)
-	polyVecKNTT(&signing.s2)
-	polyVecKNTT(&signing.t0)
-	return signing, mat, nil
+	polyVecLNTT(&priv.s1)
+	polyVecKNTT(&priv.s2)
+	polyVecKNTT(&priv.t0)
+	return priv, mat, nil
 }
 
-func cryptoSignSignatureInternal(sig, m []uint8, pre []uint8, rnd [RND_BYTES]uint8, signing *signingKey, mat *[K]polyVecL) error {
-	if signing == nil || mat == nil {
+func cryptoSignSignatureInternal(sig, m []uint8, pre []uint8, rnd [RND_BYTES]uint8, priv *PrivateKey, mat *[K]polyVecL) error {
+	if priv == nil || mat == nil {
 		return errPrivateKeyNil
 	}
 	var mu, rhoPrime [CRH_BYTES]uint8
@@ -243,14 +233,14 @@ func cryptoSignSignatureInternal(sig, m []uint8, pre []uint8, rnd [RND_BYTES]uin
 	/* Compute mu = CRH(tr, 0, ctxlen, ctx, msg) */
 	state := getShake256()
 	defer putShake256(state)
-	_, _ = state.Write(signing.tr[:])
+	_, _ = state.Write(priv.tr[:])
 	_, _ = state.Write(pre)
 	_, _ = state.Write(m)
 	_, _ = state.Read(mu[:]) // ShakeHash.Read never returns an error
 
 	/* Compute rhoprime = CRH(key, rnd, mu) */
 	state.Reset() // Reuse pooled hasher
-	_, _ = state.Write(signing.key[:])
+	_, _ = state.Write(priv.key[:])
 	_, _ = state.Write(rnd[:])
 	_, _ = state.Write(mu[:])
 	_, _ = state.Read(rhoPrime[:]) // ShakeHash.Read never returns an error
@@ -301,7 +291,7 @@ rej:
 	polyNTT(&cp)
 
 	/* Compute z, reject if it reveals secret */
-	polyVecLPointWisePolyMontgomery(&z, &cp, &signing.s1)
+	polyVecLPointWisePolyMontgomery(&z, &cp, &priv.s1)
 	polyVecLInvNTTToMont(&z)
 	polyVecLAdd(&z, &z, &y)
 	polyVecLReduce(&z)
@@ -311,7 +301,7 @@ rej:
 
 	/* Check that subtracting cs2 does not change high bits of w and low bits
 	 * do not reveal secret information */
-	polyVecKPointWisePolyMontgomery(&h, &cp, &signing.s2)
+	polyVecKPointWisePolyMontgomery(&h, &cp, &priv.s2)
 	polyVecKInvNTTToMont(&h)
 	polyVecKSub(&w0, &w0, &h)
 	polyVecKReduce(&w0)
@@ -320,7 +310,7 @@ rej:
 	}
 
 	/* Compute hints for w1 */
-	polyVecKPointWisePolyMontgomery(&h, &cp, &signing.t0)
+	polyVecKPointWisePolyMontgomery(&h, &cp, &priv.t0)
 	polyVecKInvNTTToMont(&h)
 	polyVecKReduce(&h)
 	if polyVecKChkNorm(&h, GAMMA2) != 0 {
@@ -356,7 +346,7 @@ rej:
 // Callers needing an explicit rnd value (the crypto.Signer.Sign
 // caller-supplied io.Reader path; ACVP / KAT determinism tests with
 // rnd=zero) call [cryptoSignSignatureWithRnd] directly.
-func cryptoSignSignature(random io.Reader, sig, m []uint8, ctx []uint8, signing *signingKey, mat *[K]polyVecL) error {
+func cryptoSignSignature(random io.Reader, sig, m []uint8, ctx []uint8, priv *PrivateKey, mat *[K]polyVecL) error {
 	if len(ctx) > 255 {
 		return cryptoerrors.ErrInvalidContext
 	}
@@ -368,7 +358,7 @@ func cryptoSignSignature(random io.Reader, sig, m []uint8, ctx []uint8, signing 
 	if _, err := io.ReadFull(random, rnd[:]); err != nil {
 		return err
 	}
-	return cryptoSignSignatureWithKeyAndRnd(sig, m, ctx, signing, mat, rnd)
+	return cryptoSignSignatureWithKeyAndRnd(sig, m, ctx, priv, mat, rnd)
 }
 
 // cryptoSignSignatureWithRnd signs m using the explicit rnd value
@@ -378,15 +368,15 @@ func cryptoSignSignature(random io.Reader, sig, m []uint8, ctx []uint8, signing 
 // authenticated source for hedged signing. The crypto.Signer wrapper
 // uses this path when the caller supplies an io.Reader.
 func cryptoSignSignatureWithRnd(sig, m []uint8, ctx []uint8, sk *[CRYPTO_SECRET_KEY_BYTES]uint8, rnd [RND_BYTES]uint8) error {
-	signing, mat, err := signingKeyFromSecretKey(sk)
+	priv, mat, err := privateKeyFromSecretKey(sk)
 	if err != nil {
 		return err
 	}
-	defer signing.zeroize()
-	return cryptoSignSignatureWithKeyAndRnd(sig, m, ctx, &signing, &mat, rnd)
+	defer priv.Zeroize()
+	return cryptoSignSignatureWithKeyAndRnd(sig, m, ctx, priv, &mat, rnd)
 }
 
-func cryptoSignSignatureWithKeyAndRnd(sig, m []uint8, ctx []uint8, signing *signingKey, mat *[K]polyVecL, rnd [RND_BYTES]uint8) error {
+func cryptoSignSignatureWithKeyAndRnd(sig, m []uint8, ctx []uint8, priv *PrivateKey, mat *[K]polyVecL, rnd [RND_BYTES]uint8) error {
 	if len(ctx) > 255 {
 		return cryptoerrors.ErrInvalidContext
 	}
@@ -394,7 +384,7 @@ func cryptoSignSignatureWithKeyAndRnd(sig, m []uint8, ctx []uint8, signing *sign
 	pre[0] = 0
 	pre[1] = uint8(len(ctx))
 	copy(pre[2:], ctx)
-	return cryptoSignSignatureInternal(sig, m, pre[:], rnd, signing, mat)
+	return cryptoSignSignatureInternal(sig, m, pre[:], rnd, priv, mat)
 }
 
 func newPublicKeyFromRaw(pk *[CRYPTO_PUBLIC_KEY_BYTES]uint8) (*PublicKey, error) {

@@ -87,18 +87,18 @@ func mustSignerFromSeed(t *testing.T, seed [SEED_BYTES]uint8) *PrivateKey {
 	return mldsa
 }
 
-func mustSign(t *testing.T, mldsa *PrivateKey, ctx, message []byte) [CRYPTO_BYTES]uint8 {
+func mustSign(t *testing.T, mldsa *PrivateKey, ctx, message []byte) []byte {
 	t.Helper()
-	sig, err := mldsa.Sign(nil, ctx, message)
+	sig, err := Sign(nil, mldsa, message, ctx)
 	if err != nil {
 		t.Fatalf("Sign failed: %v", err)
 	}
 	return sig
 }
 
-func mustSignDeterministic(t *testing.T, mldsa *PrivateKey, ctx, message []byte) [CRYPTO_BYTES]uint8 {
+func mustSignDeterministic(t *testing.T, mldsa *PrivateKey, ctx, message []byte) []byte {
 	t.Helper()
-	sig, err := mldsa.SignDeterministic(ctx, message)
+	sig, err := SignDeterministic(mldsa, message, ctx)
 	if err != nil {
 		t.Fatalf("SignDeterministic failed: %v", err)
 	}
@@ -166,7 +166,7 @@ func TestMetamorphicVerifyRejectsBitMauledSignatures(t *testing.T) {
 				var mauledSig [CRYPTO_BYTES]uint8
 				copy(mauledSig[:], mutated)
 
-				if verifyForTest(tc.ctx, tc.message, mauledSig, &pk) {
+				if verifyForTest(tc.ctx, tc.message, mauledSig[:], &pk) {
 					t.Fatalf("single-bit mauled signature verified at bit %d", bit)
 				}
 			}
@@ -176,7 +176,7 @@ func TestMetamorphicVerifyRejectsBitMauledSignatures(t *testing.T) {
 
 // TestMetamorphicDeterministicSigningChangesOnBitMauledMessages asserts
 // the metamorphic property "different msg → different signature bytes"
-// for deterministic signing. Routed through [PrivateKey.SignDeterministic]
+// for deterministic signing. Routed through [SignDeterministic]
 // so the byte-equality assertion is genuinely testing message-influences-
 // signature (under hedged signing the assertion would hold trivially
 // because every call uses fresh randomness).
@@ -190,7 +190,7 @@ func TestMetamorphicDeterministicSigningChangesOnBitMauledMessages(t *testing.T)
 				mauledMsg := flipSingleBit(tc.message, bit)
 				mauledSig := mustSignDeterministic(t, mldsa, tc.ctx, mauledMsg)
 
-				if mauledSig == baseSig {
+				if bytes.Equal(mauledSig, baseSig) {
 					t.Fatalf("deterministic signing collision after single-bit message maul at bit %d", bit)
 				}
 			}
@@ -240,10 +240,10 @@ func TestMetamorphicSecretKeyMaulingFeatureScan(t *testing.T) {
 						t.Fatalf("Sign failed for %s bit %d: %v", region.name, relBit, err)
 					}
 
-					if sig == baseSig {
+					if bytes.Equal(sig[:], baseSig) {
 						sameSigCount++
 					}
-					if verifyForTest(tc.ctx, tc.message, sig, &pk) {
+					if verifyForTest(tc.ctx, tc.message, sig[:], &pk) {
 						validCount++
 					}
 				}

@@ -1,7 +1,6 @@
 package mldsa87
 
 import (
-	"bytes"
 	"crypto/rand"
 	"crypto/subtle"
 	"errors"
@@ -19,13 +18,10 @@ var (
 
 // PrivateKey is an in-memory ML-DSA-87 private key.
 type PrivateKey struct {
-	seed    [SEED_BYTES]uint8
-	sk      [CRYPTO_SECRET_KEY_BYTES]uint8
-	signing signingKey
-	pub     PublicKey
-}
+	seed [SEED_BYTES]uint8
+	sk   [CRYPTO_SECRET_KEY_BYTES]uint8
+	pub  PublicKey
 
-type signingKey struct {
 	tr  [TR_BYTES]uint8
 	key [SEED_BYTES]uint8
 	s1  polyVecL // NTT(s1)
@@ -62,79 +58,33 @@ func NewPrivateKey(seed []byte) (*PrivateKey, error) {
 func newPrivateKey(seed *[SEED_BYTES]uint8) (*PrivateKey, error) {
 	var sk [CRYPTO_SECRET_KEY_BYTES]uint8
 	var pk [CRYPTO_PUBLIC_KEY_BYTES]uint8
-	var signing signingKey
-	var pub PublicKey
+	priv := &PrivateKey{seed: *seed}
 	defer zeroBytes(sk[:])
 
-	if _, err := cryptoSignKeypair(seed, &pk, &sk, &signing, &pub); err != nil {
+	if _, err := cryptoSignKeypair(seed, &pk, &sk, priv, &priv.pub); err != nil {
 		//coverage:ignore
 		//rationale: cryptoSignKeypair only fails if sha3 operations fail, which never happens
+		priv.Zeroize()
 		return nil, err
 	}
-	return &PrivateKey{
-		seed:    *seed,
-		sk:      sk,
-		signing: signing,
-		pub:     pub,
-	}, nil
+	priv.sk = sk
+	return priv, nil
 }
 
 // Bytes returns a copy of the seed form of the private key.
 func (priv *PrivateKey) Bytes() []byte {
-	if priv == nil {
-		return nil
-	}
-	return bytes.Clone(priv.seed[:])
+	seed := priv.seed
+	return seed[:]
 }
 
 // PublicKey returns the public key corresponding to priv.
 func (priv *PrivateKey) PublicKey() *PublicKey {
-	if priv == nil {
-		return nil
-	}
 	return &priv.pub
 }
 
 // Equal reports whether priv and x have the same seed.
 func (priv *PrivateKey) Equal(x *PrivateKey) bool {
-	if priv == nil || x == nil {
-		return priv == x
-	}
 	return subtle.ConstantTimeCompare(priv.seed[:], x.seed[:]) == 1
-}
-
-// Sign the message with the given context, and return a detached signature.
-// The ctx parameter is required by FIPS 204 for domain separation (max 255 bytes).
-// ML-DSA-87 detached signatures are fixed-size: exactly CRYPTO_BYTES (4,627) bytes.
-//
-// Signing is hedged (FIPS 204 §3.4): the per-signature RND_BYTES are
-// drawn from random. If random is nil, Sign uses crypto/rand.Reader, so
-// two calls with the same (ctx, message) under the same key produce
-// distinct signatures, both of which verify under the same public key.
-// (TOB-QRLLIB-6.)
-func (priv *PrivateKey) Sign(random io.Reader, ctx, message []uint8) ([CRYPTO_BYTES]uint8, error) {
-	var signature [CRYPTO_BYTES]uint8
-	if priv == nil {
-		return signature, errPrivateKeyNil
-	}
-	if err := cryptoSignSignature(random, signature[:], message, ctx, &priv.signing, &priv.pub.mat); err != nil {
-		return signature, err
-	}
-	return signature, nil
-}
-
-// SignDeterministic produces an ML-DSA-87 signature using the FIPS 204
-// §3.5 deterministic mode (per-signature RND_BYTES = 32 zero bytes).
-func (priv *PrivateKey) SignDeterministic(ctx, message []uint8) ([CRYPTO_BYTES]uint8, error) {
-	var signature [CRYPTO_BYTES]uint8
-	if priv == nil {
-		return signature, errPrivateKeyNil
-	}
-	var rnd [RND_BYTES]uint8 // zero — FIPS 204 §3.5 deterministic mode
-	if err := cryptoSignSignatureWithKeyAndRnd(signature[:], message, ctx, &priv.signing, &priv.pub.mat, rnd); err != nil {
-		return signature, err
-	}
-	return signature, nil
 }
 
 // Zeroize clears sensitive key material from memory.
@@ -149,7 +99,11 @@ func (priv *PrivateKey) Zeroize() {
 	}
 	zeroBytes(priv.sk[:])
 	zeroBytes(priv.seed[:])
-	priv.signing.zeroize()
+	zeroBytes(priv.tr[:])
+	zeroBytes(priv.key[:])
+	zeroPolyVecL(&priv.s1)
+	zeroPolyVecK(&priv.s2)
+	zeroPolyVecK(&priv.t0)
 }
 
 // PublicKey is an encoded ML-DSA-87 public key.
@@ -173,30 +127,28 @@ func NewPublicKey(publicKey []byte) (*PublicKey, error) {
 
 // Bytes returns a copy of the encoded public key.
 func (pub *PublicKey) Bytes() []byte {
-	if pub == nil {
-		return nil
-	}
-	return bytes.Clone(pub.raw[:])
+	raw := pub.raw
+	return raw[:]
 }
 
 // Equal reports whether pub and x have the same encoded public key.
 func (pub *PublicKey) Equal(x *PublicKey) bool {
-	if pub == nil || x == nil {
-		return pub == x
-	}
 	return subtle.ConstantTimeCompare(pub.raw[:], x.raw[:]) == 1
 }
 
 // Sign signs message using ctx and the randomness from random.
+//
+// Signing is hedged (FIPS 204 §3.4): the per-signature RND_BYTES are drawn
+// from random. If random is nil, Sign uses crypto/rand.Reader.
 func Sign(random io.Reader, privateKey *PrivateKey, message, ctx []byte) ([]byte, error) {
 	if privateKey == nil {
 		return nil, errPrivateKeyNil
 	}
-	signature, err := privateKey.Sign(random, ctx, message)
-	if err != nil {
+	var signature [CRYPTO_BYTES]uint8
+	if err := cryptoSignSignature(random, signature[:], message, ctx, privateKey, &privateKey.pub.mat); err != nil {
 		return nil, err
 	}
-	return bytes.Clone(signature[:]), nil
+	return signature[:], nil
 }
 
 // SignDeterministic signs message using FIPS 204 deterministic RND_BYTES.
@@ -204,11 +156,12 @@ func SignDeterministic(privateKey *PrivateKey, message, ctx []byte) ([]byte, err
 	if privateKey == nil {
 		return nil, errPrivateKeyNil
 	}
-	signature, err := privateKey.SignDeterministic(ctx, message)
-	if err != nil {
+	var signature [CRYPTO_BYTES]uint8
+	var rnd [RND_BYTES]uint8
+	if err := cryptoSignSignatureWithKeyAndRnd(signature[:], message, ctx, privateKey, &privateKey.pub.mat, rnd); err != nil {
 		return nil, err
 	}
-	return bytes.Clone(signature[:]), nil
+	return signature[:], nil
 }
 
 // Verify verifies sig over message with ctx.

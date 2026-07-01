@@ -24,7 +24,7 @@ func TestEdgeCaseZeroLengthMessage(t *testing.T) {
 	ctx := []byte{}
 
 	// Sign empty message
-	sig, err := mldsa.Sign(nil, ctx, emptyMsg)
+	sig, err := Sign(nil, mldsa, emptyMsg, ctx)
 	if err != nil {
 		t.Fatalf("Failed to sign empty message: %v", err)
 	}
@@ -48,7 +48,7 @@ func TestEdgeCaseNilMessage(t *testing.T) {
 	ctx := []byte{}
 
 	// Sign nil message (should behave like empty)
-	sig, err := mldsa.Sign(nil, ctx, nilMsg)
+	sig, err := Sign(nil, mldsa, nilMsg, ctx)
 	if err != nil {
 		t.Fatalf("Failed to sign nil message: %v", err)
 	}
@@ -83,7 +83,7 @@ func TestEdgeCaseLargeMessage(t *testing.T) {
 
 			ctx := []byte{}
 
-			sig, err := mldsa.Sign(nil, ctx, largeMsg)
+			sig, err := Sign(nil, mldsa, largeMsg, ctx)
 			if err != nil {
 				t.Fatalf("Failed to sign %d byte message: %v", size, err)
 			}
@@ -109,7 +109,7 @@ func TestEdgeCaseInvalidSignature(t *testing.T) {
 
 	t.Run("all_zeros_signature", func(t *testing.T) {
 		var zeroSig [CRYPTO_BYTES]uint8
-		if verifyForTest(ctx, msg, zeroSig, &pk) {
+		if verifyForTest(ctx, msg, zeroSig[:], &pk) {
 			t.Error("All-zeros signature should not verify")
 		}
 	})
@@ -119,7 +119,7 @@ func TestEdgeCaseInvalidSignature(t *testing.T) {
 		for i := range onesSig {
 			onesSig[i] = 0xFF
 		}
-		if verifyForTest(ctx, msg, onesSig, &pk) {
+		if verifyForTest(ctx, msg, onesSig[:], &pk) {
 			t.Error("All-ones signature should not verify")
 		}
 	})
@@ -127,13 +127,13 @@ func TestEdgeCaseInvalidSignature(t *testing.T) {
 	t.Run("random_signature", func(t *testing.T) {
 		var randomSig [CRYPTO_BYTES]uint8
 		_, _ = rand.Read(randomSig[:])
-		if verifyForTest(ctx, msg, randomSig, &pk) {
+		if verifyForTest(ctx, msg, randomSig[:], &pk) {
 			t.Error("Random signature should not verify")
 		}
 	})
 
 	t.Run("corrupted_valid_signature", func(t *testing.T) {
-		sig, err := mldsa.Sign(nil, ctx, msg)
+		sig, err := Sign(nil, mldsa, msg, ctx)
 		if err != nil {
 			t.Fatalf("Failed to sign: %v", err)
 		}
@@ -161,7 +161,7 @@ func TestEdgeCaseMalformedSignatureHints(t *testing.T) {
 	pk := mldsa.PublicKey().raw
 
 	// Get a valid signature to use as base
-	validSig, err := mldsa.Sign(nil, ctx, msg)
+	validSig, err := Sign(nil, mldsa, msg, ctx)
 	if err != nil {
 		t.Fatalf("Failed to sign: %v", err)
 	}
@@ -220,7 +220,7 @@ func TestEdgeCaseInvalidPublicKey(t *testing.T) {
 
 	msg := []byte("test message")
 	ctx := []byte{}
-	sig, err := mldsa.Sign(nil, ctx, msg)
+	sig, err := Sign(nil, mldsa, msg, ctx)
 	if err != nil {
 		t.Fatalf("Failed to sign: %v", err)
 	}
@@ -262,7 +262,7 @@ func TestEdgeCaseContextVariations(t *testing.T) {
 
 	for i, ctx := range contexts {
 		t.Run(string(rune(i)), func(t *testing.T) {
-			sig, err := mldsa.Sign(nil, ctx, msg)
+			sig, err := Sign(nil, mldsa, msg, ctx)
 			if err != nil {
 				t.Fatalf("Failed to sign with context %d: %v", i, err)
 			}
@@ -282,7 +282,7 @@ func TestEdgeCaseContextVariations(t *testing.T) {
 	// Test context exceeding max length (256 bytes, exceeds 255 limit per FIPS 204)
 	t.Run("context_too_long", func(t *testing.T) {
 		longCtx := bytes.Repeat([]byte{0x42}, 256)
-		_, err := mldsa.Sign(nil, longCtx, msg)
+		_, err := Sign(nil, mldsa, msg, longCtx)
 		if err == nil {
 			t.Error("Sign should fail with context > 255 bytes")
 		}
@@ -301,7 +301,7 @@ func TestEdgeCaseSeedBoundaries(t *testing.T) {
 
 		msg := []byte("test")
 		ctx := []byte{}
-		sig, err := mldsa.Sign(nil, ctx, msg)
+		sig, err := Sign(nil, mldsa, msg, ctx)
 		if err != nil {
 			t.Fatalf("Failed to sign with zero seed: %v", err)
 		}
@@ -324,7 +324,7 @@ func TestEdgeCaseSeedBoundaries(t *testing.T) {
 
 		msg := []byte("test")
 		ctx := []byte{}
-		sig, err := mldsa.Sign(nil, ctx, msg)
+		sig, err := Sign(nil, mldsa, msg, ctx)
 		if err != nil {
 			t.Fatalf("Failed to sign with max seed: %v", err)
 		}
@@ -348,10 +348,11 @@ func fixtureSign(t *testing.T) (msg []byte, ctx []byte, sig [CRYPTO_BYTES]uint8)
 	}
 	msg = []byte("nil-pk regression test message")
 	ctx = []byte("test-ctx")
-	sig, err = mldsa.Sign(nil, ctx, msg)
+	sigBytes, err := Sign(nil, mldsa, msg, ctx)
 	if err != nil {
 		t.Fatalf("setup: Sign failed: %v", err)
 	}
+	copy(sig[:], sigBytes)
 	return msg, ctx, sig
 }
 
