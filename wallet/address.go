@@ -7,7 +7,7 @@ import (
 	"github.com/theQRL/go-qrllib/wallet/common"
 	"github.com/theQRL/go-qrllib/wallet/common/descriptor"
 	"github.com/theQRL/go-qrllib/wallet/common/wallettype"
-	"github.com/theQRL/go-qrllib/wallet/ml_dsa_87"
+	"github.com/theQRL/go-qrllib/wallet/mldsa87"
 )
 
 func validatePKAndDescriptor(pk []uint8, descriptor descriptor.Descriptor) error {
@@ -16,11 +16,11 @@ func validatePKAndDescriptor(pk []uint8, descriptor descriptor.Descriptor) error
 	}
 	switch wallettype.WalletType(descriptor[0]) {
 	case wallettype.ML_DSA_87:
-		_, err := ml_dsa_87.BytesToPK(pk)
+		_, err := mldsa87.BytesToPK(pk)
 		if err != nil {
 			return err
 		}
-		_, err = ml_dsa_87.NewMLDSA87DescriptorFromDescriptor(descriptor)
+		_, err = mldsa87.NewMLDSA87DescriptorFromDescriptor(descriptor)
 		if err != nil {
 			//coverage:ignore
 			//rationale: descriptor.IsValid() already passed, can't fail for valid wallet type

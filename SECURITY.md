@@ -251,7 +251,7 @@ Non-canonical encodings are rejected by the verification functions. This is veri
 
 | Test File | Coverage |
 |-----------|----------|
-| [`crypto/ml_dsa_87/canonicality_test.go`](crypto/ml_dsa_87/canonicality_test.go) | Truncation, hint ordering, padding, cumulative counts |
+| [`crypto/mldsa87/canonicality_test.go`](crypto/mldsa87/canonicality_test.go) | Truncation, hint ordering, padding, cumulative counts |
 | [`crypto/sphincsplus_256s/canonicality_test.go`](crypto/sphincsplus_256s/canonicality_test.go) | Truncation, FORS/WOTS/auth path corruption |
 | [`crypto/xmss/canonicality_test.go`](crypto/xmss/canonicality_test.go) | Truncation, index/R/WOTS/auth path corruption, height validation |
 
@@ -369,13 +369,13 @@ Existing invariant-panic sites include `crypto/xmss/params.go` (WOTS parameter v
 
 | Function | Nil public key | Wrong-size signature | Oversized context | Verification failure |
 |----------|----------------|----------------------|-------------------|----------------------|
-| `crypto/ml_dsa_87.Verify` | returns `false` | returns `false` | returns `false` | returns `false` |
-| `crypto/ml_dsa_87.Open` | `(nil, ErrPublicKeyNil)` | `(nil, ErrInvalidSignatureSize)` | `(nil, ErrInvalidContext)` | `(nil, ErrInvalidSignature)` |
+| `crypto/mldsa87.Verify` | returns `false` | returns `false` | returns `false` | returns `false` |
+| `crypto/mldsa87.Open` | `(nil, ErrPublicKeyNil)` | `(nil, ErrInvalidSignatureSize)` | `(nil, ErrInvalidContext)` | `(nil, ErrInvalidSignature)` |
 | `crypto/sphincsplus_256s.Verify` | returns `false` | returns `false` | n/a | returns `false` |
 | `crypto/sphincsplus_256s.Open` | `(nil, ErrPublicKeyNil)` | `(nil, ErrInvalidSignatureSize)` | n/a | `(nil, ErrInvalidSignature)` |
 | `crypto/xmss.Verify` | n/a (slice; len-checked) | returns `false` | n/a | returns `false` |
 | `legacywallet/xmss.Verify` | n/a (value type) | returns `false` | n/a | returns `false` |
-| `wallet/ml_dsa_87.Verify` | returns `false` | returns `false` | n/a | returns `false` |
+| `wallet/mldsa87.Verify` | returns `false` | returns `false` | n/a | returns `false` |
 | `wallet/sphincsplus_256s.Verify` | returns `false` | returns `false` | n/a | returns `false` |
 
 The crypto-level `Open` functions return `([]byte, error)`. Each failure mode surfaces a distinct typed sentinel from `cryptoerrors`, so callers that need to log or route on specific failure types can use `errors.Is(err, cryptoerrors.ErrPublicKeyNil)` etc. Callers that don't care which failure occurred can write `msg, _ := Open(...)` and treat `msg == nil` as "did not verify".

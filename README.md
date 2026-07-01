@@ -116,10 +116,10 @@ randomness, constant-time comparison) comes from the Go standard library
 ### ML-DSA-87 (Recommended)
 
 ```go
-import "github.com/theQRL/go-qrllib/crypto/ml_dsa_87"
+import "github.com/theQRL/go-qrllib/crypto/mldsa87"
 
 // Generate keypair
-signer, err := ml_dsa_87.New()
+signer, err := mldsa87.New()
 if err != nil {
     log.Fatal(err)
 }
@@ -135,7 +135,7 @@ if err != nil {
 
 // Verify
 pk := signer.GetPK()
-valid := ml_dsa_87.Verify(ctx, message, signature, &pk)
+valid := mldsa87.Verify(ctx, message, signature, &pk)
 ```
 
 ### SPHINCS+-256s (primitive; wallet path gated)
@@ -171,12 +171,12 @@ valid := sphincsplus_256s.Verify(message, signature, &pk)
 The wallet packages wrap the crypto primitives with QRL-specific address derivation, a canonical descriptor, and a domain-separated signing context that cryptographically binds every signature to its wallet descriptor (see package docs for details).
 
 ```go
-import "github.com/theQRL/go-qrllib/wallet/ml_dsa_87"
+import "github.com/theQRL/go-qrllib/wallet/mldsa87"
 
 // Create a fresh wallet, or restore from a mnemonic / extended seed.
-w, err := ml_dsa_87.NewWallet()
-// w, err := ml_dsa_87.NewWalletFromMnemonic(phrase)
-// w, err := ml_dsa_87.NewWalletFromHexExtendedSeed(hexSeed)
+w, err := mldsa87.NewWallet()
+// w, err := mldsa87.NewWalletFromMnemonic(phrase)
+// w, err := mldsa87.NewWalletFromHexExtendedSeed(hexSeed)
 if err != nil {
     log.Fatal(err)
 }
@@ -191,7 +191,7 @@ if err != nil {
     log.Fatal(err)
 }
 
-ok := ml_dsa_87.Verify(message, sig[:], &pk, desc)
+ok := mldsa87.Verify(message, sig[:], &pk, desc)
 ```
 
 The same API shape is available at `github.com/theQRL/go-qrllib/wallet/sphincsplus_256s`,
@@ -206,24 +206,24 @@ split.
 ML-DSA-87 implements Go's `crypto.Signer` interface for interoperability with `crypto/tls`, `crypto/x509`, and other standard library consumers:
 
 ```go
-import "github.com/theQRL/go-qrllib/crypto/ml_dsa_87"
+import "github.com/theQRL/go-qrllib/crypto/mldsa87"
 
-d, err := ml_dsa_87.New()
+d, err := mldsa87.New()
 if err != nil {
     log.Fatal(err)
 }
 defer d.Zeroize()
 
-signer := ml_dsa_87.NewCryptoSigner(d)
+signer := mldsa87.NewCryptoSigner(d)
 // signer satisfies crypto.Signer
 
 // Sign with FIPS 204 context via SignerOpts
-sig, err := signer.Sign(nil, message, &ml_dsa_87.SignerOpts{
+sig, err := signer.Sign(nil, message, &mldsa87.SignerOpts{
     Context: []byte("my-application"),
 })
 ```
 
-The `opts` parameter must be `*ml_dsa_87.SignerOpts` or `nil` (empty context). Passing other `crypto.SignerOpts` types (e.g., `crypto.SHA256`) returns an error.
+The `opts` parameter must be `*mldsa87.SignerOpts` or `nil` (empty context). Passing other `crypto.SignerOpts` types (e.g., `crypto.SHA256`) returns an error.
 
 ### Address String Format
 
@@ -252,7 +252,7 @@ across `@theqrl/wallet.js`, `go-qrllib`, and `rust-qrllib`.
 
 | Type | Thread-Safe? | Notes |
 |------|--------------|-------|
-| `ml_dsa_87.MLDSA87` | Read: Yes, Write: No | Safe to call `GetPK()`, `Verify()` concurrently. Do not call `Sign()` concurrently on same instance. |
+| `mldsa87.MLDSA87` | Read: Yes, Write: No | Safe to call `GetPK()`, `Verify()` concurrently. Do not call `Sign()` concurrently on same instance. |
 | `sphincsplus_256s.SphincsPlus256s` | Read: Yes, Write: No | Same as ML-DSA-87 |
 | `xmss.XMSS` | **No** | NEVER use concurrently. Index management is not thread-safe. |
 | Package-level `Verify()` | Yes | Stateless, safe to call concurrently |
@@ -268,7 +268,7 @@ func signConcurrently(messages [][]byte, seed [32]byte) {
         go func(m []byte) {
             defer wg.Done()
             // Create NEW instance for each goroutine
-            signer, _ := ml_dsa_87.NewMLDSA87FromSeed(seed)
+            signer, _ := mldsa87.NewMLDSA87FromSeed(seed)
             defer signer.Zeroize()
             signer.Sign(ctx, m)
         }(msg)

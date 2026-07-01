@@ -7,7 +7,7 @@ import (
 	"github.com/theQRL/go-qrllib/wallet/common"
 	"github.com/theQRL/go-qrllib/wallet/common/descriptor"
 	"github.com/theQRL/go-qrllib/wallet/common/wallettype"
-	ml_dsa_wallet "github.com/theQRL/go-qrllib/wallet/ml_dsa_87"
+	ml_dsa_wallet "github.com/theQRL/go-qrllib/wallet/mldsa87"
 	sphincs_wallet "github.com/theQRL/go-qrllib/wallet/sphincsplus_256s"
 )
 

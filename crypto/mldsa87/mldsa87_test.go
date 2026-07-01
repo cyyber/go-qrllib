@@ -1,0 +1,302 @@
+package mldsa87
+
+import (
+	"bytes"
+	"encoding/hex"
+	"reflect"
+	"testing"
+)
+
+const (
+	PK      = "a48228209f3d17aed11158aebd2a487366efd8bbe2c6ff452d69fde46808e4b4c7c5c270f2ba4336e59f3f8f97b44c3583b8e42b7eec5c4499c0e79923486610de51e7f5503860e33e62d0ece6dc029c7410bf43ea353c11619f50f7508614e15dd943a3ebaccd9a959c28b3afe35171099ceae5cafe00a459903fd4142c7459f491833eff69e7c5231e8ff502e03e0690878f73a11f9ef0eba5182efd10311d98613bc034843d4507f698e5233232ef5758908bae7c8a8d69baf859dfdedd1f34512bb88122b635742bf9dc720cd46cb6e98dea4bfbf3d5bfa5eeba1155002a3ea93597d7815dd857848d850f3dfe81d1d0d07ba7255f638c92727928a9d7f981151480f9787e429ed40debfe2bc7cde84178c4ce440e23b12ddd67232e53054ed207bdfaf2996744ab5aa0672299482a0768527715f8be5eb76f25c7d1b20683cef17cfbaa24e6cad345b2bf61529122ba32f6b64c6e27535c3f17a8bebc92bdedf6557710c4df6247ba691984b621981133976bee749e58c655036a5fd8691f1639e8981cba42d6f2b90f02d12ad994b2907eeaba4a5277bf1399a68371bd4a73d9211c600f4ee75e43fa0d91094e5634ac3c507750c5126548f942fa1029d9b615010bfcfa1e385046056fd9d0447bc7426774a99937242eb1be6f3f831338e25824cdb83c5a67ff0305a000f98a76bb5d55ed5cdac3921340e29624490c3d05872fac37a86964f017ec94900bc0d1a46d5ca4d04eef71c46d29b2439d9733a1b46498adc05e48a81815028c37e7e452acfe78547de2ca01aa46416fdfc95877dcde725d13fb6b598235bb3c12bd4a2ab8df23ec8cbdb8a7f502dfeabbd27742d79ec9637ca92b406ba364b247e6beb0df55875ba17ad01e44f730635f68d66ccfb09bf36cecb0c9650af0f883ca84eb7d7f2f62e8decc6408639018f3725ca6bb92db81d3a7ee3f4695f70ce572a9504cc8ef9c011ad2ab0562bb6b648974e2fa7fbbc269cca0c20819e128c57b4714a24c6c6dcece6794bfa4c81c825ac3c84acf8f522a34fdfa48f460f79049c57c99c95ebef06de89431de230f815247c29b5bfce55673c7c6fcad443275c831e69b574a0161d8278c82e3d293fe884b5bc529f91e7c256d0f4fa5024d3f6d0f785419bd5a3387078904befe2b43d961e50462e1378f42c92464b1faa3ec65c61ce00a569f47cf374e8308899ebd2bb2b4a650fc066e72bc8daee50193e51d91315adeb764361439e706d43a6ef0c49618dcb314a4df0d01b1694913a309ada05bdf394ed0e4dc49d7c7b1098865614a5f56eca3fe5239ef1fed1bc9597538733f80ce0c6731000e9947bb1f9c89d8a96e0bd0c1daa4a8a3e6e57d3d639800cc8a20e197c620c0177694df3d698b0d141e04e4ced12d2b5f33665345a729a072dbc5d07c6e446fcf383b53e14198011ad19b0d000ff1b5e78ee8bc0c66e2ad371d5ec8bfec6946309cc09c6584278a28aa5160c43a6e1946f97190cb4bfce441110d3e1b09ef73d94b72200718037f572b0f980daf910d3052bb1385a1495c32680da1cc4be7ddba0a93a57466c99c9fb2bb6d02418ad6eb7be8f82ce35ddf581e35ccbdc1f6916494292794ab983614d335f4280597665cf0f587061c3468b6aefe54fd5fa117c9bcdf9e7a1c8af120a74275099bfd8117fb481e9dcc637debcae4b9124222c40bbf2d1ee3d55d45a4ab9306b59e925676dbfe5f1b66c633104dce75740c9a71e66b0692e13a31f54de387d99017ca2e65232b8ffb6a93aca30decdca9378e723b73df5e3a150b2d2a756ce4dda69cb4092cd8bf8166545aa66c7bd0b562c920aec613e1c47a8f9e994f20c2c760d2143e52c350fd00649a7900a6b62c205b4c3f6c790a24f137b60f96d3e84595cc004a07ec69741250ab34be456779924535318ffc69c4584ed809de91373fc51f4fbc8f2a1ef0182879bfa10c1f32a5b0c0d657f82a544b2aae172cb469aac654ab4fba39d6c184ce533b422eb3207300ec64e7872b66a7111c887f572fdc24b89622fcf7399926a5e9c70dc1ac10c3587c49467bac73c52f01404e010b886e91a983fa8c03945ea2b3aac37eac346631241d39176ae9ac930ebde21e2c3f8bb9859616d06ef7ec2b07298e819ecbcde76f98fb0955465b0fe6b58c33c40e84c3fc6759dc9232908e8cbb6fca1f36b2e29099d944915aa0b5fc93f5ec6252bb3b15123dd13dcced76d53416c57289bb391a067de22e0e457e3d1656016b175f5ce95acd3753b6aaf1dc6fd2c32e201d45ccbf3df4fe829572be04f83fc5a3088cd99417f9de4ee201d893142148935ce062f5d1869d5c88bf3325c0974b80e1cbf9eda89bfa61d24944e94bb481a28ddbcf6465dd934c000412c751701384175fb16112223903b92624924dfe5a817da9de8e3b2dbf8db4c21370989c729d61f689263095605b0ccae5eb3ecab7a99ac28e52600b80315e663370c84096b8a77e03ed1ba4f3cced1291641e7e5278dae59119a6883a17701340f3dba3c4a027695ac6dcbd207730895451325d7730d6eecb69846aa0950480865f8163bf273d1ccf5fc22f99e2ea713628a9e107a00f6e4cb7541ad955fd1724292a99cb7d8d0ed777b9bcbe89f325c58a9056ad7d43db1430528300b76e45b82f358d95d8a5d28a506c9ee165be47ea32b85045e0562f3b827f4ff627604c151751b738a945044e58014867c2598bc4474a691aa262cab18a94b70fe90cc13af263fdf236cce6bc12eab15cf4a10d15b517b9acac75a9e0353c0886636f8af7ecfa79cb5a861eae9541484035f1d78f92df06ba4993403bf311db9ad26f2f63fa45b315b9d637acd2253a5617cd8648de5935e20dcef2a4e05723689b6e2d723b9af5eabbc05f415ccbeaac9cbacc71e9c4fea05504690d9513a7e08ff1c28bba2c7cb73b3f40425ff5affe6170875298a69a2810d60e878f8b7dda1f0ded9d5f912e3aa76e2f844c476deb4557b45abcff44ca972428b3785c71755f16a537dbf22a6e0fbde897c5836aecf50a415ef31feba64d50183c66cdd5fd57aed91ab4230d153251d8a81b28497d7417ddea81c6c9962cc98c9ba6e4d5d85075e373c69a20b107bf3615cac5ceabe1ed4bceb3bf76cd4bafbd27676b93ea616854cd2a65b244aa777a96ba1011e1b370824906f90b50291ceccf46595977329fcabeeef0e6daaf7ce0d639b5a12b431bfcc0b24e9b8779f816e6279e32d96147bd9b5dd7ef04a4034f2e36900dde3ac0f7f30eb6afdd367066a308c46af8352b2509f24747bf844c8c5eb7d805c122767d30ccd1bbbb853b3708351dfa587911b5c9a93a9a67aa9f64f42b1d2dde5f0c73a0b75afe9f2ab88b2b797550763cdd725e6907db3296a949c6fd407d41c5eeca02c99d0731d34b9d39a7673effe55750b42cb0d01a490c860167b05c090230faa88c8a695e32e5a4ca373add2fa4e9042aae0f9ca26aaa736e73899a48ca96a44a44080e7e7692480cf0d83270e1c4fea40115707e7a3d9a3b54cce1c6ac9d6db7d83b756982a69bc6c00d76e7d71ad3e5f2b8651f95d47e504a2b52f4eb5c5587da336671207fd5fea9a7e2b439f4bab88a1452b725c71671481379d879994d239aba64f4436332d3924bc9f153352439"
+	SK      = "a48228209f3d17aed11158aebd2a487366efd8bbe2c6ff452d69fde46808e4b479deea3d4d744af54ad3b3ff0746c8a4a2d1f8c258e789b4b10ff67e2502c99ca65d5670596afbe1ee30e9ed2029db1c9976fd07142c5da41819477fb9289d80248c4398e2433e14c15be47f7c698ac2a246c1f77032cc27ad13b5c408482e6900c185da2242234105db10621b426d0b466ea3102c102031200329843666882002dc004dc19609cb3008dc164c41a04d1ab28419168ca2243141900d42284ac8a650a4a8449bc88108340082408a11226e91b490d3844d03a63198022422394008a34421b84818164d18228882c06d4b26688a96611ac58dc2240aca800d5c844d01094609a86c8bc03101a76063a86001306c481404d8300193100949b0294a904812208ce2a485d8182c10c62803955009022cc41662e0124500188509c831d3a46903092c093501984452830686d1c44d12312e810411d3040493a2041cc7716026712183715b0686dac670e14686da303190484a123270cb96200c363248080210110c491682221642414622cbb408243111cb160198945191146a48904003c8618bc471d30020d00281022805a1442951946403862c1a068143b66813157263022904a62400c630da028d991432c2b06dd1403058425281260c012431c334729c320223484290488001268c0c288ea4160a24c950c188401c015189448403812d59441062305102a008a2b28803a66819266040b47183984902c149e396510a384e83004212a944e3324453944c4c26000a056511b510e240508bc229630400013586e29088614802a2448243322421a1700b927009a631130028da1624c2982100392e593825d01282a0280480c690d0442554226de2c61103123112a10420494d03024d842431dc80109a4260e2b48910086819398a1a116211496508a20089a2709a9288c4c8650091410c002aa3346e12244d919668632861a2989108c94182a6492349411b9100c9984ca1a07060b0704ba40cc8200423376818b390da382913a404d9a665dac64093906582c630ca46625198311ca60918332150267240920858168de2c4251b916002860400101250922dd2b2709cc600c300688a382943426c8a282ce288684a2286902820d99424d3388ce4426e193772990052218649088805c328244334511a322d4bb22c1417928c3866548891c8b448db9090a0282a08a32553286d83208ed8462462b06960484e0c2385e0102ad380840130918b46001c270414814950b02c51980c4a048414454a53482d51b08882c624dab891c3248600878c608045c10024109581212925e00470844690d0a02c8b449023318c1bb96559367050389022220d1bc790500289d4806099221122c33020494022377104024d41b6448ab64110048859c40dc1b64d14450c18352123c1309bb20c183460183531d9480c03200459b08423b44188204d22039003432c0c13280c8588e132080918240b258698828061202cdc007243088e14816562940c01c951e29409a4c40c1838325a00224a38044bb20011010d992842923611219305c3860c59964110100954c4681a42244c442a1bc30151885060360edc8420e20870643612614251c1164e0a9724cc986050028993182a0cc12423480512460ed2943163162608318824172e8b88311ac151cc38669ac261493865832468d1c400112586a2384c8440510a45620940488a228e4bc04cdc108101196e1c4481a232860b038a0a966c2495491b488124802cd9960d59b4094486650bc02d00430d4aa869e296451c038513210ea4446019303252c864c8c2315ab684214650084725244542dc089154888d40c64c582081e4b84cd910891c8465a128411903289828254a8230d21270d0280c5338315a4611a1120ae3182e0b474848a00808824d1c49262106280b278904300100142a821089c3860d5b24721cc62c0ac465c8b43118211219088561468113474c5cc48500483261402ac2082d12b0604c101213090d484021e2008502b144e0b001a40861c8002219a921e3248900c585c3a20512a125a2965092066513198d103672c1286122b3641294908ac68c921005209751588450443229e314025a302859a62941828950182c92406a14144ea1828da3180492300c51c24442860dd49284612470a14232e4880912306122018401398dd4f7b76e01569de9c119942d1a999ce6894db154ae84d83315ab9892903db4cec4b2a17227300e44f2357e6d4c6dc461557fc2aca9bf5ea136314e5d87329480ce0e67019d28e5df3afaf986b7753ff2cfc4c426be55f7cca4d3882baa610a4a0422e18f68e5b234accf6dc48545c194ff43586e39138c1be2207cec2f0f21877ef3e8386ce08e9a0d7c399f7fe00f9eba899e359ab44a8e76839c31ee78918b94d2dd861832953b88b37b8f7e645b332aee7cd8980f16627d3850065ee38151a83e1dbca078a78ce2578fe1716329327ab87c13f9b77cc12bc636e8b9c80f861700f02895d0b3e61fc02c84ea11e5e4b681a82ca2263a51f3ece03d7d5c798a760ccb87390493471549cab9c500bae826a60f1d595b4d04181232e25c5d8938927f5e30b73db51a081568de4e0b5172c28ee601ea2ff92d11a8a86455c8b3aef52747358b68e1ad72c0b6929c54d8cf0c7a5dcfdfbdc8bbeade25ef79ff159a359af0eec3677912b10d04e670b71b335c25de37c839f630c16572970ac6ae7557b210ebcf828f110bda484be7bb1a0eac672b8b17d0f34841b96a8b4300e40eb7b0566df1f9872c822159e4c03cf53fe7a88eee75817f9e2e8b08fe0a7969611ddab0a80892fcecd69135bf3ed83bdf13ade895bf9ee231c4a46bf94720cd0b3796e9dd7012261ad222feac7028ff193b1bf6dcb92f35f974a4a4d49b76ea43b43d65e967ad43e31f52924586ae53c6d7e20b31ec94b3b30beb6f2227244d607c088ea1cdd7da96e8b74fc90437147e466763dbd4fd6329c2c6699b570b7c7c81d51e4ac92ee2418ca1340bbb3313d0f6f03b5c9a3019d06a8a07887347eb8648b90260d3ee01362ebdeb0a5fef3e40b6eb5943f7d98a08725852a62b7728c8136cb716817c806a054ddf61a99e279fef535d98da292ecec2ccb0c76fa0bc74a1fbc76e411d9b9b8b3b790e1dfd7786d97d4d8a9fbea8bd2f2887b55c579360cb032f7fc1a76f72ea0a6b5fc5edc34aff1a2764f6921dbb45d328ea0901a211f0cb500ec36ac73e9c704673ae7e8da5d54187628ce4e8b5969bbbfd7a3a1af02b20f4614161562137d149d5ed46b742156d24c0edf762b45b612352fc5c492fe5e31b4eb4259b56affc08af6249e1556fecbe0b69ca91a1bc0488c39f2023b7ef6653fac3104d6425e0af5924f0ba196a746d6ab22c46092a9b9301a11a3c7a247447a7b0cfca26c1efba3be25087d735626322f7cc4966be5e1460552831803cd2e13b95a15010d2490e3597e400ff8aae7781e8587de9ac9143a4534a9c5d9ed230089cff7482a335c7494d08397594ae0db5eddeac3dfb0d4bb17689a7e47c2e2acf218b69ad4869ba3013aaa9e3e31940d78c599fccd5d1599cf6edb750ecfbec0afa502b65604591ef9c53796882dfbdc0016cd2cfb9791da890dc52a214099f738a55a91fdba2f193d721cbd56f2ccbd1ff267e5c74766b3521f7793643d8b40761bd081c506ee573d39dac285cf1111590cd2892bebe302552dc4bbb77a67a1fe262f89b5579d525fcb6b5c43ca12d966e58acc7bafa072885515932a4542cdc707a520c4620d38a22f6b6d958bdf8a9d16fed3b3a5e62935f8a56a54bd60300c0be946e2571929531379d35fe2d067a557b9a08c7bb741adac723889a4855b418cc788e07b9a22a5d3474445195d8337f17700a9a66fa746434d3f37353301f53d43196783c7fc55d979fed53d0fdf624de51359638fe75cffe230bfc734453fec4a2a1b0818babbe6dab0e722ba719b0fd36fef4759124ab04cea8c9581cc6c8c64415afa3fb5ed98c3829f99c1fe4cb396655f6c45e70b0e333d939befd2cd138bfbfa76a62b47aa358469a44e65c5ab545f6dfe98476ba17724da17955acac3786635eba86336666ecd8acc6d6a7b60bd300e1cf7632274678216e9befdb3f0599717c144cb0dfe4e6106bf6eac885cec286e7b6b5b1667db446d3042c7379ec0e05078c96a6eb437a27a51c63fbf15c52f4b5f053b4bfd660b02112345f12b04b9f2763cd21642410f630da2ac82ef8e324e387e54bbcfe042090b0c7806a21bd8902ce2da1876942c14d3c1e9e81c8825d8a04e3833af90c3efdfbfec4337efaf855403e894b6a6449f74185c940f31a067790f1d0bda7a2f05e2bdaaa20957cc671fb11e6040f64d496326a2a44b51e4c58884a3d885c5124416dfceaaf04333ff4fc980e4307dd24c628126695b811ca8f0d979c9ddf951a9c0de1e27a9f594a5de269a15e4275ebd99f19e1c99aef7e0542752f87d4672197f541fe765621661eeebaf538fa1c7d7ae88184c211c5aec438ad69998f3ff67a2007344a99094e7250c525264a778eb124c6acb95cfcbb81067902daeb33785937523eb4682d80df0dafa7e6a96488665881e4848e8fadac790a6a5896235db85bdfa9dd47310ec469231b9c2048aad5828e982f0290323f9b73f5f710aa4ec0ff91c53bbfdcf76007fb9684ce148ad24325fb6c3f4f5007bfa2cee15a874d4325e561e3e5a3bab0a48535edebe051db5faaa4438145bfbfefe762a50fc15f09b5b791ff8bfaa10856b6d3450a5ccfeefe3dd6b195625e412c5346cde2036603b279126bf7dadd8a5c9d857746641903d20316a385b88a8424ce3d8adda8e36ba1b7edefdf66693f7613671b6561a2db3c3c3cd1e277725c67066208ffc7f85553500afd85906f431df58987112e7389aa5ad6dc51807713a07d54afb22ac9e198f42b38e7ad34ad26a394d3ad7086a113800445fd4830b1eaeb1014677466d46662563d328371d34fb9d32e675103dbeb765437c621e845746f58c01f09e0fa8d9655d9ff739f7f80bc030c473116c6dbef27c337b48142a0615f7848cbeda0f3bffc849ff4ef52105f8ab46efd11a37b8d7c6e4b2279a410c2aa09e328a12f81608caeb9e461617a2acee7e0a7a8c31afaa70a9c247a24f29d8c76aa13196efe3171c5e421c55907108711838a394af83b93c96910fc3abb07c9d227f5ce1910985a5dac40c6e5b690dca78d69fa04801680b62e7d035e44030b900ac21c3cf436a70de2627434ee8195435756786e5d44b27bd7fd0bac75551ef920e37ea35ec131a8e3d4c76a520397eb3da9538e5b01efd72020452044b2efd651301f388934c239225513ad061d8f8b004f48dde92de8a95efde9b69be5cf32979129ca41f1b202f099f575a116ecaabc4328c792381101f3f33f6f141d8302fda27fc42ec61428d793e9a406ba15baedb654e7e767a56c93df3da06c8fb36a22e37e240b7b221a2b1e972038b2e53d4a11b21c29f4fc187bb178f4f7dc98059b10cfff5bc67951bb125ff5619fefe9c2ddb8eb97f09e4735e943cb07a3134cd5b15df034fbf041be152824592dfc47f006a6431d30ede07f12f2d32fb6f197b7ed59c7b4b8797bba5487f89282fb9ed44cfd64f01ecaee1f37bd7c2e83ad3cf1f7fa937e6a5904b9c28d42839f3b7019518ea6424302afe4ece513a9aafddd16f0ec27db0c35d3f9b606b1a7b35bbe99171171a0fe61f2b7bd0a02aa072bcce2205e3329cc7c8920527b6eb248627a8aef208ab38fb9231c6da5d7835b3c2971a1d1361fc3b1dea6384aa1749c92694bdcbfbef5436901def3ab2fd5f92ffcf7d96880cb655ab59e673b81f53c835d59f6cb10370d8ce382e69c56abede3c58aa7bc886c8a7a2e6390a6563ffc3cd18de059393b47411149a5d1b30f495da5afddfebf961c154a24b45ba5ff39e2418f46a6212e80dc4e9feef04c23368fc3ab80ca8d062058795f8f22ada907c9619b6554a0c543076f140a219e68d4493ce98749b0ed8d679715377e3fdaf8af800adda818ba953119a1d0f8d5ff4f76688d57cf5b235f4c7d3b5b7e807cab74bab6c4db8ed3aa7c52a967717f8321d7e3adc768f3d425a9c88dc97905e960c7a933d1ac15735d9d1d54bfd945d235a083ee1b4e2f7647ae1ca641a7c3d592ab64d30388196c9ccddd227cd79777600d8411e4c72170e25515baf77889db231ccc7a38e113c9d5e4e169f7798a1d8e08bd7ada285b326bcc94af0303a00e555cb69b50b7dfbfec72c80de0cbc7f45cb524c0490800807d43011b84c16b015323f733c1ed0b535618688abcdf9a28366caed0ab22140062de5bd8d243982c2c736523fb4942df86248bb380340bb2b9fe6543eac351d00e17686d1a7be4ba726f21639f2f5870195bb5ecdca6e4a869bae3c4cc2ddadfee6a3703840b8c72f32b03aed51c0945627edc2a1ce0a10971bb9c243de3b13427defcd691b21172682385401e709726ebf6a6d66b5c5fdae9f91491b825e6701e7560262d6fc2cb42ffd502afd34cd65832a8d353148d7dd81f809a4fbb796889592a0b4976bef1897e674d881b6dcf4ae554a85c9c5384671e6607903c3c70efbfbece1ee3f879fd500b34c4a64b5909dacd2cf0e6bc979bda8a1c9dcfbed2732d1a90954fbf54416159d8a2521339b2250ea8f03cb9f3a25c074a8b31d932240cfe0eb10a02392304428e5b9b03ecc7b572e4fcd5d5aeed9867249f22afdbdb136183fbaa617bba96691a90733621a4195f0297d1b4b275f2c85c5015c2d814ebb04ba8f3905cdd3c44e52aaa2ee85362865489dd67b2ac2b883c489b2814e61fb872f528e8e7a7a2c5d07e8837a0345222ff0ab719a03df231ac0dcf"
+	HexSeed = "c3317c917c365869a32ee99b46ea1587c5883ad4f38af9367a1bf676dddfb62f"
+)
+
+func PKHStrToBin(pkHStr string) [CRYPTO_PUBLIC_KEY_BYTES]uint8 {
+	if len(pkHStr) != 2*CRYPTO_PUBLIC_KEY_BYTES {
+		panic("Invalid pkHStr")
+	}
+	var pk [CRYPTO_PUBLIC_KEY_BYTES]uint8
+	pkDecode, _ := hex.DecodeString(pkHStr)
+	copy(pk[:], pkDecode)
+	return pk
+}
+
+func SKHStrToBin(skHStr string) [CRYPTO_SECRET_KEY_BYTES]uint8 {
+	if len(skHStr) != 2*CRYPTO_SECRET_KEY_BYTES {
+		panic("Invalid skHStr")
+	}
+	var sk [CRYPTO_SECRET_KEY_BYTES]uint8
+	skDecode, _ := hex.DecodeString(skHStr)
+	copy(sk[:], skDecode)
+	return sk
+}
+
+func TestNew(t *testing.T) {
+	defer func() {
+		if err := recover(); err != nil {
+			t.Error("Panic while creating ml-dsa-87", err)
+		}
+	}()
+	if _, err := New(); err != nil {
+		t.Error("failed to generate new ml-dsa-87", err.Error())
+	}
+}
+
+func TestNewMLDSA87FromSeed(t *testing.T) {
+	defer func() {
+		if err := recover(); err != nil {
+			t.Error("Panic while creating ml-dsa-87", err)
+		}
+	}()
+
+	binUnsizeSeed, err := hex.DecodeString(HexSeed)
+	if err != nil {
+		t.Fatal("failed to decode hexseed", err.Error())
+	}
+	var binSeed [SEED_BYTES]uint8
+	copy(binSeed[:], binUnsizeSeed)
+	d, err := NewMLDSA87FromSeed(binSeed)
+	if err != nil {
+		t.Fatal("failed to generate new ml-dsa-87 from seed", err.Error())
+	}
+	if d == nil {
+		t.Fatal("ml-dsa-87 is nil")
+	}
+
+	pk := d.GetPK()
+	sk := d.GetSK()
+	strPK := hex.EncodeToString(pk[:])
+	strSK := hex.EncodeToString(sk[:])
+
+	if PK != strPK {
+		t.Errorf("pk mismatch\nExpected: %s\nFound: %s", PK, strPK)
+	}
+
+	if SK != strSK {
+		t.Errorf("sk mismatch\nExpected: %s\nFound: %s", SK, strSK)
+	}
+
+	if "0x"+HexSeed != d.GetHexSeed() {
+		t.Errorf("hexseed mismatch\nExpected: %s\nFound: %s", HexSeed, d.GetHexSeed())
+	}
+}
+
+func TestNewMLDSA87FromHexSeed(t *testing.T) {
+	defer func() {
+		if err := recover(); err != nil {
+			t.Error("Panic while creating ml-dsa-87", err)
+		}
+	}()
+	d, err := NewMLDSA87FromHexSeed(HexSeed)
+	if err != nil {
+		t.Error("failed to generate new ml-dsa-87 from hex seed", err.Error())
+	}
+	if d == nil {
+		t.Fatal("ml-dsa-87 is nil")
+	}
+
+	pk := d.GetPK()
+	sk := d.GetSK()
+	strPK := hex.EncodeToString(pk[:])
+	strSK := hex.EncodeToString(sk[:])
+
+	if PK != strPK {
+		t.Errorf("pk mismatch\nExpected: %s\nFound: %s", PK, strPK)
+	}
+
+	if SK != strSK {
+		t.Errorf("sk mismatch\nExpected: %s\nFound: %s", SK, strSK)
+	}
+
+	if "0x"+HexSeed != d.GetHexSeed() {
+		t.Errorf("hexseed mismatch\nExpected: %s\nFound: %s", HexSeed, d.GetHexSeed())
+	}
+}
+
+func TestNewMLDSA87FromHexSeedWithPrefix(t *testing.T) {
+	d, err := NewMLDSA87FromHexSeed("0x" + HexSeed)
+	if err != nil {
+		t.Fatalf("failed to generate new ml-dsa-87 from prefixed hex seed: %v", err)
+	}
+	if d == nil {
+		t.Fatal("ml-dsa-87 is nil")
+	}
+}
+
+func TestMLDSA87_GetPK(t *testing.T) {
+	pk := PKHStrToBin(PK)
+
+	d := newMLDSA87FromSeed(t, HexSeed)
+	if !reflect.DeepEqual(pk, d.GetPK()) {
+		t.Errorf("PK mismatch\nExpected: %x\nFound: %x", pk, d.GetPK())
+	}
+}
+
+func TestMLDSA87_GetSK(t *testing.T) {
+	sk := SKHStrToBin(SK)
+
+	d := newMLDSA87FromSeed(t, HexSeed)
+	if !reflect.DeepEqual(sk, d.GetSK()) {
+		t.Errorf("SK mismatch\nExpected: %x\nFound: %x", sk, d.GetSK())
+	}
+}
+
+func TestMLDSA87_GetSeed(t *testing.T) {
+	binUnsizeSeed, err := hex.DecodeString(HexSeed)
+	if err != nil {
+		t.Error("failed to decode hexseed", err.Error())
+	}
+	var binSeed [SEED_BYTES]uint8
+	copy(binSeed[:], binUnsizeSeed)
+	d, err := NewMLDSA87FromSeed(binSeed)
+	if err != nil {
+		t.Error("failed to generate new ml-dsa-87 from seed", err.Error())
+	}
+
+	if !reflect.DeepEqual(binSeed, d.GetSeed()) {
+		t.Error("Seed Mismatch")
+	}
+}
+
+func TestMLDSA87_GetHexSeed(t *testing.T) {
+	d := newMLDSA87FromSeed(t, HexSeed)
+	if "0x"+HexSeed != d.GetHexSeed() {
+		t.Errorf("HexSeed mismatch\nExpected: 0x%s\nFound: %s", HexSeed, d.GetHexSeed())
+	}
+}
+
+func TestMLDSA87_SignAttached(t *testing.T) {
+	ctx := []uint8("randomContext")
+	msg := []uint8{0, 1, 2, 4, 6, 9, 1}
+
+	d := newMLDSA87FromSeed(t, HexSeed)
+	signatureMessage, err := d.SignAttached(ctx, msg)
+	if err != nil {
+		t.Fatal("failed to seal", err.Error())
+	}
+
+	// Hedged signing (TOB-QRLLIB-6) means we cannot pin a specific
+	// signature byte string; instead, assert the round-trip via Open.
+	pk := d.GetPK()
+	opened, err := Open(ctx, signatureMessage, &pk)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	if !bytes.Equal(opened, msg) {
+		t.Error("attached signature did not round-trip via Open")
+	}
+}
+
+func TestMLDSA87_Open(t *testing.T) {
+	ctx := []uint8("randomContext")
+	msg := []uint8{0, 1, 2, 4, 6, 9, 1}
+
+	d := newMLDSA87FromSeed(t, HexSeed)
+	signatureMessage, err := d.SignAttached(ctx, msg)
+	if err != nil {
+		t.Fatal("failed to seal", err.Error())
+	}
+
+	// Hedged signing (TOB-QRLLIB-6): the previous fixed-hex assertion
+	// cannot survive the per-signature randomness; round-trip via Open
+	// remains the meaningful check.
+	pk := d.GetPK()
+	opened, err := Open(ctx, signatureMessage, &pk)
+	if err != nil {
+		t.Errorf("Open returned error: %v", err)
+	}
+	if !bytes.Equal(opened, msg) {
+		t.Error("SignatureMessage Verification failed")
+	}
+}
+
+func TestMLDSA87_Sign(t *testing.T) {
+	ctx := []uint8("randomContext")
+	msg := []uint8{0, 1, 2, 4, 6, 9, 1}
+
+	d := newMLDSA87FromSeed(t, HexSeed)
+	signature, err := d.Sign(ctx, msg)
+	if err != nil {
+		t.Fatal("failed to sign", err.Error())
+	}
+
+	// Hedged signing (TOB-QRLLIB-6) means signatures are not pinable;
+	// verify the produced signature under the matching public key.
+	pk := d.GetPK()
+	if !Verify(ctx, msg, signature, &pk) {
+		t.Error("Sign produced a signature that did not verify under its own public key")
+	}
+}
+
+func TestMLDSA87_Verify(t *testing.T) {
+	ctx := []uint8("randomContext")
+	msg := []uint8{0, 1, 2, 4, 6, 9, 1}
+
+	d := newMLDSA87FromSeed(t, HexSeed)
+	signature, err := d.Sign(ctx, msg)
+	if err != nil {
+		t.Fatal("failed to sign", err.Error())
+	}
+
+	// Hedged signing (TOB-QRLLIB-6): no fixed-hex pin; verify only.
+	pk := d.GetPK()
+	if !Verify(ctx, msg, signature, &pk) {
+		t.Error("Signature Verification failed")
+	}
+}
+
+func TestExtractMessage(t *testing.T) {
+	ctx := []uint8("randomContext")
+	msg := []uint8{0, 1, 2, 4, 6, 9, 1}
+	d := newMLDSA87FromSeed(t, HexSeed)
+
+	signatureMessage, err := d.SignAttached(ctx, msg)
+	if err != nil {
+		t.Fatal("failed to seal message: ", err.Error())
+	}
+
+	extractedMessage := ExtractMessage(signatureMessage)
+	if !bytes.Equal(msg, extractedMessage) {
+		t.Error("ExtractedMessage mismatch")
+	}
+}
+
+func TestExtractSignature(t *testing.T) {
+	ctx := []uint8("randomContext")
+	msg := []uint8{0, 1, 2, 4, 6, 9, 1}
+	d := newMLDSA87FromSeed(t, HexSeed)
+
+	signatureMessage, err := d.SignAttached(ctx, msg)
+	if err != nil {
+		t.Fatal("failed to seal message: ", err.Error())
+	}
+
+	extractedSignature := ExtractSignature(signatureMessage)
+	if !bytes.Equal(signatureMessage[:CRYPTO_BYTES], extractedSignature) {
+		t.Errorf("ExtractedSignature mismatch\nExpected: %x\nFound: %x", signatureMessage[:CRYPTO_BYTES], extractedSignature)
+	}
+}
+
+func newMLDSA87FromSeed(t *testing.T, hexSeed string) *MLDSA87 {
+	t.Helper()
+
+	binUnsizeSeed, err := hex.DecodeString(hexSeed)
+	if err != nil {
+		t.Fatal("failed to decode hexseed", err.Error())
+	}
+
+	var binSeed [SEED_BYTES]uint8
+	copy(binSeed[:], binUnsizeSeed)
+
+	d, err := NewMLDSA87FromSeed(binSeed)
+	if err != nil {
+		t.Fatal("failed to generate new ml-dsa-87 from seed", err.Error())
+	}
+	if d == nil {
+		t.Fatal("ml-dsa-87 is nil")
+	}
+
+	return d
+}

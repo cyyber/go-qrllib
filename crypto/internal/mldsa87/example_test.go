@@ -1,0 +1,156 @@
+package mldsa87_test
+
+import (
+	"fmt"
+
+	"github.com/theQRL/go-qrllib/crypto/mldsa87"
+)
+
+// Example demonstrates basic ML-DSA-87 signature operations.
+func Example() {
+	// Create a new ML-DSA-87 instance with random seed
+	m, err := mldsa87.New()
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+	defer m.Zeroize() // Clear sensitive key material when done
+
+	// Sign a message with context (FIPS 204 requirement)
+	ctx := []byte("my-application")
+	message := []byte("Hello, FIPS 204!")
+	signature, err := m.Sign(ctx, message)
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+
+	// Verify the signature
+	pk := m.GetPK()
+	valid := mldsa87.Verify(ctx, message, signature, &pk)
+	fmt.Println("Signature valid:", valid)
+	// Output: Signature valid: true
+}
+
+// ExampleNew demonstrates creating an ML-DSA-87 instance.
+func ExampleNew() {
+	// Create with random seed
+	m, err := mldsa87.New()
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+	defer m.Zeroize()
+
+	fmt.Println("Public key size:", len(m.GetPK()))
+	// Output: Public key size: 2592
+}
+
+// ExampleNewMLDSA87FromSeed demonstrates deterministic key generation.
+func ExampleNewMLDSA87FromSeed() {
+	// Create from a specific seed for reproducible keys
+	var seed [mldsa87.SEED_BYTES]uint8
+	copy(seed[:], []byte("my-32-byte-seed-for-testing!"))
+
+	m, err := mldsa87.NewMLDSA87FromSeed(seed)
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+	defer m.Zeroize()
+
+	// Same seed always produces same keys
+	pk := m.GetPK()
+	fmt.Println("Public key generated:", len(pk) == mldsa87.CRYPTO_PUBLIC_KEY_BYTES)
+	// Output: Public key generated: true
+}
+
+// ExampleMLDSA87_Sign demonstrates signing with context.
+func ExampleMLDSA87_Sign() {
+	m, _ := mldsa87.New()
+	defer m.Zeroize()
+
+	// FIPS 204 requires a context parameter for domain separation
+	// Use empty context if not needed, but consider using application-specific context
+	ctx := []byte("my-application") // application-specific context for domain separation
+	message := []byte("transaction data")
+
+	signature, err := m.Sign(ctx, message)
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+
+	fmt.Println("Signature size:", len(signature))
+	// Output: Signature size: 4627
+}
+
+// ExampleVerify demonstrates signature verification with context.
+func ExampleVerify() {
+	m, _ := mldsa87.New()
+	defer m.Zeroize()
+
+	ctx := []byte("test-context")
+	message := []byte("verify me")
+	signature, _ := m.Sign(ctx, message)
+
+	pk := m.GetPK()
+
+	// Verify requires the same context used during signing
+	valid := mldsa87.Verify(ctx, message, signature, &pk)
+	fmt.Println("Valid signature:", valid)
+
+	// Wrong context fails verification
+	wrongCtx := []byte("wrong-context")
+	valid = mldsa87.Verify(wrongCtx, message, signature, &pk)
+	fmt.Println("Wrong context:", valid)
+	// Output:
+	// Valid signature: true
+	// Wrong context: false
+}
+
+// ExampleMLDSA87_SignAttached demonstrates the attached-signature
+// variant: the returned byte string is `signature || message`. Use this
+// when you want a single self-contained payload rather than the
+// detached signature returned by Sign. There is no confidentiality —
+// the message bytes are embedded in the result in the clear.
+func ExampleMLDSA87_SignAttached() {
+	m, _ := mldsa87.New()
+	defer m.Zeroize()
+
+	ctx := []byte("example-context")
+	message := []byte("example transaction payload")
+
+	// SignAttached returns signature || message in a single buffer.
+	signed, err := m.SignAttached(ctx, message)
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+
+	fmt.Printf("Signed length: %d (signature: %d + message: %d)\n",
+		len(signed), mldsa87.CRYPTO_BYTES, len(message))
+	// Output: Signed length: 4654 (signature: 4627 + message: 27)
+}
+
+// ExampleOpen demonstrates verifying an attached-signature byte string
+// (produced by SignAttached) and recovering the plaintext message.
+func ExampleOpen() {
+	m, _ := mldsa87.New()
+	defer m.Zeroize()
+
+	ctx := []byte("open-context")
+	original := []byte("example transaction payload")
+	signed, _ := m.SignAttached(ctx, original)
+
+	// Open verifies and returns the recovered message
+	pk := m.GetPK()
+	message, err := mldsa87.Open(ctx, signed, &pk)
+	if err != nil {
+		fmt.Println("Verification failed:", err)
+		return
+	}
+
+	fmt.Println("Recovered:", string(message))
+	// Output: Recovered: example transaction payload
+}

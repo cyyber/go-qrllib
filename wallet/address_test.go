@@ -5,12 +5,12 @@ import (
 
 	"github.com/theQRL/go-qrllib/wallet/common/descriptor"
 	"github.com/theQRL/go-qrllib/wallet/common/wallettype"
-	"github.com/theQRL/go-qrllib/wallet/ml_dsa_87"
+	"github.com/theQRL/go-qrllib/wallet/mldsa87"
 	"github.com/theQRL/go-qrllib/wallet/sphincsplus_256s"
 )
 
 func TestValidatePKAndDescriptor_MLDSA87(t *testing.T) {
-	wallet, err := ml_dsa_87.NewWallet()
+	wallet, err := mldsa87.NewWallet()
 	if err != nil {
 		t.Fatalf("failed to create wallet: %v", err)
 	}
@@ -40,7 +40,7 @@ func TestValidatePKAndDescriptor_RejectsSPHINCS(t *testing.T) {
 
 func TestValidatePKAndDescriptor_InvalidDescriptor(t *testing.T) {
 	invalidDesc := descriptor.Descriptor{255, 0, 0}
-	pk := make([]byte, ml_dsa_87.PKSize)
+	pk := make([]byte, mldsa87.PKSize)
 
 	err := validatePKAndDescriptor(pk, invalidDesc)
 	if err == nil {
@@ -81,7 +81,7 @@ func TestValidatePKAndDescriptor_UnknownWalletType(t *testing.T) {
 }
 
 func TestGetAddressFromPKAndDescriptor_MLDSA87(t *testing.T) {
-	wallet, err := ml_dsa_87.NewWallet()
+	wallet, err := mldsa87.NewWallet()
 	if err != nil {
 		t.Fatalf("failed to create wallet: %v", err)
 	}
@@ -127,7 +127,7 @@ func TestGetAddressFromPKAndDescriptor_InvalidPK(t *testing.T) {
 
 func TestGetAddressFromPKAndDescriptor_InvalidDescriptor(t *testing.T) {
 	invalidDesc := descriptor.Descriptor{255, 0, 0}
-	pk := make([]byte, ml_dsa_87.PKSize)
+	pk := make([]byte, mldsa87.PKSize)
 
 	_, err := GetAddressFromPKAndDescriptor(pk, invalidDesc)
 	if err == nil {
@@ -136,7 +136,7 @@ func TestGetAddressFromPKAndDescriptor_InvalidDescriptor(t *testing.T) {
 }
 
 func TestGetAddressFromPKAndDescriptor_CrossAlgorithm(t *testing.T) {
-	mlWallet, _ := ml_dsa_87.NewWallet()
+	mlWallet, _ := mldsa87.NewWallet()
 	sphincsWallet, _ := sphincsplus_256s.NewWallet()
 
 	mlPK := mlWallet.GetPK()

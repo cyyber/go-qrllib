@@ -1,7 +1,7 @@
 package mlkem1024
 
 // Fuzz targets for ML-KEM-1024, matching the entry-point + metamorphic style of
-// the ML-DSA-87 fuzz suite (crypto/ml_dsa_87/*_fuzz_test.go). A KEM's attacker
+// the ML-DSA-87 fuzz suite (crypto/mldsa87/*_fuzz_test.go). A KEM's attacker
 // surface differs from a signature's: the ciphertext (and the encapsulation
 // key) are attacker-controlled, so these targets exercise:
 //

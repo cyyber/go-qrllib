@@ -45,7 +45,7 @@ Semantic release uses the **Conventional Commits** specification to determine ve
 #### Patch Release (1.0.0 → 1.0.1)
 
 ```
-fix: resolve nil pointer in ml_dsa_87 signature verification
+fix: resolve nil pointer in mldsa87 signature verification
 
 The cryptoSignVerify function was not properly handling nil public keys,
 causing a panic. This change adds proper validation.
@@ -118,7 +118,7 @@ it up).
 ### ML-DSA-87 signing is now hedged by default
 
 Public ML-DSA-87 signing — `MLDSA87.Sign`, `MLDSA87.SignAttached`,
-`wallet/ml_dsa_87.Wallet.Sign`, and `crypto.Signer`-style
+`wallet/mldsa87.Wallet.Sign`, and `crypto.Signer`-style
 `CryptoSigner.Sign` — is now **always hedged** as per FIPS 204 (the
 recommended mode). Each call mixes fresh `crypto/rand` randomness into
 the per-signature `RND_BYTES` value, so two calls with the same

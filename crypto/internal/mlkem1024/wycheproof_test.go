@@ -4,7 +4,7 @@ package mlkem1024
 
 // Wycheproof / CCTV ML-KEM-1024 vector verification.
 //
-// This mirrors the ML-DSA-87 harness in crypto/ml_dsa_87/wycheproof_test.go.
+// This mirrors the ML-DSA-87 harness in crypto/mldsa87/wycheproof_test.go.
 // Vectors are consumed directly from upstream at CI time (never vendored):
 //
 //   - C2SP/wycheproof  testvectors_v1/mlkem_1024_{keygen_seed,encaps,test}_test.json
